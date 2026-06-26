@@ -1,0 +1,34 @@
+identity:
+  name: destroy_sandbox
+  author: daytonaio
+  label:
+    en_US: Destroy Sandbox
+    zh_Hans: Destroy Sandbox
+    ja_JP: Destroy Sandbox
+    pt_BR: Destroy Sandbox
+description:
+  human:
+    en_US: Stop and permanently delete a Daytona sandbox and all its data.
+    zh_Hans: Stop and permanently delete a Daytona sandbox and all its data.
+    ja_JP: Stop and permanently delete a Daytona sandbox and all its data.
+    pt_BR: Stop and permanently delete a Daytona sandbox and all its data.
+  llm: Permanently destroy a Daytona sandbox by its ID. This stops the sandbox and deletes all associated data. Use this to clean up sandboxes that are no longer needed.
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox to destroy.
+      zh_Hans: The ID of the sandbox to destroy.
+      ja_JP: The ID of the sandbox to destroy.
+      pt_BR: The ID of the sandbox to destroy.
+    llm_description: The ID of the Daytona sandbox to permanently destroy.
+    form: llm
+extra:
+  python:
+    source: tools/destroy_sandbox.py

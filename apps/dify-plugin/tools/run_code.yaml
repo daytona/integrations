@@ -1,0 +1,66 @@
+identity:
+  name: run_code
+  author: daytonaio
+  label:
+    en_US: Run Code
+    zh_Hans: Run Code
+    ja_JP: Run Code
+    pt_BR: Run Code
+description:
+  human:
+    en_US: Run a snippet of code in a Daytona sandbox and return the output.
+    zh_Hans: Run a snippet of code in a Daytona sandbox and return the output.
+    ja_JP: Run a snippet of code in a Daytona sandbox and return the output.
+    pt_BR: Run a snippet of code in a Daytona sandbox and return the output.
+  llm: Execute a code snippet in a Daytona sandbox using its built-in language runtime. Supports Python, TypeScript, and JavaScript. If no sandbox_id is provided, a new ephemeral sandbox is created with the specified language and destroyed afterward. If a sandbox_id is provided, the language parameter is ignored (the sandbox uses its own configured language). For larger or multi-file scripts, upload them with upload_file and execute via run_command. Returns the combined output (stdout merged with stderr) and the exit code.
+parameters:
+  - name: code
+    type: string
+    required: true
+    label:
+      en_US: Code
+      zh_Hans: Code
+      ja_JP: Code
+      pt_BR: Code
+    human_description:
+      en_US: The code to execute in the sandbox.
+      zh_Hans: The code to execute in the sandbox.
+      ja_JP: The code to execute in the sandbox.
+      pt_BR: The code to execute in the sandbox.
+    llm_description: The source code to execute in the Daytona sandbox.
+    form: llm
+  - name: language
+    type: string
+    required: false
+    label:
+      en_US: Language
+      zh_Hans: Language
+      ja_JP: Language
+      pt_BR: Language
+    human_description:
+      en_US: Language for the code. Options are python, typescript, or javascript. Defaults to python. Only applies when creating a new ephemeral sandbox; ignored when sandbox_id is provided.
+      zh_Hans: Language for the code. Options are python, typescript, or javascript. Defaults to python. Only applies when creating a new ephemeral sandbox; ignored when sandbox_id is provided.
+      ja_JP: Language for the code. Options are python, typescript, or javascript. Defaults to python. Only applies when creating a new ephemeral sandbox; ignored when sandbox_id is provided.
+      pt_BR: Language for the code. Options are python, typescript, or javascript. Defaults to python. Only applies when creating a new ephemeral sandbox; ignored when sandbox_id is provided.
+    llm_description: 'Language of the code, used to create a new ephemeral sandbox. Must be one of: "python", "typescript", or "javascript". Defaults to "python". Ignored when sandbox_id is provided (the existing sandbox uses its own configured language).'
+    form: llm
+    default: python
+  - name: sandbox_id
+    type: string
+    required: false
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+      zh_Hans: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+      ja_JP: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+      pt_BR: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+    llm_description: The ID of an existing Daytona sandbox. If not provided, a new ephemeral sandbox is created, used, and destroyed automatically.
+    form: llm
+    default: ""
+extra:
+  python:
+    source: tools/run_code.py

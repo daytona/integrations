@@ -1,0 +1,50 @@
+identity:
+  name: run_command
+  author: daytonaio
+  label:
+    en_US: Run Command
+    zh_Hans: Run Command
+    ja_JP: Run Command
+    pt_BR: Run Command
+description:
+  human:
+    en_US: Run a shell command in a Daytona sandbox and return the output.
+    zh_Hans: Run a shell command in a Daytona sandbox and return the output.
+    ja_JP: Run a shell command in a Daytona sandbox and return the output.
+    pt_BR: Run a shell command in a Daytona sandbox and return the output.
+  llm: Execute a shell command in a Daytona sandbox. Useful for installing packages, running scripts, file operations, and any Linux command. If no sandbox_id is provided, a new ephemeral sandbox is created automatically. Returns stdout, stderr, and exit code.
+parameters:
+  - name: command
+    type: string
+    required: true
+    label:
+      en_US: Command
+      zh_Hans: Command
+      ja_JP: Command
+      pt_BR: Command
+    human_description:
+      en_US: The shell command to execute in the sandbox.
+      zh_Hans: The shell command to execute in the sandbox.
+      ja_JP: The shell command to execute in the sandbox.
+      pt_BR: The shell command to execute in the sandbox.
+    llm_description: The shell command to execute in the Daytona sandbox. This runs in a standard Linux environment.
+    form: llm
+  - name: sandbox_id
+    type: string
+    required: false
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+      zh_Hans: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+      ja_JP: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+      pt_BR: The ID of an existing sandbox. If not provided, a new sandbox will be created and destroyed after execution.
+    llm_description: The ID of an existing Daytona sandbox. If not provided, a new ephemeral sandbox is created, used, and destroyed automatically.
+    form: llm
+    default: ""
+extra:
+  python:
+    source: tools/run_command.py
