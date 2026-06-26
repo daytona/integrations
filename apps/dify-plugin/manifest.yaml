@@ -1,0 +1,33 @@
+version: 0.0.1
+type: plugin
+author: daytonaio
+name: daytona
+label:
+  en_US: Daytona
+  zh_Hans: Daytona
+  ja_JP: Daytona
+  pt_BR: Daytona
+description:
+  en_US: Tool for running code securely in Daytona sandboxes.
+  zh_Hans: Tool for running code securely in Daytona sandboxes.
+  ja_JP: Tool for running code securely in Daytona sandboxes.
+  pt_BR: Tool for running code securely in Daytona sandboxes.
+icon: icon.png
+resource:
+  memory: 268435456
+  permission: {}
+plugins:
+  tools:
+    - provider/daytona.yaml
+meta:
+  version: 0.0.1
+  arch:
+    - amd64
+    - arm64
+  runner:
+    language: python
+    version: "3.12"
+    entrypoint: main
+created_at: 2025-04-07T00:00:00.000000Z
+privacy: PRIVACY.md
+verified: false

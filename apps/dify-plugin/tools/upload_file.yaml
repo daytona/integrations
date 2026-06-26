@@ -1,0 +1,64 @@
+identity:
+  name: upload_file
+  author: daytonaio
+  label:
+    en_US: Upload File
+    zh_Hans: Upload File
+    ja_JP: Upload File
+    pt_BR: Upload File
+description:
+  human:
+    en_US: Upload a file from Dify into a Daytona sandbox at a specified path.
+    zh_Hans: Upload a file from Dify into a Daytona sandbox at a specified path.
+    ja_JP: Upload a file from Dify into a Daytona sandbox at a specified path.
+    pt_BR: Upload a file from Dify into a Daytona sandbox at a specified path.
+  llm: Upload a file (e.g. a CSV, dataset, image, or script) into an existing Daytona sandbox so subsequent run_code or run_command calls can use it. Requires a sandbox_id.
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of an existing sandbox to upload the file into.
+      zh_Hans: The ID of an existing sandbox to upload the file into.
+      ja_JP: The ID of an existing sandbox to upload the file into.
+      pt_BR: The ID of an existing sandbox to upload the file into.
+    llm_description: The ID of an existing Daytona sandbox to upload the file into. Use create_sandbox first if you don't have one.
+    form: llm
+  - name: file
+    type: file
+    required: true
+    label:
+      en_US: File
+      zh_Hans: File
+      ja_JP: File
+      pt_BR: File
+    human_description:
+      en_US: The file to upload to the sandbox.
+      zh_Hans: The file to upload to the sandbox.
+      ja_JP: The file to upload to the sandbox.
+      pt_BR: The file to upload to the sandbox.
+    llm_description: The file to upload to the sandbox.
+    form: llm
+  - name: remote_path
+    type: string
+    required: true
+    label:
+      en_US: Remote Path
+      zh_Hans: Remote Path
+      ja_JP: Remote Path
+      pt_BR: Remote Path
+    human_description:
+      en_US: 'Absolute destination path inside the sandbox (e.g. /tmp/data.csv or /home/daytona/file.txt).'
+      zh_Hans: 'Absolute destination path inside the sandbox (e.g. /tmp/data.csv or /home/daytona/file.txt).'
+      ja_JP: 'Absolute destination path inside the sandbox (e.g. /tmp/data.csv or /home/daytona/file.txt).'
+      pt_BR: 'Absolute destination path inside the sandbox (e.g. /tmp/data.csv or /home/daytona/file.txt).'
+    llm_description: 'Absolute destination path inside the sandbox where the file will be written (e.g. "/tmp/data.csv", "/home/daytona/script.py").'
+    form: llm
+extra:
+  python:
+    source: tools/upload_file.py

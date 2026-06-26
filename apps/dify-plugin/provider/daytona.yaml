@@ -1,0 +1,63 @@
+identity:
+  author: daytonaio
+  name: daytona
+  label:
+    en_US: Daytona
+    zh_Hans: Daytona
+    ja_JP: Daytona
+    pt_BR: Daytona
+  description:
+    en_US: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
+    zh_Hans: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
+    ja_JP: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
+    pt_BR: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
+  icon: icon.png
+credentials_for_provider:
+  api_key:
+    description:
+      en_US: API Key for Daytona
+      zh_Hans: API Key for Daytona
+      ja_JP: API Key for Daytona
+      pt_BR: API Key for Daytona
+    help:
+      en_US: Get your API key from the Daytona Dashboard at app.daytona.io/dashboard/keys
+      zh_Hans: Get your API key from the Daytona Dashboard at app.daytona.io/dashboard/keys
+      ja_JP: Get your API key from the Daytona Dashboard at app.daytona.io/dashboard/keys
+      pt_BR: Get your API key from the Daytona Dashboard at app.daytona.io/dashboard/keys
+    label:
+      en_US: API Key
+      zh_Hans: API Key
+      ja_JP: API Key
+      pt_BR: API Key
+    required: true
+    type: secret-input
+    url: https://app.daytona.io/dashboard/keys
+  api_url:
+    description:
+      en_US: Daytona API URL (optional, defaults to https://app.daytona.io/api)
+      zh_Hans: Daytona API URL (optional, defaults to https://app.daytona.io/api)
+      ja_JP: Daytona API URL (optional, defaults to https://app.daytona.io/api)
+      pt_BR: Daytona API URL (optional, defaults to https://app.daytona.io/api)
+    help:
+      en_US: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
+      zh_Hans: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
+      ja_JP: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
+      pt_BR: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
+    label:
+      en_US: API URL
+      zh_Hans: API URL
+      ja_JP: API URL
+      pt_BR: API URL
+    required: false
+    type: text-input
+tools:
+  - tools/create_sandbox.yaml
+  - tools/run_code.yaml
+  - tools/run_command.yaml
+  - tools/upload_file.yaml
+  - tools/download_file.yaml
+  - tools/get_preview_url.yaml
+  - tools/destroy_sandbox.yaml
+extra:
+  python:
+    source: provider/daytona.py

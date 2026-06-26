@@ -1,0 +1,17 @@
+[project]
+name = "dify-daytona"
+version = "0.1.0"
+description = "Dify plugin for Daytona sandbox infrastructure"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+
+# uv pip compile pyproject.toml -o ./requirements.txt
+dependencies = [
+    "dify_plugin>=0.3.0,<0.6.0",
+    "daytona>=0.1.0",
+]
+
+# uv run black . -C -l 100 && uv run ruff check --fix
+[dependency-groups]
+dev = []

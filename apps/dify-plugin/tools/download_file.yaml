@@ -1,0 +1,49 @@
+identity:
+  name: download_file
+  author: daytonaio
+  label:
+    en_US: Download File
+    zh_Hans: Download File
+    ja_JP: Download File
+    pt_BR: Download File
+description:
+  human:
+    en_US: Download a file from a Daytona sandbox into Dify.
+    zh_Hans: Download a file from a Daytona sandbox into Dify.
+    ja_JP: Download a file from a Daytona sandbox into Dify.
+    pt_BR: Download a file from a Daytona sandbox into Dify.
+  llm: Download a file from an existing Daytona sandbox. Returns the file as a Dify blob (so the user can preview or download it) along with metadata. Useful for retrieving generated charts, processed data, logs, or any file the sandbox produced.
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox to download the file from.
+      zh_Hans: The ID of the sandbox to download the file from.
+      ja_JP: The ID of the sandbox to download the file from.
+      pt_BR: The ID of the sandbox to download the file from.
+    llm_description: The ID of the Daytona sandbox containing the file to download.
+    form: llm
+  - name: remote_path
+    type: string
+    required: true
+    label:
+      en_US: Remote Path
+      zh_Hans: Remote Path
+      ja_JP: Remote Path
+      pt_BR: Remote Path
+    human_description:
+      en_US: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/output.csv).'
+      zh_Hans: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/output.csv).'
+      ja_JP: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/output.csv).'
+      pt_BR: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/output.csv).'
+    llm_description: 'Absolute path of the file inside the sandbox to download (e.g. "/home/daytona/output.csv", "/tmp/result.png").'
+    form: llm
+extra:
+  python:
+    source: tools/download_file.py

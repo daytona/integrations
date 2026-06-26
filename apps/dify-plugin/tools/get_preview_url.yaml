@@ -1,0 +1,49 @@
+identity:
+  name: get_preview_url
+  author: daytonaio
+  label:
+    en_US: Get Preview URL
+    zh_Hans: Get Preview URL
+    ja_JP: Get Preview URL
+    pt_BR: Get Preview URL
+description:
+  human:
+    en_US: Get a public URL that previews a service (web app, API, dashboard) running on a port inside a Daytona sandbox.
+    zh_Hans: Get a public URL that previews a service (web app, API, dashboard) running on a port inside a Daytona sandbox.
+    ja_JP: Get a public URL that previews a service (web app, API, dashboard) running on a port inside a Daytona sandbox.
+    pt_BR: Get a public URL that previews a service (web app, API, dashboard) running on a port inside a Daytona sandbox.
+  llm: 'Get the HTTPS URL that exposes a port from inside a Daytona sandbox. Use this after you start a web server (Flask, Streamlit, Next.js, etc.) so the user can open the running app in their browser. The URL has no expiry and lives as long as the sandbox runs. For private sandboxes, the returned token must be sent in the x-daytona-preview-token header; for public sandboxes the URL works on its own.'
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox running the service.
+      zh_Hans: The ID of the sandbox running the service.
+      ja_JP: The ID of the sandbox running the service.
+      pt_BR: The ID of the sandbox running the service.
+    llm_description: The ID of the Daytona sandbox running the service you want to expose.
+    form: llm
+  - name: port
+    type: number
+    required: true
+    label:
+      en_US: Port
+      zh_Hans: Port
+      ja_JP: Port
+      pt_BR: Port
+    human_description:
+      en_US: The port number inside the sandbox where the service is listening (e.g. 3000, 5000, 8080).
+      zh_Hans: The port number inside the sandbox where the service is listening (e.g. 3000, 5000, 8080).
+      ja_JP: The port number inside the sandbox where the service is listening (e.g. 3000, 5000, 8080).
+      pt_BR: The port number inside the sandbox where the service is listening (e.g. 3000, 5000, 8080).
+    llm_description: 'The port number inside the sandbox where the service is listening (e.g. 3000 for Next.js, 5000 for Flask, 8080 for generic HTTP, 8501 for Streamlit). Range 3000-9999.'
+    form: llm
+extra:
+  python:
+    source: tools/get_preview_url.py

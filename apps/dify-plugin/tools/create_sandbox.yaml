@@ -1,0 +1,160 @@
+identity:
+  name: create_sandbox
+  author: daytonaio
+  label:
+    en_US: Create Sandbox
+    zh_Hans: Create Sandbox
+    ja_JP: Create Sandbox
+    pt_BR: Create Sandbox
+description:
+  human:
+    en_US: 'Create a new Daytona sandbox: an isolated environment for running code and commands securely.'
+    zh_Hans: 'Create a new Daytona sandbox: an isolated environment for running code and commands securely.'
+    ja_JP: 'Create a new Daytona sandbox: an isolated environment for running code and commands securely.'
+    pt_BR: 'Create a new Daytona sandbox: an isolated environment for running code and commands securely.'
+  llm: Create a new Daytona sandbox. Returns the sandbox ID which can be used with run_code, run_command, and destroy_sandbox tools. By default it uses Daytona's default snapshot. You can customize the sandbox via snapshot, image, env_vars, resources, or name.
+parameters:
+  - name: name
+    type: string
+    required: false
+    label:
+      en_US: Name
+      zh_Hans: Name
+      ja_JP: Name
+      pt_BR: Name
+    human_description:
+      en_US: Optional human-readable name for the sandbox. If omitted, the name defaults to the sandbox ID.
+      zh_Hans: Optional human-readable name for the sandbox. If omitted, the name defaults to the sandbox ID.
+      ja_JP: Optional human-readable name for the sandbox. If omitted, the name defaults to the sandbox ID.
+      pt_BR: Optional human-readable name for the sandbox. If omitted, the name defaults to the sandbox ID.
+    llm_description: Optional human-readable name for the sandbox. If omitted, the name defaults to the sandbox ID.
+    form: llm
+    default: ""
+  - name: snapshot
+    type: string
+    required: false
+    label:
+      en_US: Snapshot
+      zh_Hans: Snapshot
+      ja_JP: Snapshot
+      pt_BR: Snapshot
+    human_description:
+      en_US: Name of a pre-built Daytona snapshot to use as the sandbox base. Takes priority over image. Uses Daytona default if neither snapshot nor image is provided.
+      zh_Hans: Name of a pre-built Daytona snapshot to use as the sandbox base. Takes priority over image. Uses Daytona default if neither snapshot nor image is provided.
+      ja_JP: Name of a pre-built Daytona snapshot to use as the sandbox base. Takes priority over image. Uses Daytona default if neither snapshot nor image is provided.
+      pt_BR: Name of a pre-built Daytona snapshot to use as the sandbox base. Takes priority over image. Uses Daytona default if neither snapshot nor image is provided.
+    llm_description: Name of a pre-built Daytona snapshot to use as the sandbox base. Takes priority over image. Uses Daytona default if neither snapshot nor image is provided.
+    form: llm
+    default: ""
+  - name: image
+    type: string
+    required: false
+    label:
+      en_US: Image
+      zh_Hans: Image
+      ja_JP: Image
+      pt_BR: Image
+    human_description:
+      en_US: Custom Docker image for the sandbox (e.g. "python:3.12-slim", "node:20"). Ignored when snapshot is also set. When using a custom image, you can also specify cpu, memory, and disk.
+      zh_Hans: Custom Docker image for the sandbox (e.g. "python:3.12-slim", "node:20"). Ignored when snapshot is also set. When using a custom image, you can also specify cpu, memory, and disk.
+      ja_JP: Custom Docker image for the sandbox (e.g. "python:3.12-slim", "node:20"). Ignored when snapshot is also set. When using a custom image, you can also specify cpu, memory, and disk.
+      pt_BR: Custom Docker image for the sandbox (e.g. "python:3.12-slim", "node:20"). Ignored when snapshot is also set. When using a custom image, you can also specify cpu, memory, and disk.
+    llm_description: Custom Docker image for the sandbox (e.g. "python:3.12-slim", "node:20"). Ignored when snapshot is also set.
+    form: llm
+    default: ""
+  - name: language
+    type: string
+    required: false
+    label:
+      en_US: Language
+      zh_Hans: Language
+      ja_JP: Language
+      pt_BR: Language
+    human_description:
+      en_US: Default programming language runtime for the sandbox (python, typescript, or javascript). Defaults to python.
+      zh_Hans: Default programming language runtime for the sandbox (python, typescript, or javascript). Defaults to python.
+      ja_JP: Default programming language runtime for the sandbox (python, typescript, or javascript). Defaults to python.
+      pt_BR: Default programming language runtime for the sandbox (python, typescript, or javascript). Defaults to python.
+    llm_description: Default programming language for code execution. Must be one of "python", "typescript", or "javascript". Defaults to "python".
+    form: llm
+    default: python
+  - name: env_vars
+    type: string
+    required: false
+    label:
+      en_US: Environment Variables (JSON)
+      zh_Hans: Environment Variables (JSON)
+      ja_JP: Environment Variables (JSON)
+      pt_BR: Environment Variables (JSON)
+    human_description:
+      en_US: 'Environment variables to set in the sandbox, as a JSON object string (e.g. {"API_KEY": "abc", "DEBUG": "true"}).'
+      zh_Hans: 'Environment variables to set in the sandbox, as a JSON object string (e.g. {"API_KEY": "abc", "DEBUG": "true"}).'
+      ja_JP: 'Environment variables to set in the sandbox, as a JSON object string (e.g. {"API_KEY": "abc", "DEBUG": "true"}).'
+      pt_BR: 'Environment variables to set in the sandbox, as a JSON object string (e.g. {"API_KEY": "abc", "DEBUG": "true"}).'
+    llm_description: 'Environment variables to set inside the sandbox, passed as a JSON object string. Example: {"DATABASE_URL": "postgres://...", "API_KEY": "..."}'
+    form: llm
+    default: ""
+  - name: cpu
+    type: number
+    required: false
+    label:
+      en_US: CPU (vCPU)
+      zh_Hans: CPU (vCPU)
+      ja_JP: CPU (vCPU)
+      pt_BR: CPU (vCPU)
+    human_description:
+      en_US: Number of vCPUs to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      zh_Hans: Number of vCPUs to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      ja_JP: Number of vCPUs to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      pt_BR: Number of vCPUs to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+    llm_description: Number of vCPUs to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+    form: llm
+  - name: memory
+    type: number
+    required: false
+    label:
+      en_US: Memory (GiB)
+      zh_Hans: Memory (GiB)
+      ja_JP: Memory (GiB)
+      pt_BR: Memory (GiB)
+    human_description:
+      en_US: Memory in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      zh_Hans: Memory in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      ja_JP: Memory in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      pt_BR: Memory in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+    llm_description: Memory in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+    form: llm
+  - name: disk
+    type: number
+    required: false
+    label:
+      en_US: Disk (GiB)
+      zh_Hans: Disk (GiB)
+      ja_JP: Disk (GiB)
+      pt_BR: Disk (GiB)
+    human_description:
+      en_US: Disk space in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      zh_Hans: Disk space in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      ja_JP: Disk space in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+      pt_BR: Disk space in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+    llm_description: Disk space in GiB to allocate. Only applied when using a custom image; ignored for snapshot-based sandboxes.
+    form: llm
+  - name: auto_stop_interval
+    type: number
+    required: false
+    label:
+      en_US: Auto-stop interval (minutes)
+      zh_Hans: Auto-stop interval (minutes)
+      ja_JP: Auto-stop interval (minutes)
+      pt_BR: Auto-stop interval (minutes)
+    human_description:
+      en_US: Minutes of inactivity before the sandbox auto-stops. Set to 0 to disable. Defaults to 15.
+      zh_Hans: Minutes of inactivity before the sandbox auto-stops. Set to 0 to disable. Defaults to 15.
+      ja_JP: Minutes of inactivity before the sandbox auto-stops. Set to 0 to disable. Defaults to 15.
+      pt_BR: Minutes of inactivity before the sandbox auto-stops. Set to 0 to disable. Defaults to 15.
+    llm_description: Minutes of inactivity before the sandbox auto-stops. Set to 0 to disable auto-stop. Defaults to 15.
+    form: llm
+    default: 15
+extra:
+  python:
+    source: tools/create_sandbox.py
