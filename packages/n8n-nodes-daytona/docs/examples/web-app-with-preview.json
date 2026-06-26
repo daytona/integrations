@@ -1,0 +1,119 @@
+{
+  "name": "Daytona — Run web app and return preview URL",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 320]
+    },
+    {
+      "parameters": {
+        "resource": "sandbox",
+        "operation": "create",
+        "snapshot": "",
+        "name": "n8n-web-app",
+        "ephemeral": false,
+        "waitUntilStarted": true,
+        "waitTimeoutSeconds": 90,
+        "additionalFields": {
+          "public": true,
+          "autoStopInterval": 30
+        }
+      },
+      "id": "22222222-2222-2222-2222-222222222222",
+      "name": "Create Sandbox",
+      "type": "@daytona/n8n-nodes-daytona.daytona",
+      "typeVersion": 1,
+      "position": [440, 320],
+      "credentials": {
+        "daytonaApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Daytona API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "code",
+        "operation": "runCommand",
+        "command": "cat > /tmp/server.py << 'EOF'\nfrom http.server import HTTPServer, BaseHTTPRequestHandler\n\nclass Handler(BaseHTTPRequestHandler):\n    def do_GET(self):\n        self.send_response(200)\n        self.send_header('Content-Type','text/html')\n        self.end_headers()\n        self.wfile.write(b'<h1>Hello from a Daytona sandbox!</h1>')\n\nHTTPServer(('0.0.0.0', 3000), Handler).serve_forever()\nEOF\nnohup python3 /tmp/server.py > /tmp/server.log 2>&1 &\nsleep 1\necho 'Server started on port 3000'",
+        "useEphemeralSandbox": false,
+        "sandboxId": "={{ $json.id }}",
+        "additionalFields": {
+          "timeout": 30
+        }
+      },
+      "id": "33333333-3333-3333-3333-333333333333",
+      "name": "Start Web Server",
+      "type": "@daytona/n8n-nodes-daytona.daytona",
+      "typeVersion": 1,
+      "position": [680, 320],
+      "credentials": {
+        "daytonaApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Daytona API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sandbox",
+        "operation": "getPreviewUrl",
+        "sandboxId": "={{ $('Create Sandbox').item.json.id }}",
+        "port": 3000,
+        "urlType": "signed",
+        "expiresInSeconds": 3600
+      },
+      "id": "44444444-4444-4444-4444-444444444444",
+      "name": "Get Preview URL",
+      "type": "@daytona/n8n-nodes-daytona.daytona",
+      "typeVersion": 1,
+      "position": [920, 320],
+      "credentials": {
+        "daytonaApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Daytona API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Web app preview URL\n\nAfter running, the **Get Preview URL** node returns a signed URL valid for 1 hour. Open `{{ $json.url }}` in a browser to see the running web server.\n\nThe sandbox auto-stops after 30 minutes of inactivity (configured on Create) so you don't need to clean it up manually for short demos.",
+        "height": 240,
+        "width": 360
+      },
+      "id": "55555555-5555-5555-5555-555555555555",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [440, 540]
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [[{ "node": "Create Sandbox", "type": "main", "index": 0 }]]
+    },
+    "Create Sandbox": {
+      "main": [[{ "node": "Start Web Server", "type": "main", "index": 0 }]]
+    },
+    "Start Web Server": {
+      "main": [[{ "node": "Get Preview URL", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "daytona-example",
+      "id": "daytona-example"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
