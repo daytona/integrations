@@ -1,0 +1,64 @@
+{
+  "name": "Daytona — Run Python in ephemeral sandbox",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 320]
+    },
+    {
+      "parameters": {
+        "resource": "code",
+        "operation": "runCode",
+        "code": "import platform\nimport sys\nprint(f\"Python {sys.version_info.major}.{sys.version_info.minor} on {platform.system()}\")\nprint(\"Hello from a Daytona sandbox!\")\n",
+        "language": "python",
+        "useEphemeralSandbox": true,
+        "snapshot": "",
+        "additionalFields": {
+          "waitTimeoutSeconds": 60,
+          "timeout": 30
+        }
+      },
+      "id": "22222222-2222-2222-2222-222222222222",
+      "name": "Run Python (Ephemeral)",
+      "type": "@daytona/n8n-nodes-daytona.daytona",
+      "typeVersion": 1,
+      "position": [520, 320],
+      "credentials": {
+        "daytonaApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Daytona API account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Run Python (Ephemeral)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "daytona-example",
+      "id": "daytona-example"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
