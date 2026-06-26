@@ -1,0 +1,45 @@
+# Enforces Conventional-Commit PR titles.
+#
+# WHY THIS MATTERS HERE: this repo squash-merges PRs, and the squash commit
+# takes the PR TITLE as its message. release-please reads that commit to decide
+# the version bump and changelog entry. A malformed title => a missed or wrong
+# release, so we block merges until the title is valid.
+#
+# Reminder: which package a commit releases is decided by the FILE PATHS it
+# touches, not by the (cosmetic) scope. Keep one PR focused on one package.
+
+name: pr-title-lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Allowed conventional-commit types (aligned with release-please).
+          # fix -> patch, feat -> minor, feat! / BREAKING CHANGE -> major.
+          types: |
+            feat
+            fix
+            perf
+            deps
+            revert
+            docs
+            chore
+            refactor
+            test
+            build
+            ci
+            style
+          # Scope is optional and purely cosmetic (path-based routing decides
+          # the package), so we don't force or enumerate scopes.
+          requireScope: false

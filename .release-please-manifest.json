@@ -1,0 +1,7 @@
+{
+  "packages/adk-plugin": "0.1.0",
+  "packages/langchain-data-analysis": "0.1.1",
+  "packages/n8n-nodes-daytona": "0.1.2",
+  "packages/pi-extension": "0.190.1",
+  "packages/opencode-plugin": "0.190.1"
+}

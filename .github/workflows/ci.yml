@@ -1,0 +1,196 @@
+# Path-filtered CI: only the package(s) touched by a PR are linted/tested.
+# Each job is bootstrap-safe — it skips quietly until that package actually
+# has its build manifest (so the scaffolding PR with empty folders stays green).
+
+name: ci
+
+on:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      adk: ${{ steps.filter.outputs.adk }}
+      langchain: ${{ steps.filter.outputs.langchain }}
+      n8n: ${{ steps.filter.outputs.n8n }}
+      pi: ${{ steps.filter.outputs.pi }}
+      opencode: ${{ steps.filter.outputs.opencode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            adk:
+              - 'packages/adk-plugin/**'
+            langchain:
+              - 'packages/langchain-data-analysis/**'
+            n8n:
+              - 'packages/n8n-nodes-daytona/**'
+            pi:
+              - 'packages/pi-extension/**'
+            opencode:
+              - 'packages/opencode-plugin/**'
+
+  adk:
+    needs: changes
+    if: needs.changes.outputs.adk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/adk-plugin/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/adk-plugin
+        run: python -m pip install -e ".[dev]"
+      - name: Lint (ruff)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/adk-plugin
+        run: ruff check .
+      - name: Test (pytest)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/adk-plugin
+        run: pytest
+
+  langchain:
+    needs: changes
+    if: needs.changes.outputs.langchain == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/langchain-data-analysis/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install Poetry
+        if: steps.guard.outputs.ready == 'true'
+        run: pipx install poetry
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/langchain-data-analysis
+        run: poetry install --with test,lint
+      - name: Lint (ruff)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/langchain-data-analysis
+        run: poetry run ruff check .
+      - name: Test (pytest)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/langchain-data-analysis
+        run: poetry run pytest
+
+  n8n:
+    needs: changes
+    if: needs.changes.outputs.n8n == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/n8n-nodes-daytona/package.json && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/n8n-nodes-daytona
+        run: npm ci
+      - name: Lint
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/n8n-nodes-daytona
+        run: npm run lint
+      - name: Build
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/n8n-nodes-daytona
+        run: npm run build
+
+  pi:
+    needs: changes
+    if: needs.changes.outputs.pi == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/pi-extension/package.json && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/pi-extension
+        run: npm ci
+      - name: Typecheck
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/pi-extension
+        run: npm run typecheck --if-present
+      - name: Build
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/pi-extension
+        run: npm run build --if-present
+
+  opencode:
+    needs: changes
+    if: needs.changes.outputs.opencode == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/opencode-plugin/package.json && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/opencode-plugin
+        run: npm ci
+      - name: Typecheck
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/opencode-plugin
+        run: npm run typecheck --if-present
+      - name: Build
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/opencode-plugin
+        run: npm run build --if-present
+
+  # Single, stable status check to require in branch protection.
+  # It ALWAYS runs (if: always()) and fails only if a relevant job failed or
+  # was cancelled. A "skipped" job (a package this PR didn't touch) is fine —
+  # so requiring just this one check never wedges a PR, while still blocking
+  # merges when a touched package's lint/test/build fails.
+  ci-success:
+    name: ci-success
+    needs: [changes, adk, langchain, n8n, pi, opencode]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any needed job did not succeed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "One or more CI jobs failed or were cancelled."
+          exit 1
+      - name: All relevant checks passed
+        run: echo "OK"
