@@ -1,17 +1,19 @@
 {
   "name": "@daytona/pi",
-  "version": "0.0.0-dev",
+  "version": "0.190.1",
   "description": "Pi coding agent extension that runs all tool calls inside a remote, ephemeral Daytona sandbox while the agent runs locally",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/daytonaio/daytona.git"
+    "url": "git+https://github.com/daytona/integrations.git",
+    "directory": "packages/pi-extension"
   },
   "author": "Daytona Platforms Inc.",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/daytonaio/daytona/issues"
+    "url": "https://github.com/daytona/integrations/issues"
   },
+  "homepage": "https://github.com/daytona/integrations/tree/main/packages/pi-extension#readme",
   "keywords": [
     "pi-package",
     "pi-extension",
@@ -45,6 +47,7 @@
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.79.0",
+    "@types/node": "^22",
     "typebox": "1.1.38",
     "typescript": "^5.6.0"
   }

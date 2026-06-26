@@ -1,7 +1,6 @@
 {
-  // Standalone on purpose (does not extend tsconfig.base.json): this is a jiti-loaded
-  // ESM extension using .ts-extension imports + noEmit, which conflicts with the base's
-  // commonjs/node-resolution/importHelpers build model.
+  // Standalone config: this is a jiti-loaded ESM extension using .ts-extension
+  // imports + noEmit, so it doesn't share a CommonJS/node-resolution build model.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -14,11 +13,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "baseUrl": "../..",
-    "paths": {
-      "@daytona/sdk": ["libs/sdk-typescript/src/index.ts"]
-    }
+    "resolveJsonModule": true
   },
   "include": ["index.ts", "src/**/*.ts"]
 }

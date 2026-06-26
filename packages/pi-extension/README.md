@@ -127,39 +127,22 @@ All network git operations (clone/push) run **inside the sandbox** through Dayto
 
 ## Development
 
-This extension is part of the Daytona monorepo.
+This package lives in the [`daytona/integrations`](https://github.com/daytona/integrations) monorepo under `packages/pi-extension`, and is self-contained — it has its own `package.json`, lockfile, and dependencies (no workspace tooling).
 
 ### Setup
 
-First, clone the Daytona monorepo:
-
 ```bash
-git clone https://github.com/daytonaio/daytona
-cd daytona
-```
-
-Install dependencies:
-
-```bash
-yarn install
+git clone https://github.com/daytona/integrations
+cd integrations/packages/pi-extension
+npm install
 ```
 
 ### Development and Testing
 
-To modify the extension, edit the source files in `libs/pi-extension`.
+To modify the extension, edit the source files in this package.
 
 > [!NOTE]
 > Because Pi loads extensions as TypeScript via [jiti](https://github.com/unjs/jiti), there is no build step — Pi runs the source directly.
-
-#### Install dependencies
-
-Install the extension's own dependencies once (needed for running it and for the tests):
-
-```bash
-cd libs/pi-extension && npm install
-```
-
-This is needed even after `yarn install` at the repo root, which doesn't make `@daytona/sdk` resolvable at runtime.
 
 #### Run from source
 
@@ -173,7 +156,7 @@ pi uninstall <source>          # e.g. npm:@daytona/pi — use the source shown b
 Install the local directory:
 
 ```bash
-pi install ./libs/pi-extension    # add --local to scope it to the current project instead of globally
+pi install .    # add --local to scope it to the current project instead of globally
 ```
 
 Run Pi:
@@ -187,33 +170,25 @@ Edits to the source take effect on the next run — no reinstall needed.
 Alternatively, load the source for a single run without installing:
 
 ```bash
-DAYTONA_API_KEY=dtn_... pi -e ./libs/pi-extension/index.ts --daytona
+DAYTONA_API_KEY=dtn_... pi -e ./index.ts --daytona
 ```
 
 #### Tests
 
 ```bash
-npx nx run pi-extension:type-check   # type-check (from the repo root; needs the monorepo installed)
-
-cd libs/pi-extension
+npm run typecheck                 # type-check (tsc --noEmit)
 npm run smoke                     # offline: load the extension and check it registers (no API key/network)
 npm run test:live                 # end-to-end against real Daytona (needs DAYTONA_API_KEY)
 ```
 
 ### Publishing
 
-Publish the TypeScript source to npm:
-
-```bash
-npx nx run pi-extension:publish
-```
-
-This will publish to npm with public access and use the version number from `package.json`.
+Releases are automated: merging this package's [release-please](https://github.com/googleapis/release-please) Release PR tags it and publishes the TypeScript source to npm (public, with provenance) from the repo's release workflow — there is no manual publish step.
 
 ## Project Structure
 
 ```
-libs/pi-extension/
+packages/pi-extension/
 ├── index.ts            # Extension entry point: flags, lifecycle, commands
 ├── src/                # Daytona-backed tool implementations
 │   ├── tools.ts        # Tool registration (sandbox-backed tools + preview_url)
@@ -227,7 +202,6 @@ libs/pi-extension/
 │   └── util.ts         # Small shared helpers
 ├── scripts/            # Offline smoke + live integration tests
 ├── package.json        # Package metadata (includes the "pi" extensions field)
-├── project.json        # Nx project configuration
 ├── tsconfig.json       # TypeScript config
 └── README.md
 ```
