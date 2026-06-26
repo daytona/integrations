@@ -78,7 +78,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          # Pinned: obstore (pulled via daytona ^0.113.2) ships no wheels for the
+          # newest Python; 3.12 has wheels so `poetry install` succeeds.
+          python-version: "3.12"
       - name: Detect package
         id: guard
         run: |
