@@ -117,26 +117,19 @@ The plugin uses [XDG Base Directory](https://specifications.freedesktop.org/base
 
 ## Development
 
-This plugin is part of the Daytona monorepo.
+This package lives in the [`daytona/integrations`](https://github.com/daytona/integrations) monorepo under `packages/opencode-plugin`, and is self-contained — its own `package.json`, lockfile, and dependencies (no workspace tooling).
 
 ### Setup
 
-First, clone the Daytona monorepo:
-
 ```bash
-git clone https://github.com/daytonaio/daytona
-cd daytona
-```
-
-Install dependencies:
-
-```bash
-yarn install
+git clone https://github.com/daytona/integrations
+cd integrations/packages/opencode-plugin
+npm install
 ```
 
 ### Development and Testing
 
-To modify the plugin, edit the source code files in `libs/opencode-plugin/.opencode`.
+To modify the plugin, edit the source code files in `.opencode/plugin`.
 
 To test the OpenCode plugin, create a test project to run OpenCode in:
 
@@ -148,7 +141,7 @@ cd myproject
 Add a symlink from the project directory to the plugin source code:
 
 ```
-ln -s [ABSOLUTE_PATH_TO_DAYTONA]/libs/opencode-plugin/.opencode .opencode
+ln -s [ABSOLUTE_PATH_TO_REPO]/packages/opencode-plugin/.opencode .opencode
 ```
 
 Initialize git to enable file syncing:
@@ -170,13 +163,13 @@ Use the instructions from [Running OpenCode](#running-opencode) above to check t
 
 ### Building
 
-Build the plugin:
+Build the plugin — `tsc` compiles `.opencode/plugin/**/*.ts` to `.js` + `.d.ts` in place:
 
 ```bash
-npx nx run opencode-plugin:build
+npm run build
 ```
 
-This compiles the TypeScript source files in `.opencode/` to JavaScript in `dist/.opencode/`.
+The published package contains the compiled `.js`/`.d.ts`; the `.ts` sources are stripped by `.npmignore`.
 
 #### Test the built package
 
@@ -186,7 +179,7 @@ After building, create a test project and add a plugin file to load the built pl
 mkdir -p ~/myproject && cd ~/myproject
 mkdir -p .opencode/plugins
 cat > .opencode/plugins/daytona-local.js << 'EOF'
-module.exports = require('[ABSOLUTE_PATH_TO_DAYTONA]/dist/libs/opencode-plugin/.opencode/plugin')
+module.exports = require('[ABSOLUTE_PATH_TO_REPO]/packages/opencode-plugin/.opencode/plugin')
 EOF
 ```
 
@@ -199,37 +192,19 @@ opencode
 
 ### Publishing
 
-Log into npm:
-
-```bash
-npm login
-```
-
-Publish the compiled JavaScript package to npm:
-
-```bash
-npx nx run opencode-plugin:publish
-```
-
-This will publish to npm with public access and use the version number from `package.json`.
+Releases are automated: merging this package's [release-please](https://github.com/googleapis/release-please) Release PR builds it and publishes the compiled package to npm (public, with provenance) from the repo's release workflow — there is no manual publish step.
 
 ## Project Structure
 
 ```
-libs/opencode-plugin/
-├── .opencode/                     # Source TypeScript files
-│   ├── plugin/
-│   │   ├── daytona/               # Main Daytona integration
-│   │   │   └── ...
-│   │   └── index.ts               # Plugin entry point
-├── dist/                          # Build output
-│   └── .opencode/                 # Compiled JavaScript files
+packages/opencode-plugin/
+├── .opencode/plugin/              # Plugin source (TypeScript)
+│   ├── daytona/                   # Main Daytona integration
+│   └── index.ts                   # Plugin entry point (compiled to .js in place)
 ├── .gitignore
 ├── .npmignore
-├── package.json                   # Package metadata (includes main/types)
-├── project.json                   # Nx build configuration
+├── package.json                   # Package metadata (main/types + build script)
 ├── tsconfig.json                  # TypeScript config
-├── tsconfig.lib.json              # TypeScript config for library build
 └── README.md
 ```
 

@@ -4,3 +4,8 @@ node_modules
 .DS_Store
 .env
 .env.*
+
+# Compiled output — tsc emits .js/.d.ts/.js.map in place; published, never committed
+.opencode/**/*.js
+.opencode/**/*.d.ts
+.opencode/**/*.js.map

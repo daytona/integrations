@@ -4,7 +4,6 @@
 
 # Build artifacts
 tsconfig.json
-project.json
 
 # Development files
 .gitignore
