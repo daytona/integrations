@@ -1,0 +1,41 @@
+{
+  "name": "@daytona/opencode",
+  "version": "0.190.1",
+  "description": "OpenCode plugin that automatically runs all sessions in Daytona sandboxes for isolated, reproducible development environments",
+  "main": "./.opencode/plugin/index.js",
+  "types": "./.opencode/plugin/index.d.ts",
+  "files": [
+    ".opencode"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daytona/integrations.git",
+    "directory": "packages/opencode-plugin"
+  },
+  "author": "Daytona Platforms Inc.",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/daytona/integrations/issues"
+  },
+  "homepage": "https://github.com/daytona/integrations/tree/main/packages/opencode-plugin#readme",
+  "keywords": [
+    "daytona",
+    "opencode",
+    "plugin"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@daytona/sdk": "^0.163.0",
+    "@opencode-ai/plugin": "1.1.59",
+    "xdg-basedir": "^5.1.0",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.6.0"
+  }
+}

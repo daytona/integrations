@@ -1,0 +1,23 @@
+{
+  // Standalone build config. Was Nx (extended ../../tsconfig.base.json via a
+  // tsconfig.lib.json + project references). Compiles the plugin's .ts in place to
+  // .js + .d.ts — package.json main/types point at .opencode/plugin/index.js / .d.ts,
+  // and .npmignore strips the .ts sources from the published tarball.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2022", "dom"],
+    "types": ["node"],
+    "declaration": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [".opencode/plugin/**/*.ts"],
+  "exclude": [".opencode/plugin/**/*.spec.ts", ".opencode/plugin/**/*.test.ts"]
+}
