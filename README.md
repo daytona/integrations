@@ -4,7 +4,7 @@ Community and partner integrations, plugins, and tools for [Daytona](https://www
 
 ## Packages
 
-Published packages live in [`packages/`](packages/):
+Packages published to **npm / PyPI** live in [`packages/`](packages/):
 
 | Package | Published as |
 |---|---|
@@ -16,7 +16,7 @@ Published packages live in [`packages/`](packages/):
 
 ## Apps
 
-Runnable, non-published projects live in [`apps/`](apps/):
+Standalone projects **not published to a package registry** (npm / PyPI) live in [`apps/`](apps/):
 
 | App | Description |
 |---|---|
