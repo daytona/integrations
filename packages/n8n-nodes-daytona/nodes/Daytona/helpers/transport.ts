@@ -161,7 +161,9 @@ export async function waitForSandboxState(
 	options: WaitForSandboxStateOptions,
 ): Promise<Sandbox> {
 	const targets = new Set<SandboxState>(options.targetStates);
-	const failures = new Set<SandboxState>(options.failOnStates ?? ['error']);
+	// `build_failed` is terminal: without it, a sandbox whose snapshot/image build
+	// fails would poll until timeout instead of erroring out immediately.
+	const failures = new Set<SandboxState>(options.failOnStates ?? ['error', 'build_failed']);
 	const timeoutMs = options.timeoutMs ?? SANDBOX_READY_POLL.timeoutMs;
 	const intervalMs = options.intervalMs ?? SANDBOX_READY_POLL.intervalMs;
 	const start = Date.now();
