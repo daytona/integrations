@@ -27,8 +27,13 @@ export async function execute(
 ): Promise<INodeExecutionData[]> {
 	const sandboxId = (this.getNodeParameter('sandboxId', itemIndex) as string).trim();
 
-	await daytonaApiRequest.call(this, 'DELETE', API_ENDPOINTS.sandbox.delete(sandboxId));
-	invalidateToolboxCache(this, sandboxId);
+	try {
+		await daytonaApiRequest.call(this, 'DELETE', API_ENDPOINTS.sandbox.delete(sandboxId));
+	} finally {
+		// Always drop this sandbox's cached toolbox URL, even if the DELETE throws,
+		// so a stale entry can't linger in this execution context.
+		invalidateToolboxCache(this, sandboxId);
+	}
 
 	return [
 		{

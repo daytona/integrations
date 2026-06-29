@@ -58,16 +58,25 @@ export async function execute(
 
 	let sandbox: Sandbox;
 	if (waitUntilStopped) {
+		// `destroyed` is a valid terminal outcome here: ephemeral sandboxes
+		// (autoDeleteInterval=0) are removed on stop, so treat it as success
+		// instead of waiting for `stopped` until the timeout elapses.
 		sandbox = await waitForSandboxState.call(this, sandboxId, {
-			targetStates: ['stopped', 'archived'],
+			targetStates: ['stopped', 'archived', 'destroyed'],
 			timeoutMs: waitTimeoutSeconds * 1000,
 		});
 	} else {
-		sandbox = (await daytonaApiRequest.call(
-			this,
-			'GET',
-			API_ENDPOINTS.sandbox.get(sandboxId),
-		)) as Sandbox;
+		try {
+			sandbox = (await daytonaApiRequest.call(
+				this,
+				'GET',
+				API_ENDPOINTS.sandbox.get(sandboxId),
+			)) as Sandbox;
+		} catch {
+			// The stop succeeded, but an ephemeral sandbox may already be gone, so
+			// the follow-up GET can 404. Report success without the fetched object.
+			sandbox = { id: sandboxId, state: 'destroyed' } as Sandbox;
+		}
 	}
 
 	return [
