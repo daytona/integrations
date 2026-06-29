@@ -15,7 +15,9 @@ export async function getSnapshots(
 	let page = 1;
 
 	// Page through results so snapshots beyond the first page still appear in the
-	// picker (previously capped at a single 100-item page).
+	// picker. The list endpoint returns `total`/`totalPages`, so we stop on those
+	// rather than assuming a fixed server page size (the API documents no hard cap
+	// on `limit` and only a default of 10).
 	while (items.length < MAX_SNAPSHOTS) {
 		const response = (await daytonaApiRequest.call(
 			this,
@@ -28,9 +30,14 @@ export async function getSnapshots(
 		const batch = Array.isArray(response) ? response : (response?.items ?? []);
 		items.push(...batch);
 
-		if (batch.length < PAGE_SIZE) break;
-		if (!Array.isArray(response) && response?.hasMore === false) break;
-		if (!Array.isArray(response) && response?.totalPages && page >= response.totalPages) break;
+		if (batch.length === 0) break; // no progress — guard against an infinite loop
+		if (Array.isArray(response)) break; // unpaginated array response — single page
+		if (response.totalPages && page >= response.totalPages) break; // reached the last page
+		if (response.total !== undefined && items.length >= response.total) break; // collected everything
+		// Last resort when the response carries no pagination metadata at all.
+		if (response.totalPages === undefined && response.total === undefined && batch.length < PAGE_SIZE) {
+			break;
+		}
 		page++;
 	}
 
