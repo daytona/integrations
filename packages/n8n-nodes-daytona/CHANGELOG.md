@@ -1,3 +1,12 @@
+# Changelog
+
+## [0.1.3](https://github.com/daytona/integrations/compare/n8n-nodes-daytona-v0.1.2...n8n-nodes-daytona-v0.1.3) (2026-06-29)
+
+
+### Bug Fixes
+
+* **n8n-nodes-daytona:** validate inputs, harden git/sandbox ops, and remove dead workflows ([#12](https://github.com/daytona/integrations/issues/12)) ([f9ba09b](https://github.com/daytona/integrations/commit/f9ba09b148d77632bf7c34547a0b3ecbe6fea6ac))
+
 ### Changelog
 
 All notable changes to this project will be documented in this file. Dates are displayed in UTC.
