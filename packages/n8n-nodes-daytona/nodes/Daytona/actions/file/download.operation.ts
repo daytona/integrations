@@ -57,10 +57,15 @@ function deriveFileName(remotePath: string, contentDisposition?: string): string
 				return encoded;
 			}
 		}
-		// Basic `filename=`: handle quoted values (which may legally contain `;`)
-		// as well as bare unquoted tokens.
-		const basic = /(?:^|;\s*)filename=(?:"([^"]*)"|'([^']*)'|([^;]+))/i.exec(contentDisposition);
-		const basicName = basic?.[1] ?? basic?.[2] ?? basic?.[3]?.trim();
+		// Basic `filename=`: handle quoted values (which may legally contain `;`
+		// and quoted-pair escapes like \") as well as bare unquoted tokens.
+		const basic = /(?:^|;\s*)filename=(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^;]+))/i.exec(
+			contentDisposition,
+		);
+		// Unescape quoted-pair sequences (\" -> ", \\ -> \) in the quoted forms
+		// before decoding; the bare token ([3]) carries no escaping.
+		const quoted = basic?.[1] ?? basic?.[2];
+		const basicName = quoted !== undefined ? quoted.replace(/\\(.)/g, '$1') : basic?.[3]?.trim();
 		if (basicName) {
 			try {
 				return decodeURIComponent(basicName);
