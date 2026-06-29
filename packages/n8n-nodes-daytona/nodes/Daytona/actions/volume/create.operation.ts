@@ -8,6 +8,7 @@ import type {
 import { API_ENDPOINTS } from '../../helpers/constants';
 import { daytonaApiRequest } from '../../helpers/transport';
 import type { CreateVolumeRequest, Volume } from '../../helpers/types';
+import { requireNonEmpty } from '../../helpers/utils';
 
 const showOnly = { resource: ['volume'], operation: ['create'] };
 
@@ -28,7 +29,7 @@ export async function execute(
 	this: IExecuteFunctions,
 	itemIndex: number,
 ): Promise<INodeExecutionData[]> {
-	const name = (this.getNodeParameter('name', itemIndex) as string).trim();
+	const name = requireNonEmpty(this, this.getNodeParameter('name', itemIndex) as string, 'Name', itemIndex);
 	const body: CreateVolumeRequest = { name };
 
 	const volume = (await daytonaApiRequest.call(

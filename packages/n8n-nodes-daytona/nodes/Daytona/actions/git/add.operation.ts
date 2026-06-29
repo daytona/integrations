@@ -4,9 +4,11 @@ import type {
 	INodeExecutionData,
 	INodeProperties,
 } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 
 import { TOOLBOX_ENDPOINTS } from '../../helpers/constants';
 import { daytonaToolboxRequest } from '../../helpers/transport';
+import { requireNonEmpty } from '../../helpers/utils';
 
 const showOnly = { resource: ['git'], operation: ['add'] };
 
@@ -47,14 +49,22 @@ export async function execute(
 	this: IExecuteFunctions,
 	itemIndex: number,
 ): Promise<INodeExecutionData[]> {
-	const sandboxId = (this.getNodeParameter('sandboxId', itemIndex) as string).trim();
-	const path = (this.getNodeParameter('path', itemIndex) as string).trim();
+	const sandboxId = requireNonEmpty(this, this.getNodeParameter('sandboxId', itemIndex) as string, 'Sandbox ID', itemIndex);
+	const path = requireNonEmpty(this, this.getNodeParameter('path', itemIndex) as string, 'Path', itemIndex);
 	const filesRaw = (this.getNodeParameter('files', itemIndex) as string).trim();
 
 	const files = filesRaw
 		.split(',')
 		.map((f) => f.trim())
 		.filter((f) => f.length > 0);
+
+	if (files.length === 0) {
+		throw new NodeOperationError(
+			this.getNode(),
+			'Files is required: provide a comma-separated list of paths to stage, or "." to stage everything.',
+			{ itemIndex },
+		);
+	}
 
 	await daytonaToolboxRequest.call(
 		this,
