@@ -54,11 +54,13 @@ export async function getSnapshots(
 		const name = (snapshot.name as string | undefined)?.trim();
 		// Submit the immutable id as the value (names can collide); show the
 		// friendly name in the label, falling back to the id when unnamed.
-		const value = id ?? name;
+		// Truthy (not nullish) fallback so an empty-string id/name is skipped over
+		// rather than selected, and a blank name still shows the id in the label.
+		const value = id || name;
 		if (!value) continue;
 		const stateSuffix = snapshot.state ? ` (${snapshot.state})` : '';
 		options.push({
-			name: `${name ?? id}${stateSuffix}`,
+			name: `${name || id}${stateSuffix}`,
 			value,
 		});
 	}
