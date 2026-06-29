@@ -46,11 +46,14 @@ export function omitUndefined<T extends Record<string, unknown>>(obj: T): Partia
  */
 export function requireNonEmpty(
 	ctx: IExecuteFunctions,
-	value: string,
+	value: unknown,
 	displayName: string,
 	itemIndex: number,
 ): string {
-	const trimmed = value.trim();
+	// `value` is typed string at call sites, but an n8n expression can resolve to
+	// a non-string at runtime; guard so we throw the friendly validation error
+	// instead of a raw TypeError from `.trim()`.
+	const trimmed = typeof value === 'string' ? value.trim() : '';
 	if (!trimmed) {
 		throw new NodeOperationError(
 			ctx.getNode(),
