@@ -3,7 +3,9 @@ import type {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeProperties,
+	JsonObject,
 } from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
 
 import { API_ENDPOINTS } from '../../helpers/constants';
 import {
@@ -12,6 +14,16 @@ import {
 	waitForSandboxState,
 } from '../../helpers/transport';
 import type { Sandbox } from '../../helpers/types';
+
+/**
+ * A 404 means the sandbox no longer exists — the expected outcome when stopping
+ * an ephemeral sandbox (autoDeleteInterval=0), which Daytona deletes on stop.
+ * Any other error is a real failure and must not be swallowed.
+ */
+function isNotFoundError(error: unknown): boolean {
+	const httpCode = (error as { httpCode?: string | number | null })?.httpCode;
+	return httpCode === '404' || httpCode === 404;
+}
 
 const showOnly = { resource: ['sandbox'], operation: ['stop'] };
 
@@ -58,13 +70,20 @@ export async function execute(
 
 	let sandbox: Sandbox;
 	if (waitUntilStopped) {
-		// `destroyed` is a valid terminal outcome here: ephemeral sandboxes
-		// (autoDeleteInterval=0) are removed on stop, so treat it as success
-		// instead of waiting for `stopped` until the timeout elapses.
-		sandbox = await waitForSandboxState.call(this, sandboxId, {
-			targetStates: ['stopped', 'archived', 'destroyed'],
-			timeoutMs: waitTimeoutSeconds * 1000,
-		});
+		// `destroyed` is a valid terminal outcome: ephemeral sandboxes
+		// (autoDeleteInterval=0) are removed on stop. We also tolerate a 404 in
+		// case the sandbox is purged before we observe a terminal state.
+		try {
+			sandbox = await waitForSandboxState.call(this, sandboxId, {
+				targetStates: ['stopped', 'archived', 'destroyed'],
+				timeoutMs: waitTimeoutSeconds * 1000,
+			});
+		} catch (error) {
+			if (!isNotFoundError(error)) {
+				throw new NodeApiError(this.getNode(), error as JsonObject);
+			}
+			sandbox = { id: sandboxId, state: 'destroyed' } as Sandbox;
+		}
 	} else {
 		try {
 			sandbox = (await daytonaApiRequest.call(
@@ -72,9 +91,12 @@ export async function execute(
 				'GET',
 				API_ENDPOINTS.sandbox.get(sandboxId),
 			)) as Sandbox;
-		} catch {
-			// The stop succeeded, but an ephemeral sandbox may already be gone, so
-			// the follow-up GET can 404. Report success without the fetched object.
+		} catch (error) {
+			// Only a 404 means the sandbox is already gone (ephemeral auto-delete on
+			// stop). Re-throw anything else so real failures aren't masked as success.
+			if (!isNotFoundError(error)) {
+				throw new NodeApiError(this.getNode(), error as JsonObject);
+			}
 			sandbox = { id: sandboxId, state: 'destroyed' } as Sandbox;
 		}
 	}
