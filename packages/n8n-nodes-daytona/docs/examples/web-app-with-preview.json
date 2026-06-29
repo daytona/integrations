@@ -81,7 +81,7 @@
     },
     {
       "parameters": {
-        "content": "## Web app preview URL\n\nAfter running, the **Get Preview URL** node returns a signed URL valid for 1 hour. Open `{{ $json.url }}` in a browser to see the running web server.\n\nThe sandbox auto-stops after 30 minutes of inactivity (configured on Create) so you don't need to clean it up manually for short demos.",
+        "content": "## Web app preview URL\n\nAfter running, the **Get Preview URL** node returns a signed URL valid for 1 hour. Open `{{ $json.url }}` in a browser to see the running web server.\n\nThe sandbox auto-stops after 30 minutes of inactivity (configured on Create), but auto-stop does not delete it — add a Sandbox.Delete node to free resources when you're done.",
         "height": 240,
         "width": 360
       },
