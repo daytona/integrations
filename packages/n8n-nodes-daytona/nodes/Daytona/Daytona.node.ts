@@ -331,13 +331,13 @@ export class Daytona implements INodeType {
 						name: 'Delete',
 						value: 'delete',
 						action: 'Delete a volume',
-						description: 'Delete a volume by ID or name',
+						description: 'Delete a volume by ID',
 					},
 					{
 						name: 'Get',
 						value: 'get',
 						action: 'Get a volume',
-						description: 'Retrieve a single volume by ID or name',
+						description: 'Retrieve a single volume by ID',
 					},
 					{
 						name: 'Get Many',

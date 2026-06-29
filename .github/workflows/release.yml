@@ -130,9 +130,15 @@ jobs:
         run: npm install -g npm@latest
       - name: Install, build, publish
         working-directory: packages/n8n-nodes-daytona
-        # `n8n-node build` produces the n8n-compliant dist/. `prepublishOnly`
-        # (n8n-node prerelease) runs automatically on `npm publish` and is
-        # n8n's required validation for community nodes.
+        # `n8n-node build` produces the n8n-compliant dist/. On `npm publish`,
+        # the package's prepublishOnly hook (`n8n-node prerelease`) aborts with
+        # exit 1 unless RELEASE_MODE is set — this is exactly what
+        # `n8n-node release` exports internally when it publishes from CI. We
+        # set it explicitly so we can keep the direct, OIDC-friendly
+        # `npm publish --provenance` invocation instead of shelling out to the
+        # CLI's release command.
+        env:
+          RELEASE_MODE: 'true'
         run: |
           npm ci
           npx n8n-node build

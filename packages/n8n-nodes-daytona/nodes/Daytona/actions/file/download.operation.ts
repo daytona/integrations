@@ -42,12 +42,35 @@ export const description: INodeProperties[] = [
 
 function deriveFileName(remotePath: string, contentDisposition?: string): string {
 	if (contentDisposition) {
-		const match = /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i.exec(contentDisposition);
-		if (match?.[1]) {
+		// Prefer the RFC 5987 extended field (`filename*=charset'lang'value`) when
+		// present: it carries percent-encoded UTF-8 and must take precedence over
+		// the ASCII `filename` fallback, otherwise Unicode names get clobbered.
+		const extended = /filename\*=([^;]+)/i.exec(contentDisposition);
+		if (extended?.[1]) {
+			const raw = extended[1].trim().replace(/^["']|["']$/g, '');
+			// Strip the `charset'lang'` prefix — the language subtag may be non-empty
+			// (e.g. `UTF-8'en'...`) — leaving just the percent-encoded value.
+			const encoded = /^[\w-]+'[^']*'(.*)$/.exec(raw)?.[1] ?? raw;
 			try {
-				return decodeURIComponent(match[1]);
+				return decodeURIComponent(encoded);
 			} catch {
-				return match[1];
+				return encoded;
+			}
+		}
+		// Basic `filename=`: handle quoted values (which may legally contain `;`
+		// and quoted-pair escapes like \") as well as bare unquoted tokens.
+		const basic = /(?:^|;\s*)filename=(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^;]+))/i.exec(
+			contentDisposition,
+		);
+		// Unescape quoted-pair sequences (\" -> ", \\ -> \) in the quoted forms
+		// before decoding; the bare token ([3]) carries no escaping.
+		const quoted = basic?.[1] ?? basic?.[2];
+		const basicName = quoted !== undefined ? quoted.replace(/\\(.)/g, '$1') : basic?.[3]?.trim();
+		if (basicName) {
+			try {
+				return decodeURIComponent(basicName);
+			} catch {
+				return basicName;
 			}
 		}
 	}
@@ -61,7 +84,7 @@ export async function execute(
 ): Promise<INodeExecutionData[]> {
 	const sandboxId = (this.getNodeParameter('sandboxId', itemIndex) as string).trim();
 	const remotePath = (this.getNodeParameter('remotePath', itemIndex) as string).trim();
-	const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex, 'data') as string;
+	const binaryPropertyName = (this.getNodeParameter('binaryPropertyName', itemIndex, 'data') as string).trim() || 'data';
 
 	const result = await daytonaToolboxDownloadFile.call(this, sandboxId, remotePath);
 	const filename = deriveFileName(remotePath, result.headers['content-disposition'] as string | undefined);

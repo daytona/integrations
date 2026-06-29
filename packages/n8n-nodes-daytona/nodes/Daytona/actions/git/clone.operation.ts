@@ -92,6 +92,24 @@ interface AdditionalFields {
 	password?: string;
 }
 
+/**
+ * Strip embedded HTTPS credentials (`https://user:token@host/…`) from a URL
+ * before echoing it back in the node output, so tokens don't leak into the
+ * execution data. Falls back to a regex for URLs the WHATWG parser rejects.
+ */
+function redactUrlCredentials(rawUrl: string): string {
+	try {
+		const url = new URL(rawUrl);
+		if (url.username || url.password) {
+			url.username = '';
+			url.password = '';
+		}
+		return url.toString();
+	} catch {
+		return rawUrl.replace(/\/\/[^/@]+@/, '//');
+	}
+}
+
 export async function execute(
 	this: IExecuteFunctions,
 	itemIndex: number,
@@ -101,11 +119,16 @@ export async function execute(
 	const path = (this.getNodeParameter('path', itemIndex) as string).trim();
 	const additional = this.getNodeParameter('additionalFields', itemIndex, {}) as AdditionalFields;
 
+	const commitId = additional.commitId?.trim() || undefined;
+	// A commit SHA fully determines the checkout, so the branch is ignored when a
+	// commit is given (matches the field help text). Only send branch otherwise.
+	const branch = commitId ? undefined : additional.branch?.trim() || undefined;
+
 	const body = omitUndefined({
 		url: repositoryUrl,
 		path,
-		branch: additional.branch?.trim() || undefined,
-		commit_id: additional.commitId?.trim() || undefined,
+		branch,
+		commit_id: commitId,
 		username: additional.username?.trim() || undefined,
 		password: additional.password || undefined,
 	}) as unknown as IDataObject;
@@ -117,10 +140,10 @@ export async function execute(
 			json: {
 				success: true,
 				sandboxId,
-				repositoryUrl,
+				repositoryUrl: redactUrlCredentials(repositoryUrl),
 				path,
-				branch: additional.branch?.trim() || undefined,
-				commitId: additional.commitId?.trim() || undefined,
+				branch,
+				commitId,
 			},
 			pairedItem: { item: itemIndex },
 		},

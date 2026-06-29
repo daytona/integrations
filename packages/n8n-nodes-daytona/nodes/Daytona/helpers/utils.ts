@@ -1,3 +1,6 @@
+import type { IExecuteFunctions } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+
 interface KeyValueEntry {
 	name?: string;
 	value?: string;
@@ -32,4 +35,31 @@ export function omitUndefined<T extends Record<string, unknown>>(obj: T): Partia
 		}
 	}
 	return result;
+}
+
+/**
+ * Trim a required string parameter and throw a NodeOperationError when it is
+ * empty after trimming. n8n's `required: true` only blocks an empty field in
+ * the editor UI — it does not catch whitespace-only input or expressions that
+ * resolve to an empty string. Without this guard those slip through and hit the
+ * API as malformed requests (e.g. `DELETE /volumes/` with no id).
+ */
+export function requireNonEmpty(
+	ctx: IExecuteFunctions,
+	value: unknown,
+	displayName: string,
+	itemIndex: number,
+): string {
+	// `value` is typed string at call sites, but an n8n expression can resolve to
+	// a non-string at runtime; guard so we throw the friendly validation error
+	// instead of a raw TypeError from `.trim()`.
+	const trimmed = typeof value === 'string' ? value.trim() : '';
+	if (!trimmed) {
+		throw new NodeOperationError(
+			ctx.getNode(),
+			`${displayName} is required and cannot be empty.`,
+			{ itemIndex },
+		);
+	}
+	return trimmed;
 }

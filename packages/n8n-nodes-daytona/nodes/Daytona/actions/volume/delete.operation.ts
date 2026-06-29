@@ -6,6 +6,7 @@ import type {
 
 import { API_ENDPOINTS } from '../../helpers/constants';
 import { daytonaApiRequest } from '../../helpers/transport';
+import { requireNonEmpty } from '../../helpers/utils';
 
 const showOnly = { resource: ['volume'], operation: ['delete'] };
 
@@ -16,7 +17,7 @@ export const description: INodeProperties[] = [
 		type: 'string',
 		required: true,
 		default: '',
-		description: 'ID or name of the volume to delete',
+		description: 'ID of the volume to delete',
 		displayOptions: { show: showOnly },
 	},
 ];
@@ -25,7 +26,7 @@ export async function execute(
 	this: IExecuteFunctions,
 	itemIndex: number,
 ): Promise<INodeExecutionData[]> {
-	const volumeId = (this.getNodeParameter('volumeId', itemIndex) as string).trim();
+	const volumeId = requireNonEmpty(this, this.getNodeParameter('volumeId', itemIndex) as string, 'Volume ID', itemIndex);
 
 	await daytonaApiRequest.call(this, 'DELETE', API_ENDPOINTS.volume.delete(volumeId));
 

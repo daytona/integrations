@@ -7,7 +7,7 @@ import type {
 
 import { TOOLBOX_ENDPOINTS } from '../../helpers/constants';
 import { daytonaToolboxRequest } from '../../helpers/transport';
-import { omitUndefined } from '../../helpers/utils';
+import { omitUndefined, requireNonEmpty } from '../../helpers/utils';
 
 const showOnly = { resource: ['git'], operation: ['push'] };
 
@@ -67,8 +67,8 @@ export async function execute(
 	this: IExecuteFunctions,
 	itemIndex: number,
 ): Promise<INodeExecutionData[]> {
-	const sandboxId = (this.getNodeParameter('sandboxId', itemIndex) as string).trim();
-	const path = (this.getNodeParameter('path', itemIndex) as string).trim();
+	const sandboxId = requireNonEmpty(this, this.getNodeParameter('sandboxId', itemIndex) as string, 'Sandbox ID', itemIndex);
+	const path = requireNonEmpty(this, this.getNodeParameter('path', itemIndex) as string, 'Path', itemIndex);
 	const additional = this.getNodeParameter('additionalFields', itemIndex, {}) as AdditionalFields;
 
 	const body = omitUndefined({

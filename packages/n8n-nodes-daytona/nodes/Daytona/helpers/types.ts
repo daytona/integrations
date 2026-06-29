@@ -1,5 +1,9 @@
+// Mirrors the Daytona API SandboxState enum (the api-client uses
+// SCREAMING_SNAKE_CASE; the wire values are the lowercase forms below). Keep in
+// sync with the documented sandbox lifecycle.
 export type SandboxState =
 	| 'creating'
+	| 'restoring'
 	| 'starting'
 	| 'started'
 	| 'stopping'
@@ -8,8 +12,13 @@ export type SandboxState =
 	| 'archived'
 	| 'destroying'
 	| 'destroyed'
+	| 'resizing'
+	| 'snapshotting'
+	| 'forking'
 	| 'pulling_snapshot'
-	| 'restoring'
+	| 'building_snapshot'
+	| 'pending_build'
+	| 'build_failed'
 	| 'error'
 	| 'unknown';
 

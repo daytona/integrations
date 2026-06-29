@@ -45,6 +45,7 @@ export async function execute(
 	const sandboxes: Sandbox[] = [];
 	const pageLimit = returnAll ? PAGE_SIZE : limit;
 	let cursor: string | undefined;
+	const seenCursors = new Set<string>();
 
 	while (true) {
 		const qs: IDataObject = { limit: pageLimit };
@@ -61,8 +62,13 @@ export async function execute(
 		sandboxes.push(...(response.items ?? []));
 
 		if (!returnAll) break;
-		if (!response.nextCursor) break;
-		cursor = response.nextCursor;
+		const nextCursor = response.nextCursor;
+		if (!nextCursor) break;
+		// Forward-progress guard: bail out if the API ever returns a cursor we've
+		// already followed, instead of looping forever on a stuck cursor.
+		if (seenCursors.has(nextCursor)) break;
+		seenCursors.add(nextCursor);
+		cursor = nextCursor;
 	}
 
 	return sandboxes.map((sandbox) => ({

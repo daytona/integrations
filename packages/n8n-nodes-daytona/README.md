@@ -82,7 +82,7 @@ The credential is verified against `GET /api-keys/current` when you save — n8n
 | | Activate | Mark a snapshot as active so it becomes usable for sandbox creation. |
 | | Deactivate | Mark a snapshot as inactive. |
 | **Volume** | Create | Create a persistent volume that can be mounted into sandboxes. |
-| | Get | Fetch a single volume by ID or name. |
+| | Get | Fetch a single volume by ID. |
 | | Get Many | List volumes; optionally include soft-deleted ones. |
 | | Delete | Delete a volume. |
 

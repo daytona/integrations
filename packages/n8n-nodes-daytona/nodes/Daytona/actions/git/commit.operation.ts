@@ -102,7 +102,9 @@ export async function execute(
 		message,
 		author,
 		email,
-		allow_empty: additional.allowEmpty || undefined,
+		// Pass the boolean through as-is — `|| undefined` would drop an explicit
+		// `false`, which the API treats differently from an omitted field.
+		allow_empty: additional.allowEmpty,
 	}) as unknown as IDataObject;
 
 	const response = (await daytonaToolboxRequest.call(
