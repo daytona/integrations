@@ -42,25 +42,30 @@ export const description: INodeProperties[] = [
 
 function deriveFileName(remotePath: string, contentDisposition?: string): string {
 	if (contentDisposition) {
-		// Prefer the RFC 5987 extended field (`filename*=UTF-8''…`) when present:
-		// it carries percent-encoded UTF-8 and must take precedence over the ASCII
-		// `filename` fallback, otherwise Unicode names get clobbered by it.
+		// Prefer the RFC 5987 extended field (`filename*=charset'lang'value`) when
+		// present: it carries percent-encoded UTF-8 and must take precedence over
+		// the ASCII `filename` fallback, otherwise Unicode names get clobbered.
 		const extended = /filename\*=([^;]+)/i.exec(contentDisposition);
 		if (extended?.[1]) {
 			const raw = extended[1].trim().replace(/^["']|["']$/g, '');
-			const encoded = /^[\w-]+''(.*)$/.exec(raw)?.[1] ?? raw;
+			// Strip the `charset'lang'` prefix — the language subtag may be non-empty
+			// (e.g. `UTF-8'en'...`) — leaving just the percent-encoded value.
+			const encoded = /^[\w-]+'[^']*'(.*)$/.exec(raw)?.[1] ?? raw;
 			try {
 				return decodeURIComponent(encoded);
 			} catch {
 				return encoded;
 			}
 		}
-		const basic = /filename=["']?([^"';]+)["']?/i.exec(contentDisposition);
-		if (basic?.[1]) {
+		// Basic `filename=`: handle quoted values (which may legally contain `;`)
+		// as well as bare unquoted tokens.
+		const basic = /(?:^|;\s*)filename=(?:"([^"]*)"|'([^']*)'|([^;]+))/i.exec(contentDisposition);
+		const basicName = basic?.[1] ?? basic?.[2] ?? basic?.[3]?.trim();
+		if (basicName) {
 			try {
-				return decodeURIComponent(basic[1]);
+				return decodeURIComponent(basicName);
 			} catch {
-				return basic[1];
+				return basicName;
 			}
 		}
 	}
