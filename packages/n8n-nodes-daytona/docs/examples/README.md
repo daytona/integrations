@@ -26,7 +26,7 @@ CI-style flow against a persistent sandbox.
 Manual Trigger → Sandbox.Create → Git.Clone → Code.RunCommand (build) → File.Download → Sandbox.Delete
 ```
 
-Demonstrates passing `sandboxId` between operations using `={{ $('Create Sandbox').item.json.id }}` expressions, and proper cleanup via Sandbox.Delete.
+Demonstrates passing `sandboxId` between operations using `={{ $('Create Sandbox').item.json.id }}` expressions, and cleanup via Sandbox.Delete on the success path. For production, also route failures into a Sandbox.Delete (e.g. via an error branch) so a mid-workflow error doesn't leak the sandbox.
 
 ### `web-app-with-preview.json`
 
@@ -36,4 +36,4 @@ Run a long-lived web service in a sandbox and return a public URL.
 Manual Trigger → Sandbox.Create → Code.RunCommand (start server) → Sandbox.GetPreviewUrl
 ```
 
-The sandbox is configured with `public: true` and `autoStopInterval: 30` so the URL is browsable for up to 30 minutes of activity. The Get Preview URL node returns a signed URL with the auth token embedded — share it directly without needing custom headers.
+The sandbox is configured with `public: true` and `autoStopInterval: 30`, so it auto-stops after 30 minutes **of inactivity** (the preview URL stops working once it does). The Get Preview URL node returns a signed URL with the auth token embedded — share it directly without needing custom headers. Auto-stop doesn't delete the sandbox, so add a Sandbox.Delete node when you're done to free resources.
