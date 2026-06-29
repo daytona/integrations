@@ -47,7 +47,7 @@ export async function execute(
 ): Promise<INodeExecutionData[]> {
 	const sandboxId = (this.getNodeParameter('sandboxId', itemIndex) as string).trim();
 	const remotePath = (this.getNodeParameter('remotePath', itemIndex) as string).trim();
-	const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex, 'data') as string;
+	const binaryPropertyName = (this.getNodeParameter('binaryPropertyName', itemIndex, 'data') as string).trim() || 'data';
 
 	const binaryMeta = this.helpers.assertBinaryData(itemIndex, binaryPropertyName);
 	const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);

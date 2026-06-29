@@ -42,12 +42,25 @@ export const description: INodeProperties[] = [
 
 function deriveFileName(remotePath: string, contentDisposition?: string): string {
 	if (contentDisposition) {
-		const match = /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i.exec(contentDisposition);
-		if (match?.[1]) {
+		// Prefer the RFC 5987 extended field (`filename*=UTF-8''…`) when present:
+		// it carries percent-encoded UTF-8 and must take precedence over the ASCII
+		// `filename` fallback, otherwise Unicode names get clobbered by it.
+		const extended = /filename\*=([^;]+)/i.exec(contentDisposition);
+		if (extended?.[1]) {
+			const raw = extended[1].trim().replace(/^["']|["']$/g, '');
+			const encoded = /^[\w-]+''(.*)$/.exec(raw)?.[1] ?? raw;
 			try {
-				return decodeURIComponent(match[1]);
+				return decodeURIComponent(encoded);
 			} catch {
-				return match[1];
+				return encoded;
+			}
+		}
+		const basic = /filename=["']?([^"';]+)["']?/i.exec(contentDisposition);
+		if (basic?.[1]) {
+			try {
+				return decodeURIComponent(basic[1]);
+			} catch {
+				return basic[1];
 			}
 		}
 	}
@@ -61,7 +74,7 @@ export async function execute(
 ): Promise<INodeExecutionData[]> {
 	const sandboxId = (this.getNodeParameter('sandboxId', itemIndex) as string).trim();
 	const remotePath = (this.getNodeParameter('remotePath', itemIndex) as string).trim();
-	const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex, 'data') as string;
+	const binaryPropertyName = (this.getNodeParameter('binaryPropertyName', itemIndex, 'data') as string).trim() || 'data';
 
 	const result = await daytonaToolboxDownloadFile.call(this, sandboxId, remotePath);
 	const filename = deriveFileName(remotePath, result.headers['content-disposition'] as string | undefined);
