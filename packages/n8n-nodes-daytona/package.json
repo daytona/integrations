@@ -1,6 +1,6 @@
 {
   "name": "@daytona/n8n-nodes-daytona",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "n8n community node for Daytona — manage sandboxes/snapshots/volumes, execute code and commands, drive Git pipelines, and manage the sandbox filesystem inside Daytona from your workflows.",
   "license": "MIT",
   "homepage": "https://github.com/daytona/integrations/tree/main/packages/n8n-nodes-daytona#readme",
