@@ -5,13 +5,35 @@
  *
  * Needs live keys and creates a real sandbox + a small paid model call, so it's
  * a manual/preflight check, not a CI unit test. Run it with:
- *   npm test                     # loads .env if present
- *   node --env-file=.env scripts/test.mjs
+ *   npm test                     # loads .env / .env.local automatically
+ *   node scripts/test.mjs
  */
+import { readFileSync } from 'node:fs'
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
 import { Daytona } from '@daytona/sdk'
+
+// Load .env / .env.local ourselves rather than relying on `node --env-file`, so
+// this runs on any Node >=20 without depending on a version-specific CLI flag.
+for (const file of ['.env', '.env.local']) {
+  try {
+    for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+      const t = line.trim()
+      if (!t || t.startsWith('#')) continue
+      const eq = t.indexOf('=')
+      if (eq === -1) continue
+      const key = t.slice(0, eq).trim()
+      let val = t.slice(eq + 1).trim()
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1)
+      }
+      if (key && process.env[key] === undefined) process.env[key] = val
+    }
+  } catch {
+    // .env files are optional
+  }
+}
 
 const ok = (m) => console.log(`\x1b[32m✓\x1b[0m ${m}`)
 const fail = (m) => console.log(`\x1b[31m✗\x1b[0m ${m}`)

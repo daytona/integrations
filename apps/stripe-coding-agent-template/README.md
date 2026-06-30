@@ -137,7 +137,7 @@ On the React side, `app/page.tsx` registers one `useRenderTool` per tool; each r
 
 ## Prerequisites
 
-- **Node.js 20.18+** (or 22.9+) — for `node --env-file` support used by `npm test`
+- **Node.js 20+**
 - A **Daytona** key (or `daytona/sandbox` via Stripe Projects) — note a Daytona plan must be active before a sandbox can be provisioned
 - An **OpenRouter** key (or `openrouter/api` via Stripe Projects). The default model needs the `pay_as_you_go` plan; on the `free` plan, set `OPENROUTER_MODEL` to a free model
 

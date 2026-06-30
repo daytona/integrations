@@ -350,8 +350,16 @@ async function main() {
     );
   }
 
-  const deploymentUrl = typeof payload?.url === 'string' ? `https://${payload.url}` : null;
-  const inspectorUrl = typeof payload?.inspectorUrl === 'string' ? payload.inspectorUrl : null;
+  // A 2xx with an unparseable body means the deployment API/proxy returned
+  // something unexpected — surface it instead of reporting a URL-less success.
+  if (!payload) {
+    throw new Error(
+      'Vercel returned an unexpected non-JSON response for the deployment. Check the Vercel dashboard or try again.',
+    );
+  }
+
+  const deploymentUrl = typeof payload.url === 'string' ? `https://${payload.url}` : null;
+  const inspectorUrl = typeof payload.inspectorUrl === 'string' ? payload.inspectorUrl : null;
 
   console.log('Deployment started successfully.');
   if (syncedEnvironmentKeys.length > 0) {
