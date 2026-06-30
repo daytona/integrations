@@ -17,6 +17,7 @@ export function ReplaceCard({ status, pattern, newValue, results }: Props) {
   const pending = status !== 'complete'
   const list = results ?? []
   const successCount = list.filter((r) => r.success).length
+  const failed = !pending && list.some((r) => r.success === false)
 
   return (
     <div
@@ -39,8 +40,8 @@ export function ReplaceCard({ status, pattern, newValue, results }: Props) {
           borderBottom: list.length ? '1px solid var(--border)' : 'none',
         }}
       >
-        <span style={{ color: pending ? '#2563eb' : '#16a34a', fontWeight: 600 }}>
-          {pending ? '…' : '✓'}
+        <span style={{ color: pending ? '#2563eb' : failed ? '#b91c1c' : '#16a34a', fontWeight: 600 }}>
+          {pending ? '…' : failed ? '✗' : '✓'}
         </span>
         <span style={{ color: '#64748b' }}>replaced</span>
         {pattern || newValue ? (

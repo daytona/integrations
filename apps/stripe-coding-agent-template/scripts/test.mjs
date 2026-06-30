@@ -125,6 +125,7 @@ try {
       ok(`cleaned up sandbox ${sandbox.id}`)
     } catch (e) {
       fail(`cleanup failed (delete manually): ${e?.message ?? e}`)
+      failures++
     }
   }
 }

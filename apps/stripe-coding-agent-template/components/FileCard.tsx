@@ -75,7 +75,7 @@ export function FileCard({ status, verb, path, content, bytes }: Props) {
             style={vscDarkPlus}
             customStyle={{ margin: 0, fontSize: 12 }}
           >
-            {content}
+            {content.length > 50000 ? `${content.slice(0, 50000)}\n… (truncated)` : content}
           </SyntaxHighlighter>
         </div>
       ) : null}

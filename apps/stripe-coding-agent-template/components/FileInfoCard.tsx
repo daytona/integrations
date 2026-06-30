@@ -21,7 +21,7 @@ export function FileInfoCard({ status, info }: Props) {
   const pending = status !== 'complete'
   const rawRows: Array<[string, string | number | undefined]> = info
     ? [
-        ['type', info.isDir ? 'directory' : 'file'],
+        ['type', typeof info.isDir === 'boolean' ? (info.isDir ? 'directory' : 'file') : undefined],
         ['size', info.size],
         ['mode', info.mode],
         ['permissions', info.permissions],

@@ -41,7 +41,7 @@ export function GrepCard({ status, path, pattern, matches }: Props) {
         <span style={{ color: pending ? '#2563eb' : '#16a34a', fontWeight: 600 }}>
           {pending ? '…' : '✓'}
         </span>
-        <span style={{ color: '#64748b' }}>found</span>
+        <span style={{ color: '#64748b' }}>searched</span>
         <code
           style={{
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',

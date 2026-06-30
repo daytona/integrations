@@ -90,7 +90,7 @@ export function TerminalCard({
             ['background', background ? 'true' : 'false'],
             ['sessionId', sessionId],
             ['cmdId', cmdId],
-            ['stdout bytes', stdout ? String(stdout.length) : '0'],
+            ['stdout bytes', stdout ? String(new TextEncoder().encode(stdout).length) : '0'],
           ]}
         />
       ) : null}

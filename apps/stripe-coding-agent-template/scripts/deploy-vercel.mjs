@@ -329,7 +329,13 @@ async function main() {
     },
   );
 
-  const payload = await response.json();
+  let payload = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
 
   if (!response.ok) {
     const fallbackMessage =
@@ -344,8 +350,8 @@ async function main() {
     );
   }
 
-  const deploymentUrl = typeof payload.url === 'string' ? `https://${payload.url}` : null;
-  const inspectorUrl = typeof payload.inspectorUrl === 'string' ? payload.inspectorUrl : null;
+  const deploymentUrl = typeof payload?.url === 'string' ? `https://${payload.url}` : null;
+  const inspectorUrl = typeof payload?.inspectorUrl === 'string' ? payload.inspectorUrl : null;
 
   console.log('Deployment started successfully.');
   if (syncedEnvironmentKeys.length > 0) {

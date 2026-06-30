@@ -46,6 +46,7 @@ export function InspectorToggle({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       aria-label={open ? 'hide details' : 'show details'}
       style={{

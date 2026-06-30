@@ -61,7 +61,9 @@ export function FileListCard({ status, verb, path, pattern, entries, files }: Pr
         </code>
         {!pending && list.length ? (
           <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: 11 }}>
-            {list.length} {list.length === 1 ? 'entry' : 'entries'}
+            {verb === 'searched'
+              ? `${list.length} ${list.length === 1 ? 'match' : 'matches'}`
+              : `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`}
           </span>
         ) : null}
         <InspectorToggle open={open} onClick={() => setOpen((o) => !o)} />
