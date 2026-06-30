@@ -16,7 +16,7 @@ import { Daytona } from '@daytona/sdk'
 
 // Load .env / .env.local ourselves rather than relying on `node --env-file`, so
 // this runs on any Node >=20 without depending on a version-specific CLI flag.
-for (const file of ['.env', '.env.local']) {
+for (const file of ['.env.local', '.env']) {
   try {
     for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
       const t = line.trim()
