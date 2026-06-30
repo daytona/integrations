@@ -40,9 +40,8 @@ const fail = (m) => console.log(`\x1b[31m✗\x1b[0m ${m}`)
 
 // ── OpenRouter wiring (mirrors route.ts) ────────────────────────────────────
 function resolveOpenRouterKey() {
-  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY
-  const k = Object.keys(process.env).find((n) => /^OPENROUTER_.*API_KEY$/.test(n))
-  return k ? process.env[k] : undefined
+  // OPENROUTER_API_KEY (manual) or OPENROUTER_API_API_KEY (stripe projects add openrouter/api).
+  return process.env.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_API_KEY
 }
 const openrouter = createOpenAI({
   apiKey: resolveOpenRouterKey(),
