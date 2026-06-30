@@ -1,0 +1,71 @@
+# Stripe Projects build-template manifest — reference copy that lives with the app.
+#
+# The authoritative copy the CLI reads is the one submitted to the registry at
+# https://github.com/stripe/projects-template-registry as <category>/<variant>.yaml.
+# Schema reference: projects-template-registry/example/example.yaml
+#
+# `ref` stays a placeholder in this in-repo copy. Pin it to the `main` commit SHA
+# in the REGISTRY copy when you open the registry PR (i.e. after this app merges
+# to main, take that squash-merge SHA).
+
+guided:
+  category: ai_agent
+  framework: nextjs
+
+template: daytona/coding-agent
+variant: daytona-coding-agent
+default: true
+variant_description: Next.js • Daytona Sandbox • OpenRouter • Vercel
+install_command: npm install
+
+ref: REPLACE_WITH_COMMIT_SHA
+repo: https://github.com/daytona/integrations/tree/main/apps/stripe-coding-agent-template
+
+metadata:
+  name: Daytona Coding Agent
+  description: Generative-UI coding agent that writes and runs code in a Daytona sandbox, live-previewed in chat
+  owner: daytona
+  tags:
+    - daytona
+    - sandbox
+    - coding-agent
+    - copilotkit
+    - openrouter
+    - generative-ui
+    - nextjs
+
+services:
+  - daytona/sandbox
+  - openrouter/api
+  - vercel/project
+
+next_steps:
+  - label: Run locally
+    command: npm run dev
+  - label: Customize with Codex
+    command: codex "Help me extend this coding agent. Follow prompts/starter-to-product.md."
+  - label: Customize with Claude
+    command: claude "Help me extend this coding agent. Follow prompts/starter-to-product.md."
+  - label: Deploy
+    command: npm run deploy
+
+tier_plans:
+  # A Daytona sandbox requires an active plan (the provider returns
+  # `plan_required` otherwise), so each tier maps to a Daytona top-up credit
+  # plan — top-ups show as Daytona *plans* in `stripe projects catalog daytona`.
+  daytona/sandbox:
+    free_lowest_cost: Daytona/top-up-0025
+    starter_paid: Daytona/top-up-0500
+    higher_scale: Daytona/top-up-2000
+  # All tiers use pay_as_you_go ($0/mo base, usage-based): the coding agent
+  # needs reliable tool-calling models, and OpenRouter's `free` plan only serves
+  # free models. To run at zero spend, switch this to OpenRouter/free and set
+  # OPENROUTER_MODEL to a free model (e.g. deepseek/deepseek-chat-v3.1:free).
+  openrouter/api:
+    free_lowest_cost: OpenRouter/pay_as_you_go
+    starter_paid: OpenRouter/pay_as_you_go
+    higher_scale: OpenRouter/pay_as_you_go
+  vercel/project:
+    free_lowest_cost: Vercel/hobby
+    starter_paid: Vercel/pro
+    higher_scale: Vercel/pro

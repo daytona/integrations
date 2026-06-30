@@ -1,0 +1,50 @@
+{
+  "name": "stripe-coding-agent-template",
+  "version": "1.0.0",
+  "description": "Generative-UI coding agent that writes and runs code in a Daytona sandbox, live-previewed in chat. CopilotKit UI, OpenRouter LLM, deploy on Vercel. A Stripe Projects build template.",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "deploy": "node scripts/deploy-vercel.mjs",
+    "test": "node scripts/test.mjs"
+  },
+  "keywords": [
+    "copilotkit",
+    "daytona",
+    "openrouter",
+    "vercel",
+    "stripe-projects",
+    "sandbox",
+    "generative-ui",
+    "coding-agent",
+    "ai-agent",
+    "typescript",
+    "nextjs"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.36",
+    "@copilotkit/react-core": "1.59.5",
+    "@copilotkit/runtime": "1.59.5",
+    "@daytona/sdk": "0.184.0",
+    "next": "15.5.15",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-syntax-highlighter": "16.1.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "ai": "^6.0.104",
+    "@types/node": "^20.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "typescript": "^5.4.0"
+  }
+}
