@@ -9,16 +9,13 @@
 # to main, take that squash-merge SHA).
 
 guided:
-  # Coding agents aren't one of the official guided categories
-  # (saas / one_time_payment / static_site), so this surfaces under
-  # "Something else" + search. `framework` still matches the Next.js filter.
   category: ai_agent
   framework: nextjs
 
 template: daytona/coding-agent
-variant: openrouter
+variant: daytona-coding-agent
 default: true
-variant_description: Daytona • OpenRouter • Vercel
+variant_description: Next.js • Daytona Sandbox • OpenRouter • Vercel
 install_command: npm install
 
 ref: REPLACE_WITH_COMMIT_SHA
@@ -29,11 +26,13 @@ metadata:
   description: Generative-UI coding agent that writes and runs code in a Daytona sandbox, live-previewed in chat
   owner: daytona
   tags:
-    - AI Agent
-    - Coding Agent
-    - Sandbox
-    - Generative UI
-    - Next.js
+    - daytona
+    - sandbox
+    - coding-agent
+    - copilotkit
+    - openrouter
+    - generative-ui
+    - nextjs
 
 services:
   - daytona/sandbox
