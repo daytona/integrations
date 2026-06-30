@@ -41,29 +41,30 @@ const fail = (m) => console.log(`\x1b[31m✗\x1b[0m ${m}`)
 // ── OpenRouter wiring (mirrors route.ts) ────────────────────────────────────
 function resolveOpenRouterKey() {
   // OPENROUTER_API_KEY (manual) or OPENROUTER_API_API_KEY (stripe projects add openrouter/api).
-  return process.env.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_API_KEY
+  // `||` so a blank placeholder falls through to the provisioned key.
+  return process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_API_KEY
 }
 const openrouter = createOpenAI({
   apiKey: resolveOpenRouterKey(),
-  baseURL: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
+  baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
 })
-const MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5'
+const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-sonnet-4.5'
 
 // ── Daytona wiring (mirrors route.ts) ───────────────────────────────────────
 const daytona = new Daytona({
-  apiKey: process.env.DAYTONA_API_KEY ?? process.env.DAYTONA_SANDBOX_API_KEY,
+  apiKey: process.env.DAYTONA_API_KEY || process.env.DAYTONA_SANDBOX_API_KEY,
   apiUrl:
-    process.env.DAYTONA_API_URL ??
-    process.env.DAYTONA_SANDBOX_API_URL ??
+    process.env.DAYTONA_API_URL ||
+    process.env.DAYTONA_SANDBOX_API_URL ||
     'https://app.daytona.io/api',
   organizationId:
-    process.env.DAYTONA_ORGANIZATION_ID ?? process.env.DAYTONA_SANDBOX_ORGANIZATION_ID,
+    process.env.DAYTONA_ORGANIZATION_ID || process.env.DAYTONA_SANDBOX_ORGANIZATION_ID,
 })
 
 // Fail fast with a clear message if credentials aren't present.
 const missing = []
 if (!resolveOpenRouterKey()) missing.push('OPENROUTER_API_KEY')
-if (!(process.env.DAYTONA_API_KEY ?? process.env.DAYTONA_SANDBOX_API_KEY))
+if (!(process.env.DAYTONA_API_KEY || process.env.DAYTONA_SANDBOX_API_KEY))
   missing.push('DAYTONA_API_KEY (or DAYTONA_SANDBOX_API_KEY)')
 if (missing.length > 0) {
   fail(`Missing credentials: ${missing.join(', ')}`)

@@ -20,13 +20,13 @@ import { z } from 'zod'
  * whether you provisioned through Stripe Projects or set raw DAYTONA_* keys.
  */
 const daytona = new Daytona({
-  apiKey: process.env.DAYTONA_API_KEY ?? process.env.DAYTONA_SANDBOX_API_KEY,
+  apiKey: process.env.DAYTONA_API_KEY || process.env.DAYTONA_SANDBOX_API_KEY,
   apiUrl:
-    process.env.DAYTONA_API_URL ??
-    process.env.DAYTONA_SANDBOX_API_URL ??
+    process.env.DAYTONA_API_URL ||
+    process.env.DAYTONA_SANDBOX_API_URL ||
     'https://app.daytona.io/api',
   organizationId:
-    process.env.DAYTONA_ORGANIZATION_ID ?? process.env.DAYTONA_SANDBOX_ORGANIZATION_ID,
+    process.env.DAYTONA_ORGANIZATION_ID || process.env.DAYTONA_SANDBOX_ORGANIZATION_ID,
 })
 
 /*
@@ -41,12 +41,14 @@ const daytona = new Daytona({
  *     OPENROUTER_API_API_KEY (the `api` service key, not OPENROUTER_PLAN_API_KEY).
  */
 function resolveOpenRouterKey(): string | undefined {
-  return process.env.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_API_KEY
+  // `||` (not `??`) so a blank OPENROUTER_API_KEY placeholder from .env.example
+  // falls through to the Stripe-provisioned OPENROUTER_API_API_KEY.
+  return process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_API_KEY
 }
 
 const openrouterHeaders: Record<string, string> = {
   // Optional attribution shown on your OpenRouter activity dashboard.
-  'X-Title': process.env.OPENROUTER_SITE_NAME ?? 'Daytona Coding Agent',
+  'X-Title': process.env.OPENROUTER_SITE_NAME || 'Daytona Coding Agent',
 }
 if (process.env.OPENROUTER_SITE_URL) {
   openrouterHeaders['HTTP-Referer'] = process.env.OPENROUTER_SITE_URL
@@ -54,12 +56,12 @@ if (process.env.OPENROUTER_SITE_URL) {
 
 const openrouter = createOpenAI({
   apiKey: resolveOpenRouterKey(),
-  baseURL: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
+  baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
   headers: openrouterHeaders,
 })
 
 // Any model id from https://openrouter.ai/models. Override with OPENROUTER_MODEL.
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5'
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-sonnet-4.5'
 
 const SYSTEM_PROMPT = `You are a coding agent with shell access to a fresh Daytona sandbox.
 
