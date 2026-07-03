@@ -11,7 +11,7 @@ from daytona import (
     Resources,
 )
 
-from _client import build_client
+from _client import build_client, to_int
 
 
 class CreateSandboxTool(Tool):
@@ -28,9 +28,7 @@ class CreateSandboxTool(Tool):
 
         env_vars = self._parse_env_vars(tool_parameters.get("env_vars"))
 
-        auto_stop = tool_parameters.get("auto_stop_interval", 15)
-        if isinstance(auto_stop, float):
-            auto_stop = int(auto_stop)
+        auto_stop = to_int(tool_parameters.get("auto_stop_interval", 15), "auto_stop_interval")
 
         common_kwargs: dict[str, Any] = {
             "language": language,
@@ -82,9 +80,9 @@ class CreateSandboxTool(Tool):
             return None
         kwargs: dict[str, int] = {}
         if cpu is not None:
-            kwargs["cpu"] = int(cpu)
+            kwargs["cpu"] = to_int(cpu, "cpu")
         if memory is not None:
-            kwargs["memory"] = int(memory)
+            kwargs["memory"] = to_int(memory, "memory")
         if disk is not None:
-            kwargs["disk"] = int(disk)
+            kwargs["disk"] = to_int(disk, "disk")
         return Resources(**kwargs)

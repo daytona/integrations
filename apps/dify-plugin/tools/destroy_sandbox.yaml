@@ -12,7 +12,7 @@ description:
     zh_Hans: Stop and permanently delete a Daytona sandbox and all its data.
     ja_JP: Stop and permanently delete a Daytona sandbox and all its data.
     pt_BR: Stop and permanently delete a Daytona sandbox and all its data.
-  llm: Permanently destroy a Daytona sandbox by its ID. This stops the sandbox and deletes all associated data. Use this to clean up sandboxes that are no longer needed.
+  llm: Permanently destroy a Daytona sandbox by its ID. This stops the sandbox and deletes all associated data. Use this only for sandboxes you created with create_sandbox that are no longer needed. Do not call this on ephemeral sandboxes from run_code or run_command; those are destroyed automatically, so destroying them again fails with a not-found error.
 parameters:
   - name: sandbox_id
     type: string

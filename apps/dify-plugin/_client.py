@@ -3,6 +3,16 @@ from typing import Any
 from daytona import Daytona, DaytonaConfig, DaytonaNotFoundError, Sandbox
 
 
+def to_int(value: Any, name: str) -> int:
+    # Dify sends "number" params as float; silent int() truncation (0.5 -> 0)
+    # disables auto-stop and under-provisions resources, so reject fractions.
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a whole number, got {value!r}")
+    if isinstance(value, float) and not value.is_integer():
+        raise ValueError(f"{name} must be a whole number, got {value}")
+    return int(value)
+
+
 def build_client(credentials: dict[str, Any]) -> Daytona:
     config = DaytonaConfig(api_key=credentials["api_key"])
     if api_url := credentials.get("api_url"):

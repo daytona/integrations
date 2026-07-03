@@ -23,9 +23,6 @@ class DownloadFileTool(Tool):
         sandbox = get_sandbox(daytona, sandbox_id)
         content = sandbox.fs.download_file(remote_path)
 
-        if content is None:
-            raise ValueError(f"Could not read '{remote_path}' from sandbox '{sandbox_id}': no content returned")
-
         filename = os.path.basename(remote_path) or "downloaded_file"
         mime_type, _ = mimetypes.guess_type(filename)
         if not mime_type:

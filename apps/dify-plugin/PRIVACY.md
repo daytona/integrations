@@ -1,6 +1,6 @@
 ## Privacy Policy for Daytona Dify Plugin
 
-This plugin connects to the Daytona API (https://app.daytona.io/api) to create and manage sandbox environments.
+This plugin connects to the Daytona API to create and manage sandbox environments. It defaults to the hosted Daytona endpoint (https://app.daytona.io/api); users on a self-hosted or region-specific Daytona deployment can point it at their own Daytona API URL through the plugin credentials.
 
 ### Data Collected
 
