@@ -66,8 +66,11 @@ jobs:
     permissions:
       id-token: write # OIDC -> PyPI Trusted Publishing
       contents: read
-    # environment: pypi   # optional but recommended; create it in repo
-    #                     # settings and match it in the Trusted Publisher.
+    # Environment `pypi` is configured in repo Settings → Environments with
+    # "Selected branches and tags = main". Any workflow run on a non-main
+    # ref is refused at env-resolution time before the OIDC token is minted.
+    # The PyPI Trusted Publisher for this project must set Environment=pypi.
+    environment: pypi
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -91,7 +94,8 @@ jobs:
     permissions:
       id-token: write # OIDC -> PyPI Trusted Publishing
       contents: read
-    # environment: pypi
+    # See publish-adk for the pypi environment contract (repo Settings + PyPI).
+    environment: pypi
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -118,6 +122,9 @@ jobs:
     permissions:
       id-token: write # OIDC -> npm Trusted Publishing + provenance
       contents: read
+    # Environment `npm` restricts deploys to main and matches the
+    # `Environment name` field on each package's npm Trusted Publisher.
+    environment: npm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -152,6 +159,8 @@ jobs:
     permissions:
       id-token: write # OIDC -> npm Trusted Publishing + provenance
       contents: read
+    # See publish-n8n for the npm environment contract (repo Settings + npm).
+    environment: npm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -177,6 +186,8 @@ jobs:
     permissions:
       id-token: write # OIDC -> npm Trusted Publishing + provenance
       contents: read
+    # See publish-n8n for the npm environment contract (repo Settings + npm).
+    environment: npm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
