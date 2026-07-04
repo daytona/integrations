@@ -265,10 +265,10 @@ Parameters:
           `[TOOL: startDevServerTool]\nStart command: ${startCommand}`
         );
         const sessionId = "start-dev-server-cmd";
+        network.state.data.devServerSessionId = sessionId;
         const sessions = await sandbox.process.listSessions();
         let session = sessions.find((s) => s.sessionId === sessionId);
         if (!session) {
-          network.state.data.devServerSessionId = sessionId;
           await sandbox.process.createSession(sessionId);
           session = await sandbox.process.getSession(sessionId);
         }
@@ -375,9 +375,11 @@ Guidelines:
       console.log(`\n ===== Iteration #${callCount + 1} =====\n`);
       if (callCount > 0) {
         if (previousIterationMessageContent.includes("TASK_COMPLETED")) {
-          const isDevServerAppMessage = network.state.results.map((result) => extractTextMessageContent(result)).find((messageContent) =>
-            messageContent.includes("DEV_SERVER_PORT")
-          );
+          const isDevServerAppMessage = network.state.results
+            .map((result) => extractTextMessageContent(result))
+            .findLast((messageContent) =>
+              messageContent.includes("DEV_SERVER_PORT")
+            );
           if (isDevServerAppMessage) {
             const portMatch = isDevServerAppMessage.match(
               /DEV_SERVER_PORT=([0-9]+)/
@@ -409,7 +411,7 @@ Guidelines:
           previewInfo.url +
           "\x1b[0m"
       );
-    } else sandbox.delete();
+    } else await sandbox.delete();
   } catch (error) {
     console.error("An error occurred during the final phase:", error);
   }

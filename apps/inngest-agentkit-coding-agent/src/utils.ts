@@ -22,7 +22,9 @@ export async function createSandbox(network?: NetworkRun<Record<string, any>>) {
   try {
     sandbox = await daytona.create();
   } catch (error) {
-    throw new Error(`Failed to create Daytona sandbox: ${error}`);
+    throw new Error(`Failed to create Daytona sandbox: ${error}`, {
+      cause: error,
+    });
   }
   if (network) network.state.data.sandbox = sandbox;
   return sandbox;
@@ -35,6 +37,6 @@ export async function getSandbox(network?: NetworkRun<Record<string, any>>) {
 }
 
 export const logDebug = (message: string) => {
-  const enableDebugLogs = false;
+  const enableDebugLogs = process.env.ENABLE_DEBUG_LOGS === "true";
   if (enableDebugLogs) console.log(message);
 };
