@@ -16,13 +16,12 @@ class RunCodeTool(Tool):
         sandbox_id = tool_parameters.get("sandbox_id", "")
         ephemeral = not sandbox_id
 
-        language = tool_parameters.get("language", "python")
-        if language not in ("python", "typescript", "javascript"):
-            raise ValueError(f"Invalid language: {language}. Must be python, typescript, or javascript.")
-
         if sandbox_id:
             sandbox = get_sandbox(daytona, sandbox_id)
         else:
+            language = tool_parameters.get("language", "python")
+            if language not in ("python", "typescript", "javascript"):
+                raise ValueError(f"Invalid language: {language}. Must be python, typescript, or javascript.")
             sandbox = daytona.create(CreateSandboxFromSnapshotParams(language=language))
 
         try:
