@@ -12,7 +12,7 @@ This project demonstrates a fully autonomous coding agent capable of performing 
 - **File and directory management:** Creates, uploads, reads, and deletes files and directories as needed.
 - **Script and test execution:** Runs arbitrary scripts and test suites.
 - **Automated reasoning:** Plans and executes multi-step development workflows based on user prompts.
-- **Debug logging:** Detailed agent flow tracking enabled via `enableDebugLogs=true`.
+- **Debug logging:** Detailed agent flow tracking, disabled by default and enabled by setting `ENABLE_DEBUG_LOGS=true`.
 
 ## Requirements
 
@@ -35,7 +35,8 @@ See the `.env.example` file for the exact structure and variable names. Copy `.e
 
 Before proceeding with either Local or Docker setup, complete the following steps:
 1. Clone this repository to your local machine
-2. Copy `.env.example` to `.env` and add your API keys
+2. Change into the app directory: `cd apps/inngest-agentkit-coding-agent`
+3. Copy `.env.example` to `.env` and add your API keys
 
 ### 1. Local Setup
 
@@ -53,16 +54,19 @@ Before proceeding with either Local or Docker setup, complete the following step
 
 ### 2. Docker Setup
 
+> [!Note]
+> Your `.env` file is intentionally excluded from the image (via `.dockerignore`), so your API keys are never baked into the build. They are injected at runtime with `--env-file` instead (see the run command below).
+
 1. Build the Docker image:
 
    ```bash
    docker buildx build . -t coding-agent
    ```
 
-2. Run the container:
+2. Run the container (API keys are injected at runtime from your `.env`):
 
    ```bash
-   docker run --rm -it coding-agent
+   docker run --rm -it --env-file .env coding-agent
    ```
 
 
@@ -70,7 +74,7 @@ Before proceeding with either Local or Docker setup, complete the following step
 
 - **Prompt Setting:** The main prompt for the agent is configured in the `network.run(...)` call inside [`src/index.ts`](src/index.ts). You can edit this prompt to change the agent's task or try different app ideas and workflows.
 
-- **Debug Logs:** Detailed agent flow tracking is enabled by setting `enableDebugLogs=true`. This will log all agent iterations and tool actions for transparency and troubleshooting.
+- **Debug Logs:** Detailed agent flow tracking is disabled by default. Enable it by setting `ENABLE_DEBUG_LOGS=true` in your environment (for example, in your `.env` file). This will log all agent iterations and tool actions for transparency and troubleshooting.
 
 ## Example Usage
 
