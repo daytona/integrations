@@ -4,6 +4,8 @@ Provides ADK tool implementations for code execution in Daytona sandbox.
 """
 
 import logging
+import shlex
+import uuid
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -40,7 +42,11 @@ class ExecuteCodeTool(BaseTool):
                     ),
                     "language": types.Schema(
                         type=types.Type.STRING,
-                        description="Programming language: 'python' (default), 'javascript', or 'typescript'.",
+                        description=(
+                            "Programming language. Optional; defaults to 'python' when omitted. "
+                            "MUST be set to 'javascript' or 'typescript' to execute those languages — "
+                            "omitting this field will run the code through the Python interpreter."
+                        ),
                         enum=["python", "javascript", "typescript"],
                     ),
                     "env": types.Schema(
@@ -57,7 +63,7 @@ class ExecuteCodeTool(BaseTool):
                         description="Optional timeout in seconds.",
                     ),
                 },
-                required=["code", "language"],
+                required=["code"],
             ),
         )
 
@@ -87,26 +93,33 @@ class ExecuteCodeTool(BaseTool):
 
             elif language in ("javascript", "typescript"):
                 ext = "js" if language == "javascript" else "ts"
-                script_path = f"/tmp/script_{id(self)}.{ext}"
+                script_path = f"/tmp/script_{uuid.uuid4().hex}.{ext}"
                 self.sandbox.fs.upload_file(code.encode("utf-8"), script_path)
 
-                if language == "javascript":
-                    cmd = f"node {script_path}"
-                else:
-                    # ts-node: skip type checking, ignore tsconfig, force commonjs
-                    cmd = (
-                        f"ts-node --transpile-only --skipProject "
-                        f"--compilerOptions '{{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}}' "
-                        f"{script_path}"
-                    )
+                try:
+                    if language == "javascript":
+                        cmd = f"node {script_path}"
+                    else:
+                        # ts-node: skip type checking, ignore tsconfig, force commonjs
+                        cmd = (
+                            f"ts-node --transpile-only --skipProject "
+                            f"--compilerOptions '{{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}}' "
+                            f"{script_path}"
+                        )
 
-                if argv:
-                    cmd += " " + " ".join(argv)
+                    if argv:
+                        cmd += " " + " ".join(shlex.quote(str(arg)) for arg in argv)
 
-                response = self.sandbox.process.exec(cmd, env=env, timeout=timeout)
-                self.sandbox.fs.delete_file(script_path)
-                logger.debug(f"Code execution completed with exit_code: {response.exit_code}")
-                return {"result": response.result, "exit_code": response.exit_code}
+                    response = self.sandbox.process.exec(cmd, env=env, timeout=timeout)
+                    logger.debug(f"Code execution completed with exit_code: {response.exit_code}")
+                    return {"result": response.result, "exit_code": response.exit_code}
+                finally:
+                    try:
+                        self.sandbox.fs.delete_file(script_path)
+                    except Exception as cleanup_error:
+                        logger.warning(
+                            f"Failed to delete temp script {script_path}: {cleanup_error}"
+                        )
 
             else:
                 logger.warning(f"Unsupported language requested: {language}")
@@ -325,7 +338,7 @@ class StartLongRunningCommandTool(BaseTool):
         """Start a long-running command."""
         command = args.get("command", "")
         timeout = args.get("timeout")
-        session_id = f"long-running-{id(self)}"
+        session_id = f"long-running-{uuid.uuid4().hex}"
 
         logger.debug(f"Starting long-running command: {command[:100]}{'...' if len(command) > 100 else ''}")
 

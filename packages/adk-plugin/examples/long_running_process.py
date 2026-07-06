@@ -19,7 +19,7 @@ async def main() -> None:
     plugin = DaytonaPlugin()
 
     agent = Agent(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         name="process_manager",
         tools=plugin.get_tools(),
     )
@@ -43,7 +43,9 @@ async def main() -> None:
         print("Verifying Server is Running")
         print("=" * 60)
         response = await runner.run_debug(
-            "Check if the HTTP server is running by executing: curl -s http://localhost:8000 | head -n 5"
+            "Check if the HTTP server is running by executing: "
+            "curl -s --retry 5 --retry-delay 1 --retry-connrefused "
+            "http://localhost:8000 | head -n 5"
         )
         print(f"Response: {response}\n")
 
@@ -52,7 +54,7 @@ async def main() -> None:
         print("Checking Process List")
         print("=" * 60)
         response = await runner.run_debug(
-            "Run command to show Python processes: ps aux | grep 'python -m http.server'"
+            "Run command to show the running server process: pgrep -af 'python -m http.server'"
         )
         print(f"Response: {response}\n")
 
