@@ -25,9 +25,9 @@ check_banned_import() {
     fi
 }
 
-check_banned_import '^[[:space:]]*(from|import) langchain\.'
-check_banned_import '^[[:space:]]*(from|import) langchain_experimental\.'
-check_banned_import '^[[:space:]]*(from|import) langchain_community\.'
+check_banned_import '^[[:space:]]*(from|import) langchain\b'
+check_banned_import '^[[:space:]]*(from|import) langchain_experimental\b'
+check_banned_import '^[[:space:]]*(from|import) langchain_community\b'
 
 # Decide on an exit status based on the errors
 if [ "$errors" -gt 0 ]; then
