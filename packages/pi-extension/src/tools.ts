@@ -130,10 +130,14 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
       'Use this after starting a server (e.g. a dev server on port 3000) to give the user a link.',
     promptSnippet: 'Get a browser-openable preview URL for a port served in the sandbox',
     parameters: Type.Object({
-      port: Type.Number({ description: 'The port the server listens on inside the sandbox' }),
+      port: Type.Integer({
+        minimum: 1,
+        maximum: 65535,
+        description: 'The port the server listens on inside the sandbox',
+      }),
     }),
     async execute(_id, { port }) {
-      const active = getActive()
+      const active = requireSandbox()
       if (!active) {
         return { content: [{ type: 'text', text: 'No active Daytona sandbox.' }], details: undefined }
       }

@@ -21,8 +21,13 @@ const PUSH_USERNAME = 'x-access-token'
 export interface PushTarget {
   sandbox: Sandbox
   cwd: string
-  /** True when a GitHub origin and token are available (otherwise a no-op). */
-  pushEnabled: boolean
+  /**
+   * True when this session is configured for GitHub sync (repo has a github.com
+   * origin and gh was authenticated at session start). Token availability at
+   * push time is validated separately in `doPush` — a missing token here is a
+   * real failure, not a "no sync configured" no-op.
+   */
+  syncConfigured: boolean
 }
 
 export interface PushResult {
@@ -41,7 +46,10 @@ export function pushChanges(target: PushTarget, token: string | undefined): Prom
 }
 
 async function doPush(target: PushTarget, token: string | undefined): Promise<PushResult> {
-  if (!target.pushEnabled || !token) return { pushed: false }
+  // Sync genuinely off -> no-op. But sync configured + no token is a real failure,
+  // not "nothing to push": swallowing it would let callers proceed on stale remote.
+  if (!target.syncConfigured) return { pushed: false }
+  if (!token) throw new Error('GitHub push token unavailable — run `gh auth login` and retry.')
 
   const { sandbox, cwd } = target
   const status = await withRecovery(sandbox, () => sandbox.git.status(cwd))

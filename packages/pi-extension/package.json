@@ -42,8 +42,8 @@
     "@daytona/sdk": "^0.184.0"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "typebox": "*"
+    "@earendil-works/pi-coding-agent": "^0.79.0",
+    "typebox": "^1.1.38"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.79.0",

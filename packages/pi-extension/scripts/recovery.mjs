@@ -27,7 +27,7 @@ const jiti = createJiti(import.meta.url, {
   moduleCache: false,
   alias: { '@earendil-works/pi-coding-agent': hostEntry },
 })
-const { Daytona } = await import('@daytona/sdk')
+const { Daytona, DaytonaNotFoundError } = await import('@daytona/sdk')
 
 let pass = 0,
   fail = 0
@@ -47,10 +47,12 @@ const { createBashOps } = await jiti.import(path.join(root, 'src/ops.ts'))
 
 const daytona = new Daytona()
 const sandbox = await daytona.create({ labels: { 'created-by': 'pi-daytona-test' }, autoDeleteInterval: 60 })
+// Resolve home from the sandbox API so the test isn't tied to a specific image/user.
+const home = (await sandbox.getUserHomeDir()) ?? '/home/daytona'
 const ops = createBashOps(sandbox)
 const runOps = async (command) => {
   let out = ''
-  const { exitCode } = await ops.exec(command, '/home/daytona', { onData: (b) => (out += b.toString()) })
+  const { exitCode } = await ops.exec(command, home, { onData: (b) => (out += b.toString()) })
   return { out: out.trim(), exitCode }
 }
 
@@ -67,7 +69,19 @@ try {
 
   console.log('B. deleted sandbox -> clear error, no host fallback')
   await sandbox.delete()
-  await new Promise((r) => setTimeout(r, 1500))
+  // Poll until the deletion is visible (refreshData throws NotFound) instead of a
+  // fixed sleep — propagation time varies, and a guess makes the test flaky.
+  // Narrow to NotFound only: a transient refresh error must not be misread as
+  // "deletion complete" (that would advance the test before the sandbox is gone).
+  for (let i = 0; i < 30; i++) {
+    try {
+      await sandbox.refreshData()
+    } catch (e) {
+      if (e instanceof DaytonaNotFoundError) break
+      // transient: keep polling
+    }
+    await new Promise((r) => setTimeout(r, 300))
+  }
   let err
   try {
     await runOps('pwd')

@@ -13,7 +13,7 @@
  * Blueprint: examples/extensions/ssh.ts from @earendil-works/pi-coding-agent.
  */
 
-import { Daytona, type Sandbox } from '@daytona/sdk'
+import { Daytona, DaytonaNotFoundError, type Sandbox } from '@daytona/sdk'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { resolveApiKey } from './src/auth.ts'
@@ -137,7 +137,7 @@ export default function (pi: ExtensionAPI) {
       try {
         // Push the agent's latest commits first so the merge includes them.
         const token = await getGithubToken(pi)
-        await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token)
+        await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, syncConfigured: true }, token)
         const res = await mergeBranch(pi, slug, base, branch)
         if (!res.ok) {
           ctx.ui.notify(`Merge failed: ${res.message}`, 'error')
@@ -253,7 +253,12 @@ export default function (pi: ExtensionAPI) {
             )
             setRunningStatus(ctx, sandbox.id, prev.cwd)
             return
-          } catch {
+          } catch (err) {
+            // Only a truly missing sandbox (404) should spawn a fresh one. A
+            // transient failure must NOT fall through — that would orphan the
+            // existing sandbox with a duplicate. Rethrow so the outer catch
+            // fails cleanly (no sandbox was created yet).
+            if (!(err instanceof DaytonaNotFoundError)) throw err
             // Sandbox is gone (reaped/deleted) — fall through and create a fresh one.
           }
         }
@@ -388,7 +393,7 @@ export default function (pi: ExtensionAPI) {
     if (!active?.git) return
     try {
       const token = await getGithubToken(pi)
-      const res = await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token)
+      const res = await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, syncConfigured: true }, token)
       if (res.pushed) {
         ctx.ui.notify(
           `Pushed ${active.git.branch} → ${compareUrl(active.git.slug, active.git.base, active.git.branch)}`,
@@ -430,7 +435,7 @@ export default function (pi: ExtensionAPI) {
       if (current.git) {
         try {
           const token = await getGithubToken(pi)
-          await pushChanges({ sandbox: current.sandbox, cwd: current.cwd, pushEnabled: true }, token)
+          await pushChanges({ sandbox: current.sandbox, cwd: current.cwd, syncConfigured: true }, token)
           // Delete the branch only if it contributed nothing (HEAD == base on
           // GitHub). Compare on the remote — local ahead-of-remote is 0 right
           // after the push and would wrongly flag branches with real work.
@@ -520,7 +525,11 @@ function stringFlag(value: boolean | string | undefined): string | undefined {
 /** Parse a flag into a positive integer (minutes), or undefined if unset/invalid. */
 function numberFlag(value: boolean | string | undefined): number | undefined {
   const n = typeof value === 'string' ? Number(value) : NaN
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined
+  if (!Number.isFinite(n)) return undefined
+  // Floor first, then enforce the positive-integer contract: a fractional input
+  // like `0.5` must NOT collapse to `0` (which would read as "disable autostop").
+  const floored = Math.floor(n)
+  return floored >= 1 ? floored : undefined
 }
 
 function errorMessage(err: unknown): string {
