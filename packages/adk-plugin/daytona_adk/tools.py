@@ -42,7 +42,11 @@ class ExecuteCodeTool(BaseTool):
                     ),
                     "language": types.Schema(
                         type=types.Type.STRING,
-                        description="Programming language: 'python' (default), 'javascript', or 'typescript'.",
+                        description=(
+                            "Programming language. Optional; defaults to 'python' when omitted. "
+                            "MUST be set to 'javascript' or 'typescript' to execute those languages — "
+                            "omitting this field will run the code through the Python interpreter."
+                        ),
                         enum=["python", "javascript", "typescript"],
                     ),
                     "env": types.Schema(
