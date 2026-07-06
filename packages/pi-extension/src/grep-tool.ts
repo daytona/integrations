@@ -56,13 +56,28 @@ export async function runRemoteGrep(sandbox: Sandbox, cwd: string, params: GrepP
   if (glob) rg.push('--glob', shellQuote(glob))
   rg.push('--', shellQuote(pattern), shellQuote(searchDir))
 
-  // POSIX grep fallback — always present even on minimal images.
+  // GNU-ish grep fallback (used when bash is present but rg is not). Assumes
+  // GNU/busybox grep; the flags `-r`, `-I`, `-C`, `--include` are non-POSIX
+  // extensions that most bash-having systems provide.
   const gp = ['grep', '-rnI']
   if (ignoreCase) gp.push('-i')
   if (literal) gp.push('-F')
   if (ctxLines) gp.push('-C', String(ctxLines))
   if (glob) gp.push(`--include=${shellQuote(glob)}`)
   gp.push('--', shellQuote(pattern), shellQuote(searchDir))
+
+  // Strict-POSIX grep fallback (used only on bash-less + rg-less snapshots —
+  // the deepest fallback path). Uses `find … -exec grep` with ONLY POSIX flags
+  // (-n, -i, -F, -e). Trades away `-I` (skip binaries) and `-C` (context) for
+  // universal portability; those are GNU extensions strict POSIX grep lacks.
+  const posixGp = ['find', shellQuote(searchDir), '-type', 'f']
+  if (glob) posixGp.push('-name', shellQuote(glob))
+  posixGp.push('!', '-path', shellQuote('*/.git/*'))
+  posixGp.push('!', '-path', shellQuote('*/node_modules/*'))
+  posixGp.push('-exec', 'grep', '-n')
+  if (ignoreCase) posixGp.push('-i')
+  if (literal) posixGp.push('-F')
+  posixGp.push('-e', shellQuote(pattern), '/dev/null', '{}', '+')
 
   // Two shell paths depending on whether the snapshot has bash:
   //
@@ -95,7 +110,7 @@ export async function runRemoteGrep(sandbox: Sandbox, cwd: string, params: GrepP
     'if command -v rg >/dev/null 2>&1; then',
     `  ( ${rg.join(' ')} ) >"$__pi_out" 2>/dev/null`,
     'else',
-    `  ( ${gp.join(' ')} ) >"$__pi_out" 2>/dev/null`,
+    `  ( ${posixGp.join(' ')} ) >"$__pi_out" 2>/dev/null`,
     'fi',
     'rc=$?',
     `head -n ${max} "$__pi_out"`,

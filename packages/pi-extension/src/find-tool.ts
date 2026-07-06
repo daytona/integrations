@@ -65,6 +65,8 @@ export async function runRemoteFind(sandbox: Sandbox, cwd: string, params: FindP
     shellQuote(effective),
   ].join(' ')
 
+  // Use POSIX `!` (not GNU `-not`) so this works on busybox/dash/strict-POSIX
+  // find. GNU find accepts `!` too, so this is a strict portability improvement.
   const find = [
     'find',
     '.',
@@ -72,10 +74,10 @@ export async function runRemoteFind(sandbox: Sandbox, cwd: string, params: FindP
     'f',
     '-name',
     shellQuote(basename),
-    '-not',
+    '!',
     '-path',
     shellQuote('*/.git/*'),
-    '-not',
+    '!',
     '-path',
     shellQuote('*/node_modules/*'),
   ].join(' ')
