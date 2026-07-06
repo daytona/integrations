@@ -45,8 +45,11 @@ const check = (cond, msg, detail) => {
 const { createBashOps } = await jiti.import(path.join(root, 'src/ops.ts'))
 
 const daytona = new Daytona()
-const sandbox = await daytona.create({ ephemeral: true, labels: { 'created-by': 'pi-daytona-test' } })
+// Create inside the guarded block so a setup failure is reported as a failed
+// check (deterministic PASS/FAIL) instead of aborting with a raw rejection.
+let sandbox
 try {
+  sandbox = await daytona.create({ ephemeral: true, labels: { 'created-by': 'pi-daytona-test' } })
   const home = (await sandbox.getUserHomeDir()) ?? '/home/daytona'
   const ops = createBashOps(sandbox)
   // Bound every exec with a watchdog: the whole point of this test is that a
@@ -115,7 +118,7 @@ try {
   // raw rejection; record it as a failed check so the summary below still prints.
   check(false, 'aborted early', e?.message)
 } finally {
-  await sandbox.delete().catch(() => {})
+  if (sandbox) await sandbox.delete().catch(() => {})
   console.log('  (sandbox deleted)')
 }
 

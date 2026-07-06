@@ -47,10 +47,12 @@ const { createBashOps } = await jiti.import(path.join(root, 'src/ops.ts'))
 
 const daytona = new Daytona()
 const sandbox = await daytona.create({ labels: { 'created-by': 'pi-daytona-test' }, autoDeleteInterval: 60 })
+// Resolve home from the sandbox API so the test isn't tied to a specific image/user.
+const home = (await sandbox.getUserHomeDir()) ?? '/home/daytona'
 const ops = createBashOps(sandbox)
 const runOps = async (command) => {
   let out = ''
-  const { exitCode } = await ops.exec(command, '/home/daytona', { onData: (b) => (out += b.toString()) })
+  const { exitCode } = await ops.exec(command, home, { onData: (b) => (out += b.toString()) })
   return { out: out.trim(), exitCode }
 }
 
@@ -67,7 +69,16 @@ try {
 
   console.log('B. deleted sandbox -> clear error, no host fallback')
   await sandbox.delete()
-  await new Promise((r) => setTimeout(r, 1500))
+  // Poll until the deletion is visible (refreshData starts failing) instead of a
+  // fixed sleep — propagation time varies, and a guess makes the test flaky.
+  for (let i = 0; i < 30; i++) {
+    try {
+      await sandbox.refreshData()
+    } catch {
+      break
+    }
+    await new Promise((r) => setTimeout(r, 300))
+  }
   let err
   try {
     await runOps('pwd')

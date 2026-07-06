@@ -41,7 +41,10 @@ export function pushChanges(target: PushTarget, token: string | undefined): Prom
 }
 
 async function doPush(target: PushTarget, token: string | undefined): Promise<PushResult> {
-  if (!target.pushEnabled || !token) return { pushed: false }
+  // Sync genuinely off -> no-op. But sync on with no token is a real failure, not
+  // "nothing to push": swallowing it would let callers proceed on stale remote state.
+  if (!target.pushEnabled) return { pushed: false }
+  if (!token) throw new Error('GitHub push token unavailable — run `gh auth login` and retry.')
 
   const { sandbox, cwd } = target
   const status = await withRecovery(sandbox, () => sandbox.git.status(cwd))

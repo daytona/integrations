@@ -18,7 +18,7 @@
  * fails loudly — it never silently falls back to the host.
  */
 
-import type { Sandbox } from '@daytona/sdk'
+import { DaytonaNotFoundError, type Sandbox } from '@daytona/sdk'
 
 export class SandboxUnavailableError extends Error {
   constructor(public readonly sandboxId: string) {
@@ -44,9 +44,11 @@ export async function withRecovery<T>(sandbox: Sandbox, fn: () => Promise<T>): P
     try {
       await sandbox.refreshData()
       state = sandbox.state
-    } catch {
-      // refreshData failing means the sandbox no longer exists.
-      throw new SandboxUnavailableError(sandbox.id)
+    } catch (refreshErr) {
+      // Only a 404 means the sandbox is truly gone. A transient/network refresh
+      // failure must not be misreported as "removed" — surface the real op error.
+      if (refreshErr instanceof DaytonaNotFoundError) throw new SandboxUnavailableError(sandbox.id)
+      throw err
     }
     if (state !== undefined && state !== 'started') {
       // Stopped/archived but still present: bring it back and retry once.

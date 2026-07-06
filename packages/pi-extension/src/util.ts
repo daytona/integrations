@@ -16,6 +16,7 @@ export function shellQuote(arg: string): string {
 /** Normalize a repo argument into a clonable URL. Accepts `github.com/a/b`, full URLs, or `git@` SSH. */
 export function normalizeRepoUrl(url: string): string {
   const trimmed = url.trim()
+  if (!trimmed) throw new Error('Repository URL is empty.')
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || trimmed.startsWith('git@')) {
     return trimmed
   }
@@ -25,9 +26,10 @@ export function normalizeRepoUrl(url: string): string {
 /** Derive a directory name from a repo URL, e.g. `github.com/acme/api` -> `api`. */
 export function repoName(url: string): string {
   const cleaned = url
+    .replace(/^git@[^:]+:/, '')
+    .replace(/[/]+$/, '')
     .replace(/\.git$/i, '')
     .replace(/[/]+$/, '')
-    .replace(/^git@[^:]+:/, '')
   const parts = cleaned.split(/[/]/)
   return parts[parts.length - 1] || 'repo'
 }

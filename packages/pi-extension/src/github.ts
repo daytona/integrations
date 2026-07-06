@@ -42,19 +42,36 @@ export async function detectLocalRepo(
   }
 }
 
-/** Parse `owner/repo` from a normalized GitHub URL. Undefined if it isn't github.com. */
+/** Parse `owner/repo` from a GitHub URL. Undefined if the HOST isn't github.com. */
 export function parseRepoSlug(url: string): RepoSlug | undefined {
-  // `github.com` must be the HOST, not a substring or a path segment. It must be
-  // preceded by `//` (https authority) or `@` (scp-style/user-info) — NOT a bare
-  // `/`, which is just a path separator. This rejects look-alike hosts AND hosts
-  // where github.com appears later in the path:
-  //   https://github.com/acme/api.git        -> { owner: 'acme', repo: 'api' }
-  //   git@github.com:acme/api.git            -> { owner: 'acme', repo: 'api' }
-  //   https://evilgithub.com/acme/api        -> undefined
-  //   https://evil.com/github.com/acme/api   -> undefined  (github.com is a path segment)
-  const m = url.match(/(?:^|\/\/|@)github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i)
-  if (!m) return undefined
-  return { owner: m[1], repo: m[2] }
+  const trimmed = url.trim()
+
+  // scp-style SSH shorthand `[user@]host:owner/repo[.git]` must be matched BEFORE
+  // the URL parser: `new URL('git@github.com:acme/api')` reads `acme` as a port
+  // and throws. The negative lookahead `(?!\/\/)` keeps `https://…` on the URL
+  // branch below.
+  const scp = trimmed.match(/^(?:[^@/]+@)?([^/:]+):(?!\/\/)([^/]+)\/([^/]+?)(?:\.git)?\/?$/)
+  if (scp) {
+    const [, host, owner, repo] = scp
+    return host.toLowerCase() === 'github.com' ? { owner, repo } : undefined
+  }
+
+  // Anything else goes through the URL parser, which gives us the REAL hostname —
+  // regex-based host matching can be spoofed (e.g. `https://evil.com/@github.com/…`
+  // where the userinfo *looks* like a host but isn't).
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  let parsed: URL
+  try {
+    parsed = new URL(withScheme)
+  } catch {
+    return undefined
+  }
+  if (parsed.hostname.toLowerCase() !== 'github.com') return undefined
+  const segments = parsed.pathname.split('/').filter((s) => s.length > 0)
+  if (segments.length < 2) return undefined
+  const [owner, repoRaw] = segments
+  const repo = repoRaw.replace(/\.git$/i, '')
+  return owner && repo ? { owner, repo } : undefined
 }
 
 /** Build a GitHub compare URL (base...branch — shows the diff and a "Create pull request" button). */

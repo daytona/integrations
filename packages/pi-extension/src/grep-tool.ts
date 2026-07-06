@@ -64,10 +64,24 @@ export async function runRemoteGrep(sandbox: Sandbox, cwd: string, params: GrepP
   if (glob) gp.push(`--include=${shellQuote(glob)}`)
   gp.push('--', shellQuote(pattern), shellQuote(searchDir))
 
-  const command =
-    `if command -v rg >/dev/null 2>&1; then ${rg.join(' ')}; ` + `else ${gp.join(' ')}; fi | head -n ${max}`
+  // Preserve the search's real exit code across the `head` limiter (a pipe would
+  // report head's code instead). rg/grep exit >= 2 signals a genuine failure
+  // (bad regex, unreadable path) that must surface, not silently read as "no
+  // matches" — exit 0/1 are the normal matched/unmatched cases.
+  const search = `if command -v rg >/dev/null 2>&1; then ${rg.join(' ')}; else ${gp.join(' ')}; fi`
+  const command = [
+    '__pi_out=$(mktemp 2>/dev/null || echo "/tmp/pi-grep-$$.out")',
+    `( ${search} ) >"$__pi_out" 2>/dev/null`,
+    '__pi_rc=$?',
+    `head -n ${max} "$__pi_out"`,
+    'rm -f "$__pi_out"',
+    'exit $__pi_rc',
+  ].join('\n')
 
   const res = await execCommand(sandbox, command, cwd)
+  if ((res.exitCode ?? 0) >= 2) {
+    throw new Error(`grep failed in ${searchDir} (exit ${res.exitCode})`)
+  }
   const text = (res.result ?? res.artifacts?.stdout ?? '').replace(/\s+$/, '')
   const body = text.length > 0 ? text : `No matches found for /${pattern}/ in ${searchDir}`
   return { content: [{ type: 'text', text: body }], details: undefined }

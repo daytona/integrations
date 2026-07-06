@@ -80,11 +80,27 @@ export async function runRemoteFind(sandbox: Sandbox, cwd: string, params: FindP
     shellQuote('*/node_modules/*'),
   ].join(' ')
 
-  const command = `if command -v rg >/dev/null 2>&1; then ${rg}; else ${find}; fi | head -n ${max}`
+  // Preserve the search's real exit code across the `head` limiter (a pipe would
+  // report head's code instead). rg/grep exit >= 2 signals a genuine failure
+  // (bad path, permissions) that must surface, not silently read as "no files".
+  const search = `if command -v rg >/dev/null 2>&1; then ${rg}; else ${find}; fi`
+  const command = [
+    '__pi_out=$(mktemp 2>/dev/null || echo "/tmp/pi-find-$$.out")',
+    `( ${search} ) >"$__pi_out" 2>/dev/null`,
+    '__pi_rc=$?',
+    `head -n ${max} "$__pi_out"`,
+    'rm -f "$__pi_out"',
+    'exit $__pi_rc',
+  ].join('\n')
   const res = await execCommand(sandbox, command, searchPath)
+  if ((res.exitCode ?? 0) >= 2) {
+    throw new Error(`find failed in ${searchPath} (exit ${res.exitCode})`)
+  }
+  // Strip only the leading `./` and a trailing CR — never trim, which would
+  // corrupt filenames with legitimate leading/trailing spaces.
   const lines = (res.result ?? res.artifacts?.stdout ?? '')
     .split('\n')
-    .map((l) => l.replace(/^\.\//, '').trim())
+    .map((l) => l.replace(/^\.\//, '').replace(/\r$/, ''))
     .filter((l) => l.length > 0)
 
   const body = lines.length > 0 ? lines.join('\n') : 'No files found matching pattern'
