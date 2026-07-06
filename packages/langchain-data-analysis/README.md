@@ -42,7 +42,7 @@ def process_data_analysis_result(result: ExecutionArtifacts):
 	print(result)
 
 tool = DaytonaDataAnalysisTool(
-	daytona_api_key="your-daytona-api-key", # Only pass if not set as DAYTONA_API_KEY environment variable
+	# daytona_api_key="your-daytona-api-key",  # Only needed if DAYTONA_API_KEY is not set as an environment variable
 	on_result=process_data_analysis_result
 )
 ```

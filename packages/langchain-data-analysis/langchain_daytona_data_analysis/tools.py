@@ -1,7 +1,5 @@
 import ast
 import os
-from io import StringIO
-from sys import version_info
 from typing import IO, Any, Callable, List, Optional, Type, Union
 
 from daytona import (  # type: ignore
@@ -15,8 +13,6 @@ from langchain_core.callbacks import (  # type: ignore
 )
 from langchain_core.tools import BaseTool  # type: ignore
 from pydantic import BaseModel, Field, PrivateAttr  # type: ignore
-
-from .unparse import Unparser  # type: ignore
 
 
 class DaytonaDataAnalysisToolInput(BaseModel):
@@ -145,13 +141,6 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         on_result: Optional[Callable[[ExecutionArtifacts], Any]] = None,
         **kwargs: Any,
     ):
-        try:
-            from daytona import Daytona
-        except ImportError as e:
-            raise ImportError(
-                "Unable to import daytona, please install with `pip install daytona`."
-            ) from e
-
         super().__init__(description=tool_base_description, **kwargs)
         daytona_api_key = daytona_api_key or os.environ.get("DAYTONA_API_KEY")
         self._daytonaClient = Daytona(DaytonaConfig(api_key=daytona_api_key))
@@ -160,12 +149,15 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
     def _run(
         self, data_analysis_python_code: str, run_manager: Optional[CallbackManagerForToolRun] = None,
-    ) -> str | ExecutionArtifacts:
+    ) -> Union[str, ExecutionArtifacts]:
         python_code_to_exec = self._add_last_line_print(data_analysis_python_code)
 
         execution = self._sandbox.process.code_run(python_code_to_exec)
         if execution.exit_code != 0:
-            return 'Python code execution code exited with code ' + execution.exit_code + "\n" + "Result: " + execution.result
+            return (
+                f"Python code execution exited with code {execution.exit_code}\n"
+                f"Result: {execution.result}"
+            )
 
         if self._on_result is not None:
             if not execution.artifacts:
@@ -202,6 +194,8 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         fileName = os.path.basename(file.name)
         fileRemotePath = "/home/daytona/" + fileName
         file_bytes = file.read()
+        if isinstance(file_bytes, str):
+            file_bytes = file_bytes.encode("utf-8")
         self._sandbox.fs.upload_file(file_bytes, fileRemotePath)
 
         sandboxFile = SandboxUploadedFile(
@@ -228,15 +222,8 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         return self._daytonaClient.get(self._sandbox.id)
     
     def _unparse(self, tree: ast.AST) -> str:
-        """Unparse the AST."""
-        if version_info.minor < 9:
-            s = StringIO()
-            Unparser(tree, file=s)
-            source_code = s.getvalue()
-            s.close()
-        else:
-            source_code = ast.unparse(tree)
-        return source_code
+        """Unparse the AST back into source code."""
+        return ast.unparse(tree)
     
     def _add_last_line_print(self, code: str) -> str:
         """Add print statement to the last line if it's missing.
@@ -249,6 +236,8 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
             statement to the last line if it's missing.
         """
         tree = ast.parse(code)
+        if not tree.body:
+            return code
         node = tree.body[-1]
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
             if isinstance(node.value.func, ast.Name) and node.value.func.id == "print":
