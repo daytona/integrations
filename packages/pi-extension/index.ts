@@ -137,7 +137,7 @@ export default function (pi: ExtensionAPI) {
       try {
         // Push the agent's latest commits first so the merge includes them.
         const token = await getGithubToken(pi)
-        await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token)
+        await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, syncConfigured: true }, token)
         const res = await mergeBranch(pi, slug, base, branch)
         if (!res.ok) {
           ctx.ui.notify(`Merge failed: ${res.message}`, 'error')
@@ -393,7 +393,7 @@ export default function (pi: ExtensionAPI) {
     if (!active?.git) return
     try {
       const token = await getGithubToken(pi)
-      const res = await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, pushEnabled: true }, token)
+      const res = await pushChanges({ sandbox: active.sandbox, cwd: active.cwd, syncConfigured: true }, token)
       if (res.pushed) {
         ctx.ui.notify(
           `Pushed ${active.git.branch} → ${compareUrl(active.git.slug, active.git.base, active.git.branch)}`,
@@ -435,7 +435,7 @@ export default function (pi: ExtensionAPI) {
       if (current.git) {
         try {
           const token = await getGithubToken(pi)
-          await pushChanges({ sandbox: current.sandbox, cwd: current.cwd, pushEnabled: true }, token)
+          await pushChanges({ sandbox: current.sandbox, cwd: current.cwd, syncConfigured: true }, token)
           // Delete the branch only if it contributed nothing (HEAD == base on
           // GitHub). Compare on the remote — local ahead-of-remote is 0 right
           // after the push and would wrongly flag branches with real work.

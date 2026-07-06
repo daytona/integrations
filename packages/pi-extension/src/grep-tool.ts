@@ -64,22 +64,29 @@ export async function runRemoteGrep(sandbox: Sandbox, cwd: string, params: GrepP
   if (glob) gp.push(`--include=${shellQuote(glob)}`)
   gp.push('--', shellQuote(pattern), shellQuote(searchDir))
 
-  // Preserve the search's real exit code across the `head` limiter (a pipe would
-  // report head's code instead). rg/grep exit >= 2 signals a genuine failure
-  // (bad regex, unreadable path) that must surface, not silently read as "no
-  // matches" — exit 0/1 are the normal matched/unmatched cases.
-  const search = `if command -v rg >/dev/null 2>&1; then ${rg.join(' ')}; else ${gp.join(' ')}; fi`
-  const command = [
-    '__pi_out=$(mktemp 2>/dev/null || echo "/tmp/pi-grep-$$.out")',
-    `( ${search} ) >"$__pi_out" 2>/dev/null`,
-    '__pi_rc=$?',
-    `head -n ${max} "$__pi_out"`,
-    'rm -f "$__pi_out"',
-    'exit $__pi_rc',
+  // Stream through `head` so the search dies via SIGPIPE after `max` matches
+  // instead of scanning + buffering the entire result set. `PIPESTATUS[0]`
+  // preserves the search's real exit code across the pipe (which would otherwise
+  // report `head`'s 0). Normalize the exit code inside the script so the caller
+  // sees 0 for any expected outcome and nonzero only for a real error:
+  //   rg/grep: 0=matches, 1=no-matches (OK), 141=SIGPIPE (head cutoff), 2+=error
+  // Requires `bash` for PIPESTATUS (dash/busybox-sh don't have it).
+  const script = [
+    'set +e',
+    'if command -v rg >/dev/null 2>&1; then',
+    `  ${rg.join(' ')} 2>/dev/null | head -n ${max}`,
+    '  rc=${PIPESTATUS[0]:-$?}',
+    'else',
+    `  ${gp.join(' ')} 2>/dev/null | head -n ${max}`,
+    '  rc=${PIPESTATUS[0]:-$?}',
+    'fi',
+    'case "$rc" in 0|1|141) exit 0 ;; esac',
+    'exit "$rc"',
   ].join('\n')
+  const command = `bash -c ${shellQuote(script)}`
 
   const res = await execCommand(sandbox, command, cwd)
-  if ((res.exitCode ?? 0) >= 2) {
+  if ((res.exitCode ?? 0) !== 0) {
     throw new Error(`grep failed in ${searchDir} (exit ${res.exitCode})`)
   }
   const text = (res.result ?? res.artifacts?.stdout ?? '').replace(/\s+$/, '')

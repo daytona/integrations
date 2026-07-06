@@ -80,20 +80,32 @@ export async function runRemoteFind(sandbox: Sandbox, cwd: string, params: FindP
     shellQuote('*/node_modules/*'),
   ].join(' ')
 
-  // Preserve the search's real exit code across the `head` limiter (a pipe would
-  // report head's code instead). rg/grep exit >= 2 signals a genuine failure
-  // (bad path, permissions) that must surface, not silently read as "no files".
-  const search = `if command -v rg >/dev/null 2>&1; then ${rg}; else ${find}; fi`
-  const command = [
-    '__pi_out=$(mktemp 2>/dev/null || echo "/tmp/pi-find-$$.out")',
-    `( ${search} ) >"$__pi_out" 2>/dev/null`,
-    '__pi_rc=$?',
-    `head -n ${max} "$__pi_out"`,
-    'rm -f "$__pi_out"',
-    'exit $__pi_rc',
+  // Stream through `head` so the search dies via SIGPIPE after `max` results
+  // instead of scanning + buffering the entire result set. `PIPESTATUS[0]`
+  // preserves the search's real exit code across the pipe. The two branches
+  // handle exit codes differently because rg and find disagree on what "1"
+  // means:
+  //   rg:   0=matches, 1=no-matches (OK), 141=SIGPIPE, 2+=error
+  //   find: 0=success (matched or not), 141=SIGPIPE, 1+=error
+  // So `1` is OK for rg but is a real error for find.
+  // Requires `bash` for PIPESTATUS (dash/busybox-sh don't have it).
+  const script = [
+    'set +e',
+    'if command -v rg >/dev/null 2>&1; then',
+    `  ${rg} 2>/dev/null | head -n ${max}`,
+    '  rc=${PIPESTATUS[0]:-$?}',
+    '  case "$rc" in 0|1|141) exit 0 ;; esac',
+    'else',
+    `  ${find} 2>/dev/null | head -n ${max}`,
+    '  rc=${PIPESTATUS[0]:-$?}',
+    '  case "$rc" in 0|141) exit 0 ;; esac',
+    'fi',
+    'exit "$rc"',
   ].join('\n')
+  const command = `bash -c ${shellQuote(script)}`
+
   const res = await execCommand(sandbox, command, searchPath)
-  if ((res.exitCode ?? 0) >= 2) {
+  if ((res.exitCode ?? 0) !== 0) {
     throw new Error(`find failed in ${searchPath} (exit ${res.exitCode})`)
   }
   // Strip only the leading `./` and a trailing CR — never trim, which would

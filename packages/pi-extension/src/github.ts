@@ -49,8 +49,8 @@ export function parseRepoSlug(url: string): RepoSlug | undefined {
   // scp-style SSH shorthand `[user@]host:owner/repo[.git]` must be matched BEFORE
   // the URL parser: `new URL('git@github.com:acme/api')` reads `acme` as a port
   // and throws. The negative lookahead `(?!\/\/)` keeps `https://…` on the URL
-  // branch below.
-  const scp = trimmed.match(/^(?:[^@/]+@)?([^/:]+):(?!\/\/)([^/]+)\/([^/]+?)(?:\.git)?\/?$/)
+  // branch below. `/i` mirrors the URL branch so `.GIT` (uppercase) strips too.
+  const scp = trimmed.match(/^(?:[^@/]+@)?([^/:]+):(?!\/\/)([^/]+)\/([^/]+?)(?:\.git)?\/?$/i)
   if (scp) {
     const [, host, owner, repo] = scp
     return host.toLowerCase() === 'github.com' ? { owner, repo } : undefined
@@ -67,8 +67,12 @@ export function parseRepoSlug(url: string): RepoSlug | undefined {
     return undefined
   }
   if (parsed.hostname.toLowerCase() !== 'github.com') return undefined
+  // Require EXACTLY `owner/repo` (with optional `.git`/trailing slash — both
+  // filtered by the empty-segment drop). A URL like `.../owner/repo/tree/main`
+  // is a GitHub tree/blob URL, not a clone URL — accepting it would silently
+  // clone the repo root when the caller pointed at a subpath.
   const segments = parsed.pathname.split('/').filter((s) => s.length > 0)
-  if (segments.length < 2) return undefined
+  if (segments.length !== 2) return undefined
   const [owner, repoRaw] = segments
   const repo = repoRaw.replace(/\.git$/i, '')
   return owner && repo ? { owner, repo } : undefined

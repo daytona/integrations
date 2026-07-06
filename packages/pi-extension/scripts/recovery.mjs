@@ -27,7 +27,7 @@ const jiti = createJiti(import.meta.url, {
   moduleCache: false,
   alias: { '@earendil-works/pi-coding-agent': hostEntry },
 })
-const { Daytona } = await import('@daytona/sdk')
+const { Daytona, DaytonaNotFoundError } = await import('@daytona/sdk')
 
 let pass = 0,
   fail = 0
@@ -69,13 +69,16 @@ try {
 
   console.log('B. deleted sandbox -> clear error, no host fallback')
   await sandbox.delete()
-  // Poll until the deletion is visible (refreshData starts failing) instead of a
+  // Poll until the deletion is visible (refreshData throws NotFound) instead of a
   // fixed sleep — propagation time varies, and a guess makes the test flaky.
+  // Narrow to NotFound only: a transient refresh error must not be misread as
+  // "deletion complete" (that would advance the test before the sandbox is gone).
   for (let i = 0; i < 30; i++) {
     try {
       await sandbox.refreshData()
-    } catch {
-      break
+    } catch (e) {
+      if (e instanceof DaytonaNotFoundError) break
+      // transient: keep polling
     }
     await new Promise((r) => setTimeout(r, 300))
   }
