@@ -64,14 +64,21 @@ export async function runRemoteGrep(sandbox: Sandbox, cwd: string, params: GrepP
   if (glob) gp.push(`--include=${shellQuote(glob)}`)
   gp.push('--', shellQuote(pattern), shellQuote(searchDir))
 
-  // Stream through `head` so the search dies via SIGPIPE after `max` matches
-  // instead of scanning + buffering the entire result set. `PIPESTATUS[0]`
-  // preserves the search's real exit code across the pipe (which would otherwise
-  // report `head`'s 0). Normalize the exit code inside the script so the caller
-  // sees 0 for any expected outcome and nonzero only for a real error:
-  //   rg/grep: 0=matches, 1=no-matches (OK), 141=SIGPIPE (head cutoff), 2+=error
-  // Requires `bash` for PIPESTATUS (dash/busybox-sh don't have it).
-  const script = [
+  // Two shell paths depending on whether the snapshot has bash:
+  //
+  //   bash present (default Daytona images) -> STREAMING via pipe-to-head.
+  //     The search dies via SIGPIPE after `max` matches instead of buffering
+  //     the entire result set. `PIPESTATUS[0]` preserves the search's real exit
+  //     code across the pipe (which would otherwise report `head`'s 0).
+  //
+  //   bash absent (Alpine/busybox/dash-only snapshots) -> BUFFERED via temp
+  //     file (same idiom as ops.ts `backgroundSafe`). Loses streaming perf but
+  //     works everywhere and still preserves exit codes.
+  //
+  // Both branches normalize expected outcomes to exit 0 so the caller sees
+  // nonzero only for a real error:
+  //   rg/grep: 0=matches, 1=no-matches (OK), 141=SIGPIPE (streaming only), 2+=error
+  const bashScript = [
     'set +e',
     'if command -v rg >/dev/null 2>&1; then',
     `  ${rg.join(' ')} 2>/dev/null | head -n ${max}`,
@@ -83,7 +90,26 @@ export async function runRemoteGrep(sandbox: Sandbox, cwd: string, params: GrepP
     'case "$rc" in 0|1|141) exit 0 ;; esac',
     'exit "$rc"',
   ].join('\n')
-  const command = `bash -c ${shellQuote(script)}`
+  const posixFallback = [
+    '__pi_out=$(mktemp 2>/dev/null || echo "/tmp/pi-grep-$$.out")',
+    'if command -v rg >/dev/null 2>&1; then',
+    `  ( ${rg.join(' ')} ) >"$__pi_out" 2>/dev/null`,
+    'else',
+    `  ( ${gp.join(' ')} ) >"$__pi_out" 2>/dev/null`,
+    'fi',
+    'rc=$?',
+    `head -n ${max} "$__pi_out"`,
+    'rm -f "$__pi_out"',
+    'case "$rc" in 0|1) exit 0 ;; esac',
+    'exit "$rc"',
+  ].join('\n')
+  const command = [
+    'if command -v bash >/dev/null 2>&1; then',
+    `  bash -c ${shellQuote(bashScript)}`,
+    '  exit $?',
+    'fi',
+    posixFallback,
+  ].join('\n')
 
   const res = await execCommand(sandbox, command, cwd)
   if ((res.exitCode ?? 0) !== 0) {
