@@ -1,5 +1,6 @@
 """Unit tests for Daytona ADK tools."""
 
+import os
 from typing import Generator
 from unittest.mock import MagicMock
 
@@ -12,6 +13,12 @@ from daytona_adk.tools import (
     ReadFileTool,
     StartLongRunningCommandTool,
     UploadFileTool,
+)
+
+# Skip the whole module without credentials: every test uses the live-sandbox fixture.
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("DAYTONA_API_KEY"),
+    reason="DAYTONA_API_KEY not set; these tests require a live Daytona backend",
 )
 
 
@@ -299,8 +306,11 @@ class TestStartLongRunningCommandTool:
             args={"command": "echo 'session test'"},
             tool_context=mock_tool_context,
         )
+        assert "error" not in result
         assert "session_id" in result
         assert result["session_id"].startswith("long-running-")
+        assert "output" in result
+        assert "exit_code" in result
 
 
 class TestToolDeclarations:
@@ -328,6 +338,9 @@ class TestToolDeclarations:
         assert "command" in decl.parameters.properties
         assert "cwd" in decl.parameters.properties
         assert "env" in decl.parameters.properties
+        assert "timeout" in decl.parameters.properties
+        assert decl.parameters.required is not None
+        assert "command" in decl.parameters.required
 
     def test_upload_file_tool_declaration(self, plugin: DaytonaPlugin) -> None:
         """Test UploadFileTool has valid declaration."""
@@ -338,6 +351,9 @@ class TestToolDeclarations:
         assert decl.parameters.properties is not None
         assert "file_path" in decl.parameters.properties
         assert "content" in decl.parameters.properties
+        assert decl.parameters.required is not None
+        assert "file_path" in decl.parameters.required
+        assert "content" in decl.parameters.required
 
     def test_read_file_tool_declaration(self, plugin: DaytonaPlugin) -> None:
         """Test ReadFileTool has valid declaration."""
@@ -347,6 +363,8 @@ class TestToolDeclarations:
         assert decl.parameters is not None
         assert decl.parameters.properties is not None
         assert "file_path" in decl.parameters.properties
+        assert decl.parameters.required is not None
+        assert "file_path" in decl.parameters.required
 
     def test_start_long_running_command_tool_declaration(self, plugin: DaytonaPlugin) -> None:
         """Test StartLongRunningCommandTool has valid declaration."""
@@ -357,3 +375,5 @@ class TestToolDeclarations:
         assert decl.parameters.properties is not None
         assert "command" in decl.parameters.properties
         assert "timeout" in decl.parameters.properties
+        assert decl.parameters.required is not None
+        assert "command" in decl.parameters.required
