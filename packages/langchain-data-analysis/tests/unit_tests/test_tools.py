@@ -1,12 +1,22 @@
 import os
-from typing import Type
+from typing import Iterator, Type
+from unittest.mock import MagicMock, patch
 
+import pytest  # type: ignore
 from langchain_tests.unit_tests import ToolsUnitTests  # type: ignore
 
 from langchain_daytona_data_analysis.tools import DaytonaDataAnalysisTool
 
 
 class TestDaytonaDataAnalysisToolUnit(ToolsUnitTests):
+    @pytest.fixture(autouse=True)
+    def mock_daytona_client(self) -> Iterator[MagicMock]:
+        with patch(
+            "langchain_daytona_data_analysis.tools.Daytona"
+        ) as mock_daytona:
+            mock_daytona.return_value.create.return_value = MagicMock()
+            yield mock_daytona
+
     @property
     def tool_constructor(self) -> Type[DaytonaDataAnalysisTool]:
         return DaytonaDataAnalysisTool

@@ -79,14 +79,14 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
         code = "print('Integration test')"
         result = tool._run(code)
         assert isinstance(result, ExecutionArtifacts)
-        assert "Integration test" in result.stdout or result.stdout == ""
+        assert "Integration test" in result.stdout
 
         assert mock_on_result.called
         args, kwargs = mock_on_result.call_args
         result_arg = args[0]
 
         assert isinstance(result_arg, ExecutionArtifacts)
-        assert "Integration test" in result_arg.stdout or result_arg.stdout == ""
+        assert "Integration test" in result_arg.stdout
 
     def test_close(self, tool: DaytonaDataAnalysisTool) -> None:
         try:

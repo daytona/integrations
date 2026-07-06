@@ -48,6 +48,9 @@ optional = true
 [tool.poetry.group.lint]
 optional = true
 
+[tool.poetry.group.typing]
+optional = true
+
 [tool.poetry.group.dev]
 optional = true
 
