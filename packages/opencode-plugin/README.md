@@ -30,7 +30,7 @@ To install the plugin globally, edit `~/.config/opencode/opencode.json`.
 
 This plugin requires a [Daytona account](https://www.daytona.io/) and [Daytona API key](https://app.daytona.io/dashboard/keys) to create sandboxes.
 
-Set your Daytona API key and URL as environment variables:
+Set your Daytona API key as an environment variable:
 
 ```bash
 export DAYTONA_API_KEY="your-api-key"
@@ -108,8 +108,8 @@ The plugin only synchronizes changes from the sandbox to your system. To pass lo
 
 The plugin keeps track of which sandbox belongs to each OpenCode project using local state files. This data is stored in a separate JSON file for each project:
 
-- On macOS: `~/.local/share/opencode/storage/daytona/[projectid].json`.
-- On Windows: `%LOCALAPPDATA%\opencode\storage\daytona\[projectid].json`.
+- Default (when `XDG_DATA_HOME` is unset): `~/.local/share/opencode/storage/daytona/[projectid].json`.
+- When `XDG_DATA_HOME` is set: `$XDG_DATA_HOME/opencode/storage/daytona/[projectid].json`.
 
 Each JSON file contains the sandbox metadata for each session in the project, including when the sandbox was created, and when it was last used.
 
@@ -173,7 +173,7 @@ The published package contains the compiled `.js`/`.d.ts`; the `.ts` sources are
 
 #### Test the built package
 
-After building, create a test project and add a plugin file to load the built plugin (replace `[ABSOLUTE_PATH_TO_DAYTONA]` with your clone path, e.g. `/Users/you/daytona`):
+After building, create a test project and add a plugin file to load the built plugin (replace `[ABSOLUTE_PATH_TO_REPO]` with your clone path, e.g. `/Users/you/integrations`):
 
 ```bash
 mkdir -p ~/myproject && cd ~/myproject

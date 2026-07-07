@@ -49,14 +49,6 @@ export class SessionGitManager {
   }
 
   /**
-   * Check if local git repository exists
-   * @returns true if repo exists, false otherwise
-   */
-  hasLocalRepo(): boolean {
-    return this.hostGit.hasRepo(this.worktree)
-  }
-
-  /**
    * Initialize git in the sandbox and sync with host
    * Used when a new sandbox is created for a session
    */
@@ -120,7 +112,10 @@ export class SessionGitManager {
 
       const sshUrl = await this.getSshUrl()
 
-      await this.hostGit.pull(this.remoteName, sshUrl, this.branch, this.worktree, this.localBranch)
+      // Pull the branch the sandbox actually committed to, which may differ from the
+      // initial 'opencode' branch, so commits are never left unsynced.
+      const sandboxBranch = await this.sandboxGit.getCurrentBranch()
+      await this.hostGit.pull(this.remoteName, sshUrl, sandboxBranch, this.worktree, this.localBranch)
       toast.show({
         title: 'Changes synced',
         message: `Changes have been synced to ${this.localBranch} in your local repository`,

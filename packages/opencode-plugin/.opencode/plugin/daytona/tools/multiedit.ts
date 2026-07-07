@@ -31,6 +31,15 @@ export const multieditTool = (
     let content = decoder.decode(buffer)
 
     for (const edit of args.edits) {
+      const occurrences = content.split(edit.oldString).length - 1
+      if (occurrences === 0) {
+        throw new Error(`oldString not found in ${args.filePath}; no changes were made: ${JSON.stringify(edit.oldString)}`)
+      }
+      if (occurrences > 1) {
+        throw new Error(
+          `oldString is ambiguous (${occurrences} matches) in ${args.filePath}; no changes were made: ${JSON.stringify(edit.oldString)}`,
+        )
+      }
       content = content.replace(edit.oldString, edit.newString)
     }
 

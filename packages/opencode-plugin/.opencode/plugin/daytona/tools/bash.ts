@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod'
+import { DaytonaNotFoundError } from '@daytona/sdk'
 import type { PluginInput } from '@opencode-ai/plugin'
 import type { ToolContext } from '@opencode-ai/plugin/tool'
 import type { DaytonaSessionManager } from '../core/session-manager'
@@ -28,7 +29,10 @@ export const bashTool = (
       const execSessionId = `exec-session-${sessionId}`
       try {
         await sandbox.process.getSession(execSessionId)
-      } catch {
+      } catch (err) {
+        if (!(err instanceof DaytonaNotFoundError)) {
+          throw err
+        }
         await sandbox.process.createSession(execSessionId)
       }
       await sandbox.process.executeSessionCommand(execSessionId, {

@@ -12,11 +12,9 @@ import { readTool } from './tools/read'
 import { writeTool } from './tools/write'
 import { editTool } from './tools/edit'
 import { multieditTool } from './tools/multiedit'
-import { patchTool } from './tools/patch'
 import { lsTool } from './tools/ls'
 import { globTool } from './tools/glob'
 import { grepTool } from './tools/grep'
-import { lspTool } from './tools/lsp'
 import { getPreviewURLTool } from './tools/get-preview-url'
 
 import type { DaytonaSessionManager } from './core/session-manager'
@@ -35,11 +33,9 @@ export function createDaytonaTools(
     write: writeTool(sessionManager, projectId, worktree, pluginCtx),
     edit: editTool(sessionManager, projectId, worktree, pluginCtx),
     multiedit: multieditTool(sessionManager, projectId, worktree, pluginCtx),
-    patch: patchTool(sessionManager, projectId, worktree, pluginCtx),
     ls: lsTool(sessionManager, projectId, worktree, pluginCtx),
     glob: globTool(sessionManager, projectId, worktree, pluginCtx),
     grep: grepTool(sessionManager, projectId, worktree, pluginCtx),
-    lsp: lspTool(sessionManager, projectId, worktree, pluginCtx),
     getPreviewURL: getPreviewURLTool(sessionManager, projectId, worktree, pluginCtx),
   }
 }

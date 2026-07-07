@@ -25,6 +25,9 @@ export const editTool = (
     const buffer = await sandbox.fs.downloadFile(args.filePath)
     const decoder = new TextDecoder()
     const content = decoder.decode(buffer)
+    if (!content.includes(args.oldString)) {
+      throw new Error(`oldString not found in ${args.filePath}; no changes were made.`)
+    }
     const newContent = content.replace(args.oldString, args.newString)
     await sandbox.fs.uploadFile(Buffer.from(newContent), args.filePath)
     return `Edited ${args.filePath}`

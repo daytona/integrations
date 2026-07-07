@@ -26,6 +26,14 @@ export const grepTool = (
       throw new Error('Work directory not available')
     }
     const matches = await sandbox.fs.findFiles(workDir, args.pattern)
-    return matches.map((m: Match) => `${m.file}:${m.line}: ${m.content}`).join('\n')
+    const maxMatches = 100
+    const formatted = matches
+      .slice(0, maxMatches)
+      .map((m: Match) => `${m.file}:${m.line}: ${m.content}`)
+      .join('\n')
+    if (matches.length > maxMatches) {
+      return `${formatted}\n... (${matches.length - maxMatches} more matches truncated; refine your pattern)`
+    }
+    return formatted
   },
 })

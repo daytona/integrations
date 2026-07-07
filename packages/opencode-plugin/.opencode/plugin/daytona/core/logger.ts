@@ -31,24 +31,28 @@ class Logger {
     } catch (err) {
       // Directory may already exist, ignore
     }
-    // Trim log file if it exceeds 3MB (keep last 1MB)
+    // Trim by byte length (not characters) so the 1MB target holds for non-ASCII logs
     try {
       const stats = statSync(this.logFile)
       const maxSize = 3 * 1024 * 1024
       const keepSize = 1024 * 1024
       if (stats.size > maxSize) {
-        const content = readFileSync(this.logFile, 'utf8')
-        const trimmed = content.slice(-keepSize)
+        const buffer = readFileSync(this.logFile)
+        const trimmed = buffer.subarray(buffer.length - keepSize)
         // Drop partial first line so we don't start mid-log
         const firstNewline = trimmed.indexOf('\n')
-        writeFileSync(this.logFile, firstNewline >= 0 ? trimmed.slice(firstNewline + 1) : trimmed)
+        writeFileSync(this.logFile, firstNewline >= 0 ? trimmed.subarray(firstNewline + 1) : trimmed)
       }
     } catch (err) {
       // File may not exist yet, ignore
     }
     const timestamp = new Date().toISOString()
     const logEntry = `[${timestamp}] [${level}] ${message}\n`
-    appendFileSync(this.logFile, logEntry)
+    try {
+      appendFileSync(this.logFile, logEntry)
+    } catch (err) {
+      // Best-effort logging: never let a write failure crash the caller
+    }
   }
 
   info(message: string): void {

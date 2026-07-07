@@ -21,8 +21,10 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
     if (event.type === EVENT_TYPE_SESSION_DELETED) {
       const sessionId = (event as EventSessionDeleted).properties.info.id
       try {
-        await sessionManager.deleteSandbox(sessionId, projectId)
-        toast.show({ title: 'Session deleted', message: 'Sandbox deleted successfully.', variant: 'success' })
+        const deleted = await sessionManager.deleteSandbox(sessionId, projectId)
+        if (deleted) {
+          toast.show({ title: 'Session deleted', message: 'Sandbox deleted successfully.', variant: 'success' })
+        }
       } catch (err: any) {
         toast.show({ title: 'Delete failed', message: err?.message || 'Failed to delete sandbox.', variant: 'error' })
         throw err
@@ -40,13 +42,9 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
           `[idle] done sessionId=${sessionId} sandboxId=${sandbox.id} synced=${didSync} in ${Date.now() - start}ms`,
         )
       } catch (err: any) {
+        // autoCommitAndPull already shows a toast; only log here to avoid a duplicate
+        // error toast and noisy propagation out of the idle event hook.
         logger.error(`[idle] error sessionId=${sessionId} in ${Date.now() - start}ms: ${err}`)
-        toast.show({
-          title: 'Auto-commit error',
-          message: err?.message || 'Failed to auto-commit and pull.',
-          variant: 'error',
-        })
-        throw err
       }
     }
   }

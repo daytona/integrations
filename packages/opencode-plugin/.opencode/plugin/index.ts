@@ -8,4 +8,4 @@
  * Re-exports the default plugin from daytona.
  */
 
-export { default } from './daytona/index.js'
+export { default } from './daytona/index'

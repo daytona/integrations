@@ -29,7 +29,9 @@ export class ProjectDataStorage {
    * Get the file path for a project's session data
    */
   private getProjectFilePath(projectId: string): string {
-    return join(this.storageDir, `${projectId}.json`)
+    // Strip path separators so a projectId can never traverse outside storageDir.
+    const safeId = projectId.replace(/[/\\\0]/g, '_')
+    return join(this.storageDir, `${safeId}.json`)
   }
 
   /**
@@ -86,7 +88,19 @@ export class ProjectDataStorage {
         sessions: {},
       }
 
-      // Remove from source first (best effort).
+      // Write the destination first and confirm it landed on disk, so a write
+      // failure can never delete the source before the copy is safely persisted.
+      destination.sessions[sessionId] = found
+      // Prefer the worktree for the project we're actually operating on.
+      destination.worktree = worktree
+      this.save(projectId, destination.worktree, destination.sessions)
+
+      if (!this.load(projectId)?.sessions?.[sessionId]) {
+        logger.error(`Migration of session ${sessionId} to project ${projectId} did not persist; leaving source intact`)
+        return found
+      }
+
+      // Destination is safe; now remove from the source (best effort).
       try {
         delete otherData!.sessions[sessionId]
         this.save(otherProjectId, otherData!.worktree, otherData!.sessions)
@@ -94,16 +108,25 @@ export class ProjectDataStorage {
         logger.warn(`Failed to remove session ${sessionId} from project ${otherProjectId}: ${err}`)
       }
 
-      // Add to destination and persist.
-      destination.sessions[sessionId] = found
-      // Prefer the worktree for the project we're actually operating on.
-      destination.worktree = worktree
-      this.save(projectId, destination.worktree, destination.sessions)
-
       logger.info(`Migrated session ${sessionId} from project ${otherProjectId} to project ${projectId}`)
       return found
     }
 
+    return undefined
+  }
+
+  /**
+   * Read-only lookup of a session across all project files. Unlike getSession, this never
+   * migrates or writes, so it is safe to use on the delete path.
+   */
+  findSession(sessionId: string): { projectId: string; worktree: string; session: SessionInfo } | undefined {
+    for (const projectId of this.listProjectIds()) {
+      const data = this.load(projectId)
+      const session = data?.sessions?.[sessionId]
+      if (session) {
+        return { projectId, worktree: data!.worktree, session }
+      }
+    }
     return undefined
   }
 

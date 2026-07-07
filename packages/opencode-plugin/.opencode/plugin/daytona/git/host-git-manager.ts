@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../core/logger'
-import { execSync, spawnSync } from 'child_process'
+import { spawnSync } from 'child_process'
 
 type ExecResult = {
   ok: boolean
@@ -13,25 +13,30 @@ type ExecResult = {
   status: number | null
 }
 
-function execCommand(cmd: string, options: any = {}): ExecResult {
-  try {
-    const stdout = execSync(cmd, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      encoding: 'utf8',
-      ...options,
-    }) as unknown as string
-    return { ok: true, stdout: stdout ?? '', stderr: '', status: 0 }
-  } catch (err: any) {
-    const stdout = err?.stdout?.toString?.() ?? ''
-    const stderr = err?.stderr?.toString?.() ?? err?.message ?? String(err)
-    const status = typeof err?.status === 'number' ? err.status : null
-    return { ok: false, stdout, stderr, status }
+type ExecOptions = {
+  cwd?: string
+  env?: NodeJS.ProcessEnv
+}
+
+// Runs git with an explicit argument vector and no shell, so interpolated values
+// (SSH URLs, refs, remote names) can never be interpreted as shell syntax.
+function execGit(args: string[], options: ExecOptions = {}): ExecResult {
+  const res = spawnSync('git', args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    encoding: 'utf8',
+    ...options,
+  })
+  if (res.error) {
+    return { ok: false, stdout: '', stderr: res.error.message, status: null }
   }
+  const status = typeof res.status === 'number' ? res.status : null
+  return { ok: status === 0, stdout: res.stdout ?? '', stderr: res.stderr ?? '', status }
 }
 
 export class HostGitManager {
-  // No constructor needed; use global logger
-  private operationQueue: Promise<void> = Promise.resolve()
+  // Static so a single queue serializes git ops across every instance sharing the
+  // worktree; per-instance queues would let concurrent session syncs race.
+  private static operationQueue: Promise<void> = Promise.resolve()
   /** Cached OID of an empty commit used to reserve branch refs (branches must point at commits, not blobs). */
   private emptyCommitOidCache = new Map<string, string>()
 
@@ -40,7 +45,7 @@ export class HostGitManager {
    * @returns true if a git repo exists, false otherwise
    */
   hasRepo(cwd?: string): boolean {
-    return execCommand('git rev-parse --is-inside-work-tree', cwd ? { cwd } : {}).ok
+    return execGit(['rev-parse', '--is-inside-work-tree'], cwd ? { cwd } : {}).ok
   }
 
   /**
@@ -56,7 +61,7 @@ export class HostGitManager {
     }
 
     const base = `refs/heads/${prefix}/`
-    const listRes = execCommand(`git for-each-ref --format='%(refname:strip=3)' ${base}`, { cwd })
+    const listRes = execGit(['for-each-ref', '--format=%(refname:strip=3)', base], { cwd })
     if (!listRes.ok) throw new Error(listRes.stderr)
     const list = listRes.stdout.trim()
     const nums =
@@ -80,7 +85,7 @@ export class HostGitManager {
         continue
       }
       const oid = this.getOrCreateEmptyCommitOid(cwd)
-      const result = execCommand(`git update-ref "${ref}" "${oid}"`, { cwd })
+      const result = execGit(['update-ref', ref, oid], { cwd })
       if (result.ok) {
         logger.info(`[branch-alloc] reserved ${prefix}/${n} in ${Date.now() - start}ms`)
         return n
@@ -90,12 +95,16 @@ export class HostGitManager {
       }
     }
     const oid = this.getOrCreateEmptyCommitOid(cwd)
-    const last = execCommand(`git update-ref "${base}${n}" "${oid}"`, { cwd })
+    const last = execGit(['update-ref', `${base}${n}`, oid], { cwd })
+    if (last.ok) {
+      logger.info(`[branch-alloc] reserved ${prefix}/${n} in ${Date.now() - start}ms`)
+      return n
+    }
     throw new Error(`Failed to allocate branch number after ${attempts} attempts. Last error: ${last.stderr}`)
   }
 
   private refExists(cwd: string, ref: string): boolean {
-    return execCommand(`git show-ref --verify --quiet "${ref}"`, { cwd }).ok
+    return execGit(['show-ref', '--verify', '--quiet', ref], { cwd }).ok
   }
 
   /**
@@ -106,7 +115,7 @@ export class HostGitManager {
   private getOrCreateEmptyCommitOid(cwd: string): string {
     const cached = this.emptyCommitOidCache.get(cwd)
     if (cached) return cached
-    const headRes = execCommand('git rev-parse HEAD', { cwd })
+    const headRes = execGit(['rev-parse', 'HEAD'], { cwd })
     const head = headRes.ok ? headRes.stdout.trim() : ''
     if (head) {
       this.emptyCommitOidCache.set(cwd, head)
@@ -114,9 +123,7 @@ export class HostGitManager {
     }
 
     // Create an empty tree (idempotent) then a commit pointing at it.
-    // Branch refs must point at commits, so we can't reserve with a blob.
     const treeResult = spawnSync('git', ['hash-object', '-t', 'tree', '-w', '--stdin'], {
-      // Empty stdin => empty tree
       input: '',
       cwd,
       encoding: 'utf8',
@@ -140,11 +147,7 @@ export class HostGitManager {
       GIT_COMMITTER_EMAIL: reservationCommitEmail,
     }
 
-    // Create the commit
-    const commitRes = execCommand(`git commit-tree ${treeOid} -m "${reservationCommitMessage}"`, {
-      cwd,
-      env: commitEnv,
-    })
+    const commitRes = execGit(['commit-tree', treeOid, '-m', reservationCommitMessage], { cwd, env: commitEnv })
     if (!commitRes.ok) throw new Error(`Failed to create empty commit: ${commitRes.stderr}`)
     const commitOid = commitRes.stdout.trim()
     this.emptyCommitOidCache.set(cwd, commitOid)
@@ -157,63 +160,56 @@ export class HostGitManager {
    * @param sshUrl The SSH URL of the sandbox remote.
    * @param branch The branch to push to.
    * @param cwd Worktree path to run git in.
-   * @returns true if push was successful, false if no repo exists
+   * @returns true if push succeeded, false if no repo exists. Throws if the push fails.
    */
   async pushLocalToSandboxRemote(remoteName: string, sshUrl: string, branch: string, cwd: string): Promise<boolean> {
     if (!this.hasRepo(cwd)) {
       logger.warn('No local git repository found. Skipping push to sandbox.')
       return false
     }
-    try {
-      logger.info(`Pushing to ${remoteName} (${sshUrl}) on branch ${branch}`)
-      const operation = this.operationQueue.then(async () => {
-        const statusRes = execCommand('git status --porcelain', { cwd })
-        if (!statusRes.ok) {
-          throw new Error(statusRes.stderr)
-        }
-        if (statusRes.stdout.trim().length > 0) {
-          logger.warn('Local repository has uncommitted changes; pushing HEAD only (no auto-commit).')
-        }
+    logger.info(`Pushing to ${remoteName} (${sshUrl}) on branch ${branch}`)
+    const operation = HostGitManager.operationQueue.then(async () => {
+      const statusRes = execGit(['status', '--porcelain'], { cwd })
+      if (!statusRes.ok) {
+        throw new Error(statusRes.stderr)
+      }
+      if (statusRes.stdout.trim().length > 0) {
+        logger.warn('Local repository has uncommitted changes; pushing HEAD only (no auto-commit).')
+      }
 
-        this.setRemote(remoteName, sshUrl, cwd)
-        let attempts = 0
-        while (attempts < 3) {
-          try {
-            const pushRes = execCommand(`git push ${remoteName} HEAD:${branch}`, { cwd })
-            if (!pushRes.ok) throw new Error(pushRes.stderr)
-            logger.info(`✓ Pushed local changes to ${remoteName}`)
-            return
-          } catch (e) {
-            attempts++
-            if (attempts >= 3) {
-              logger.error(`Error pushing to ${remoteName} after 3 attempts: ${e}`)
-            } else {
-              logger.warn(`Push attempt ${attempts} failed, retrying...`)
-            }
-          }
+      this.setRemote(remoteName, sshUrl, cwd)
+      let attempts = 0
+      while (attempts < 3) {
+        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd })
+        if (pushRes.ok) {
+          logger.info(`✓ Pushed local changes to ${remoteName}`)
+          return
         }
-      })
-      this.operationQueue = operation
-      await operation
-      return true
-    } catch (e) {
-      logger.error(`Error pushing to sandbox: ${e}`)
-      return false
-    }
+        attempts++
+        if (attempts >= 3) {
+          logger.error(`Error pushing to ${remoteName} after 3 attempts: ${pushRes.stderr}`)
+          throw new Error(pushRes.stderr)
+        }
+        logger.warn(`Push attempt ${attempts} failed, retrying...`)
+      }
+    })
+    // Detach failures from the shared queue so one failed op doesn't block later ones.
+    HostGitManager.operationQueue = operation.catch(() => {})
+    await operation
+    return true
   }
 
   private setRemote(remoteName: string, sshUrl: string, cwd: string): void {
-    try {
-      // remove existing remote if it exists
-      execCommand(`git remote remove ${remoteName}`, { cwd })
-      execCommand(`git remote add ${remoteName} ${sshUrl}`, { cwd })
-    } catch (e) {
-      logger.warn(`Could not set sandbox remote: ${e}`)
+    // remove existing remote if it exists
+    execGit(['remote', 'remove', remoteName], { cwd })
+    const addRes = execGit(['remote', 'add', remoteName, sshUrl], { cwd })
+    if (!addRes.ok) {
+      logger.warn(`Could not set sandbox remote: ${addRes.stderr}`)
     }
   }
 
   async pull(remoteName: string, sshUrl: string, branch: string, cwd: string, localBranch?: string): Promise<void> {
-    const operation = this.operationQueue.then(async () => {
+    const operation = HostGitManager.operationQueue.then(async () => {
       this.setRemote(remoteName, sshUrl, cwd)
       let attempts = 0
       let lastError: unknown = undefined
@@ -223,23 +219,23 @@ export class HostGitManager {
           if (localBranch) {
             // Fetch into FETCH_HEAD only (never into refs/heads) so we don't hit
             // "refusing to fetch into branch checked out" when this branch is checked out.
-            const fetchRes = execCommand(`git fetch ${remoteName} ${branch}`, { cwd })
+            const fetchRes = execGit(['fetch', remoteName, branch], { cwd })
             if (!fetchRes.ok) throw new Error(fetchRes.stderr)
 
-            const updateRefRes = execCommand(`git update-ref refs/heads/${localBranch} FETCH_HEAD`, { cwd })
+            const updateRefRes = execGit(['update-ref', `refs/heads/${localBranch}`, 'FETCH_HEAD'], { cwd })
             if (!updateRefRes.ok) throw new Error(updateRefRes.stderr)
 
             // Only reset working directory if we're currently on this branch
-            const currentBranchRes = execCommand(`git rev-parse --abbrev-ref HEAD`, { cwd })
+            const currentBranchRes = execGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd })
             const currentBranch = currentBranchRes.ok ? currentBranchRes.stdout.trim() : ''
             if (currentBranch === localBranch) {
-              const resetRes = execCommand(`git reset --hard refs/heads/${localBranch}`, { cwd })
+              const resetRes = execGit(['reset', '--hard', `refs/heads/${localBranch}`], { cwd })
               if (!resetRes.ok) throw new Error(resetRes.stderr)
             }
 
             logger.info(`✓ Force pulled latest changes from sandbox into ${localBranch}`)
           } else {
-            const pullRes = execCommand(`git pull ${remoteName} ${branch}`, { cwd })
+            const pullRes = execGit(['pull', remoteName, branch], { cwd })
             if (!pullRes.ok) throw new Error(pullRes.stderr)
             logger.info('✓ Pulled latest changes from sandbox')
           }
@@ -258,31 +254,31 @@ export class HostGitManager {
       // If we got here, all attempts failed.
       throw lastError ?? new Error('Pull failed after 3 attempts')
     })
-    this.operationQueue = operation
+    // Detach failures from the shared queue so one failed op doesn't block later ones.
+    HostGitManager.operationQueue = operation.catch(() => {})
     await operation
   }
 
   async push(remoteName: string, sshUrl: string, branch: string, cwd: string): Promise<void> {
-    const operation = this.operationQueue.then(async () => {
+    const operation = HostGitManager.operationQueue.then(async () => {
       this.setRemote(remoteName, sshUrl, cwd)
       let attempts = 0
       while (attempts < 3) {
-        try {
-          const pushRes = execCommand(`git push ${remoteName} HEAD:${branch}`, { cwd })
-          if (!pushRes.ok) throw new Error(pushRes.stderr)
+        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd })
+        if (pushRes.ok) {
           logger.info('✓ Pushed changes to sandbox')
           return
-        } catch (e) {
-          attempts++
-          if (attempts >= 3) {
-            logger.error(`Error pushing to sandbox after 3 attempts: ${e}`)
-          } else {
-            logger.warn(`Push attempt ${attempts} failed, retrying...`)
-          }
         }
+        attempts++
+        if (attempts >= 3) {
+          logger.error(`Error pushing to sandbox after 3 attempts: ${pushRes.stderr}`)
+          throw new Error(pushRes.stderr)
+        }
+        logger.warn(`Push attempt ${attempts} failed, retrying...`)
       }
     })
-    this.operationQueue = operation
+    // Detach failures from the shared queue so one failed op doesn't block later ones.
+    HostGitManager.operationQueue = operation.catch(() => {})
     await operation
   }
 }

@@ -56,8 +56,15 @@ export class DaytonaSandboxGitManager {
     return true
   }
 
+  async getCurrentBranch(): Promise<string> {
+    const branch = await this.runGitCommand('git rev-parse --abbrev-ref HEAD')
+    return branch.trim()
+  }
+
   async resetToRemote(branch: string): Promise<void> {
-    const checkout = await this.runGitCommand(`git checkout -B ${branch}`)
+    // Check out the branch the host just pushed. Using -f (not -B) checks out the
+    // pushed commit instead of resetting the branch ref to the sandbox's current HEAD.
+    const checkout = await this.runGitCommand(`git checkout -f ${branch}`)
     logger.info(`Checked out branch '${branch}': ${checkout}`)
     await this.runGitCommand('git reset --hard')
     await this.runGitCommand('git clean -fd')
