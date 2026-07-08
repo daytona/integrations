@@ -37,20 +37,23 @@ export class ProjectDataStorage {
 
   /**
    * List known project IDs from storage, decoded to the canonical form used by callers.
+   * Filenames that can't be decoded (e.g. hand-created files with invalid percent escapes)
+   * are skipped: exposing them would return an id that can't round-trip through
+   * getProjectFilePath, causing subsequent load/save/remove to silently target the wrong file.
    */
   private listProjectIds(): string[] {
     try {
-      return readdirSync(this.storageDir)
-        .filter((name) => name.endsWith('.json'))
-        .map((name) => {
-          const encoded = name.slice(0, -'.json'.length)
-          try {
-            return decodeURIComponent(encoded)
-          } catch {
-            // Malformed filename (not our encoding): fall back to raw name so it stays visible
-            return encoded
-          }
-        })
+      const ids: string[] = []
+      for (const name of readdirSync(this.storageDir)) {
+        if (!name.endsWith('.json')) continue
+        const encoded = name.slice(0, -'.json'.length)
+        try {
+          ids.push(decodeURIComponent(encoded))
+        } catch {
+          logger.warn(`Skipping project data file with undecodable name: ${name}`)
+        }
+      }
+      return ids
     } catch (err) {
       logger.error(`Failed to list project data files: ${err}`)
       return []
@@ -133,9 +136,13 @@ export class ProjectDataStorage {
       const data = this.load(projectId)
       const session = data?.sessions?.[sessionId]
       if (session && data) {
-        // Return the canonical projectId stored inside the JSON, not the filename-derived
-        // one, so callers reusing this value for cleanup always match the source of truth.
-        return { projectId: data.projectId, worktree: data.worktree, session }
+        // Return the filename-derived projectId (the value that maps back to the file we
+        // just loaded), NOT data.projectId. The delete cleanup path passes this value to
+        // removeSession → load → getProjectFilePath; if we returned the raw canonical id
+        // and it doesn't round-trip identically (e.g. legacy files with a different
+        // sanitization scheme), the cleanup would silently target a different file and
+        // leave the stale mapping behind.
+        return { projectId, worktree: data.worktree, session }
       }
     }
     return undefined

@@ -5,6 +5,7 @@
 
 import { logger } from '../core/logger'
 import { spawnSync } from 'child_process'
+import { isAbsolute, resolve as pathResolve } from 'path'
 
 type ExecResult = {
   ok: boolean
@@ -34,28 +35,54 @@ function execGit(args: string[], options: ExecOptions = {}): ExecResult {
 }
 
 export class HostGitManager {
-  // Per-worktree serialization: one queue per cwd. Same-worktree ops still serialize
-  // (needed to avoid .git/index.lock races), but different worktrees run in parallel
-  // instead of contending on a single global queue.
+  // Per-repo serialization: one queue per git-common-dir. Linked worktrees (git worktree
+  // add) of the same repo share `.git/config` and refs, so they must share a queue to
+  // avoid racing on `remote add/remove` and `.git/config.lock`. Different repos still
+  // proceed in parallel.
   private static operationQueues = new Map<string, Promise<void>>()
 
+  // cwd → queue-key cache. `git rev-parse --git-common-dir` shells out; caching avoids
+  // running it on every enqueue. Repo layout doesn't move at runtime, so this is stable.
+  private static queueKeyCache = new Map<string, string>()
+
   /**
-   * Chain `fn` onto the queue for `cwd`. The stored promise is `.catch`-wrapped so a
-   * failure doesn't poison the chain; callers still see errors via `await` on the
-   * returned promise. When the tail settles, its map entry is cleared to avoid leaking
-   * entries for worktrees that are no longer active.
+   * Resolve the serialization key for a worktree: the absolute path of its shared
+   * git dir (common across linked worktrees of the same repo). Falls back to the cwd
+   * itself if git can't identify a repo, so per-directory serialization still applies.
+   */
+  private static queueKeyFor(cwd: string): string {
+    const cached = HostGitManager.queueKeyCache.get(cwd)
+    if (cached) return cached
+    const res = execGit(['rev-parse', '--git-common-dir'], { cwd })
+    let key: string
+    if (!res.ok) {
+      key = cwd
+    } else {
+      const raw = res.stdout.trim()
+      key = isAbsolute(raw) ? raw : pathResolve(cwd, raw)
+    }
+    HostGitManager.queueKeyCache.set(cwd, key)
+    return key
+  }
+
+  /**
+   * Chain `fn` onto the queue for the repo containing `cwd`. The stored promise is
+   * always-resolves so a failure doesn't poison the chain; callers still see errors via
+   * `await` on the returned promise. Cleared from the map when the tail settles to avoid
+   * leaking entries for repos that are no longer active.
    */
   private static enqueue<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
-    const prev = HostGitManager.operationQueues.get(cwd) ?? Promise.resolve()
+    const queueKey = HostGitManager.queueKeyFor(cwd)
+    const prev = HostGitManager.operationQueues.get(queueKey) ?? Promise.resolve()
     const operation = prev.then(fn)
     const stored: Promise<void> = operation.then(
       () => undefined,
       () => undefined,
     )
-    HostGitManager.operationQueues.set(cwd, stored)
+    HostGitManager.operationQueues.set(queueKey, stored)
     stored.then(() => {
-      if (HostGitManager.operationQueues.get(cwd) === stored) {
-        HostGitManager.operationQueues.delete(cwd)
+      if (HostGitManager.operationQueues.get(queueKey) === stored) {
+        HostGitManager.operationQueues.delete(queueKey)
       }
     })
     return operation

@@ -30,19 +30,19 @@ export const multieditTool = (
     const decoder = new TextDecoder()
     let content = decoder.decode(buffer)
 
-    for (const edit of args.edits) {
+    for (const [i, edit] of args.edits.entries()) {
       if (edit.oldString === '') {
-        throw new Error(
-          `oldString must be non-empty; refusing to prepend to ${args.filePath}: ${JSON.stringify(edit)}`,
-        )
+        throw new Error(`edits[${i}].oldString is empty; refusing to prepend to ${args.filePath}.`)
       }
       const occurrences = content.split(edit.oldString).length - 1
       if (occurrences === 0) {
-        throw new Error(`oldString not found in ${args.filePath}; no changes were made: ${JSON.stringify(edit.oldString)}`)
+        throw new Error(
+          `edits[${i}].oldString not found in ${args.filePath}: ${JSON.stringify(edit.oldString)}`,
+        )
       }
       if (occurrences > 1) {
         throw new Error(
-          `oldString is ambiguous (${occurrences} matches) in ${args.filePath}; no changes were made: ${JSON.stringify(edit.oldString)}`,
+          `edits[${i}].oldString is ambiguous (${occurrences} matches) in ${args.filePath}: ${JSON.stringify(edit.oldString)}`,
         )
       }
       content = content.replace(edit.oldString, edit.newString)
