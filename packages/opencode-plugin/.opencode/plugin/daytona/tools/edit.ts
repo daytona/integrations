@@ -25,8 +25,17 @@ export const editTool = (
     const buffer = await sandbox.fs.downloadFile(args.filePath)
     const decoder = new TextDecoder()
     const content = decoder.decode(buffer)
-    if (!content.includes(args.oldString)) {
+    if (args.oldString === '') {
+      throw new Error(`oldString must be non-empty; refusing to prepend to ${args.filePath}.`)
+    }
+    const occurrences = content.split(args.oldString).length - 1
+    if (occurrences === 0) {
       throw new Error(`oldString not found in ${args.filePath}; no changes were made.`)
+    }
+    if (occurrences > 1) {
+      throw new Error(
+        `oldString is ambiguous (${occurrences} matches) in ${args.filePath}; no changes were made.`,
+      )
     }
     const newContent = content.replace(args.oldString, args.newString)
     await sandbox.fs.uploadFile(Buffer.from(newContent), args.filePath)

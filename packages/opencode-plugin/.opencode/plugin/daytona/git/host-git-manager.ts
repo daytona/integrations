@@ -34,9 +34,33 @@ function execGit(args: string[], options: ExecOptions = {}): ExecResult {
 }
 
 export class HostGitManager {
-  // Static so a single queue serializes git ops across every instance sharing the
-  // worktree; per-instance queues would let concurrent session syncs race.
-  private static operationQueue: Promise<void> = Promise.resolve()
+  // Per-worktree serialization: one queue per cwd. Same-worktree ops still serialize
+  // (needed to avoid .git/index.lock races), but different worktrees run in parallel
+  // instead of contending on a single global queue.
+  private static operationQueues = new Map<string, Promise<void>>()
+
+  /**
+   * Chain `fn` onto the queue for `cwd`. The stored promise is `.catch`-wrapped so a
+   * failure doesn't poison the chain; callers still see errors via `await` on the
+   * returned promise. When the tail settles, its map entry is cleared to avoid leaking
+   * entries for worktrees that are no longer active.
+   */
+  private static enqueue<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+    const prev = HostGitManager.operationQueues.get(cwd) ?? Promise.resolve()
+    const operation = prev.then(fn)
+    const stored: Promise<void> = operation.then(
+      () => undefined,
+      () => undefined,
+    )
+    HostGitManager.operationQueues.set(cwd, stored)
+    stored.then(() => {
+      if (HostGitManager.operationQueues.get(cwd) === stored) {
+        HostGitManager.operationQueues.delete(cwd)
+      }
+    })
+    return operation
+  }
+
   /** Cached OID of an empty commit used to reserve branch refs (branches must point at commits, not blobs). */
   private emptyCommitOidCache = new Map<string, string>()
 
@@ -168,7 +192,7 @@ export class HostGitManager {
       return false
     }
     logger.info(`Pushing to ${remoteName} (${sshUrl}) on branch ${branch}`)
-    const operation = HostGitManager.operationQueue.then(async () => {
+    await HostGitManager.enqueue(cwd, async () => {
       const statusRes = execGit(['status', '--porcelain'], { cwd })
       if (!statusRes.ok) {
         throw new Error(statusRes.stderr)
@@ -193,23 +217,20 @@ export class HostGitManager {
         logger.warn(`Push attempt ${attempts} failed, retrying...`)
       }
     })
-    // Detach failures from the shared queue so one failed op doesn't block later ones.
-    HostGitManager.operationQueue = operation.catch(() => {})
-    await operation
     return true
   }
 
   private setRemote(remoteName: string, sshUrl: string, cwd: string): void {
-    // remove existing remote if it exists
+    // Remote may not exist yet — ignore this result. `remote add` below is the check that matters.
     execGit(['remote', 'remove', remoteName], { cwd })
     const addRes = execGit(['remote', 'add', remoteName, sshUrl], { cwd })
     if (!addRes.ok) {
-      logger.warn(`Could not set sandbox remote: ${addRes.stderr}`)
+      throw new Error(`Failed to configure sandbox remote '${remoteName}': ${addRes.stderr}`)
     }
   }
 
   async pull(remoteName: string, sshUrl: string, branch: string, cwd: string, localBranch?: string): Promise<void> {
-    const operation = HostGitManager.operationQueue.then(async () => {
+    await HostGitManager.enqueue(cwd, async () => {
       this.setRemote(remoteName, sshUrl, cwd)
       let attempts = 0
       let lastError: unknown = undefined
@@ -254,13 +275,10 @@ export class HostGitManager {
       // If we got here, all attempts failed.
       throw lastError ?? new Error('Pull failed after 3 attempts')
     })
-    // Detach failures from the shared queue so one failed op doesn't block later ones.
-    HostGitManager.operationQueue = operation.catch(() => {})
-    await operation
   }
 
   async push(remoteName: string, sshUrl: string, branch: string, cwd: string): Promise<void> {
-    const operation = HostGitManager.operationQueue.then(async () => {
+    await HostGitManager.enqueue(cwd, async () => {
       this.setRemote(remoteName, sshUrl, cwd)
       let attempts = 0
       while (attempts < 3) {
@@ -277,8 +295,5 @@ export class HostGitManager {
         logger.warn(`Push attempt ${attempts} failed, retrying...`)
       }
     })
-    // Detach failures from the shared queue so one failed op doesn't block later ones.
-    HostGitManager.operationQueue = operation.catch(() => {})
-    await operation
   }
 }

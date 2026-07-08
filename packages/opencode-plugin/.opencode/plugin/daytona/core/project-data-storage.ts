@@ -26,22 +26,31 @@ export class ProjectDataStorage {
   }
 
   /**
-   * Get the file path for a project's session data
+   * Get the file path for a project's session data.
+   * encodeURIComponent gives a reversible, collision-free encoding that also
+   * strips path separators, so a projectId can't traverse outside storageDir
+   * and distinct ids can't collide onto the same file.
    */
   private getProjectFilePath(projectId: string): string {
-    // Strip path separators so a projectId can never traverse outside storageDir.
-    const safeId = projectId.replace(/[/\\\0]/g, '_')
-    return join(this.storageDir, `${safeId}.json`)
+    return join(this.storageDir, `${encodeURIComponent(projectId)}.json`)
   }
 
   /**
-   * List known project IDs from storage.
+   * List known project IDs from storage, decoded to the canonical form used by callers.
    */
   private listProjectIds(): string[] {
     try {
       return readdirSync(this.storageDir)
         .filter((name) => name.endsWith('.json'))
-        .map((name) => name.slice(0, -'.json'.length))
+        .map((name) => {
+          const encoded = name.slice(0, -'.json'.length)
+          try {
+            return decodeURIComponent(encoded)
+          } catch {
+            // Malformed filename (not our encoding): fall back to raw name so it stays visible
+            return encoded
+          }
+        })
     } catch (err) {
       logger.error(`Failed to list project data files: ${err}`)
       return []
@@ -123,8 +132,10 @@ export class ProjectDataStorage {
     for (const projectId of this.listProjectIds()) {
       const data = this.load(projectId)
       const session = data?.sessions?.[sessionId]
-      if (session) {
-        return { projectId, worktree: data!.worktree, session }
+      if (session && data) {
+        // Return the canonical projectId stored inside the JSON, not the filename-derived
+        // one, so callers reusing this value for cleanup always match the source of truth.
+        return { projectId: data.projectId, worktree: data.worktree, session }
       }
     }
     return undefined

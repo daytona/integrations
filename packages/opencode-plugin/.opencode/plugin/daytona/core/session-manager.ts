@@ -151,10 +151,18 @@ export class DaytonaSessionManager {
 
         return sandbox
       } catch (err) {
-        // Stored sandbox is stale/deleted: drop the mapping and create a replacement below.
-        logger.error(`Failed to reconnect to sandbox ${existing.id}; creating a replacement: ${err}`)
-        this.sessionSandboxes.delete(sessionId)
-        this.dataStorage.removeSession(projectId, worktree, sessionId)
+        // Only treat 404 as "sandbox is confirmed gone" — clear the mapping and fall through
+        // to create a replacement. For transient errors (network, auth, timeout, provisioning),
+        // preserve the mapping and propagate so the caller can retry later without losing the
+        // session→sandbox binding and its branchNumber.
+        if (err instanceof DaytonaNotFoundError) {
+          logger.error(`Sandbox ${existing.id} no longer exists; creating a replacement.`)
+          this.sessionSandboxes.delete(sessionId)
+          this.dataStorage.removeSession(projectId, worktree, sessionId)
+        } else {
+          logger.error(`Failed to reconnect to sandbox ${existing.id}: ${err}`)
+          throw err
+        }
       }
     }
 
@@ -247,7 +255,11 @@ export class DaytonaSessionManager {
             sandboxGone = true
             logger.warn(`Sandbox ${stored.session.sandboxId} no longer exists; clearing stale mapping.`)
           } else {
+            // Non-404: we cannot confirm the sandbox is gone. Surface the error so the
+            // event handler shows a "Delete failed" toast instead of silently reporting
+            // success while leaving a running sandbox on the Daytona account.
             logger.error(`Failed to reconnect to sandbox ${stored.session.sandboxId}: ${err}`)
+            throw err
           }
         }
       } else {

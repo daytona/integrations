@@ -31,6 +31,11 @@ export const multieditTool = (
     let content = decoder.decode(buffer)
 
     for (const edit of args.edits) {
+      if (edit.oldString === '') {
+        throw new Error(
+          `oldString must be non-empty; refusing to prepend to ${args.filePath}: ${JSON.stringify(edit)}`,
+        )
+      }
       const occurrences = content.split(edit.oldString).length - 1
       if (occurrences === 0) {
         throw new Error(`oldString not found in ${args.filePath}; no changes were made: ${JSON.stringify(edit.oldString)}`)
