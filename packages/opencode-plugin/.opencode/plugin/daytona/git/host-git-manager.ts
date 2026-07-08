@@ -5,6 +5,7 @@
 
 import { logger } from '../core/logger'
 import { spawnSync } from 'child_process'
+import { realpathSync } from 'fs'
 import { isAbsolute, resolve as pathResolve } from 'path'
 
 type ExecResult = {
@@ -46,20 +47,28 @@ export class HostGitManager {
   private static queueKeyCache = new Map<string, string>()
 
   /**
-   * Resolve the serialization key for a worktree: the absolute path of its shared
-   * git dir (common across linked worktrees of the same repo). Falls back to the cwd
-   * itself if git can't identify a repo, so per-directory serialization still applies.
+   * Resolve the serialization key for a worktree: the CANONICAL absolute path of its
+   * shared git dir (common across linked worktrees of the same repo). Canonicalizing
+   * with realpath collapses symlinked aliases onto the same key, so two callers
+   * reaching the same repo via different symlink paths still share a queue and can't
+   * race on `.git/config`. Falls back to (canonical) cwd if git can't identify a repo.
    */
   private static queueKeyFor(cwd: string): string {
     const cached = HostGitManager.queueKeyCache.get(cwd)
     if (cached) return cached
     const res = execGit(['rev-parse', '--git-common-dir'], { cwd })
+    const rawPath = !res.ok
+      ? cwd
+      : (() => {
+          const out = res.stdout.trim()
+          return isAbsolute(out) ? out : pathResolve(cwd, out)
+        })()
     let key: string
-    if (!res.ok) {
-      key = cwd
-    } else {
-      const raw = res.stdout.trim()
-      key = isAbsolute(raw) ? raw : pathResolve(cwd, raw)
+    try {
+      key = realpathSync(rawPath)
+    } catch {
+      // Path may have been deleted between git resolution and our stat; use as-is
+      key = rawPath
     }
     HostGitManager.queueKeyCache.set(cwd, key)
     return key

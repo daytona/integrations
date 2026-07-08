@@ -105,7 +105,7 @@ export class ProjectDataStorage {
       destination.sessions[sessionId] = found
       // Prefer the worktree for the project we're actually operating on.
       destination.worktree = worktree
-      this.save(projectId, destination.worktree, destination.sessions)
+      this.save(projectId, destination)
 
       if (!this.load(projectId)?.sessions?.[sessionId]) {
         logger.error(`Migration of session ${sessionId} to project ${projectId} did not persist; leaving source intact`)
@@ -115,7 +115,7 @@ export class ProjectDataStorage {
       // Destination is safe; now remove from the source (best effort).
       try {
         delete otherData!.sessions[sessionId]
-        this.save(otherProjectId, otherData!.worktree, otherData!.sessions)
+        this.save(otherProjectId, otherData!)
       } catch (err) {
         logger.warn(`Failed to remove session ${sessionId} from project ${otherProjectId}: ${err}`)
       }
@@ -149,21 +149,21 @@ export class ProjectDataStorage {
   }
 
   /**
-   * Save project session data to disk
+   * Save project session data to disk.
+   *
+   * `storageKey` identifies WHICH FILE on disk to write (round-trips through
+   * getProjectFilePath). `projectData.projectId` is the CANONICAL id written into
+   * the JSON body — kept separate so callers who reached a file via a filename-derived
+   * key (e.g. findSession → removeSession for legacy files) don't clobber the
+   * pre-existing canonical id with the storage key.
    */
-  save(projectId: string, worktree: string, sessions: Record<string, SessionInfo>): void {
-    const filePath = this.getProjectFilePath(projectId)
-    const projectData: ProjectSessionData = {
-      projectId,
-      worktree,
-      sessions,
-    }
-
+  save(storageKey: string, projectData: ProjectSessionData): void {
+    const filePath = this.getProjectFilePath(storageKey)
     try {
       writeFileSync(filePath, JSON.stringify(projectData, null, 2))
-      logger.info(`Saved project data for ${projectId}`)
+      logger.info(`Saved project data for ${projectData.projectId}`)
     } catch (err) {
-      logger.error(`Failed to save project data for ${projectId}: ${err}`)
+      logger.error(`Failed to save project data for ${projectData.projectId} at ${filePath}: ${err}`)
     }
   }
 
@@ -214,7 +214,7 @@ export class ProjectDataStorage {
       }
     }
 
-    this.save(projectId, worktree, projectData.sessions)
+    this.save(projectId, projectData)
   }
 
   /**
@@ -224,7 +224,7 @@ export class ProjectDataStorage {
     const projectData = this.load(projectId)
     if (projectData && projectData.sessions[sessionId]) {
       delete projectData.sessions[sessionId]
-      this.save(projectId, worktree, projectData.sessions)
+      this.save(projectId, projectData)
     }
   }
 }
