@@ -8,7 +8,7 @@
  * Stores data per-project in ~/.local/share/opencode/storage/daytona/{projectId}.json
  */
 
-import { Daytona, type Sandbox } from '@daytona/sdk'
+import { Daytona, DaytonaNotFoundError, type Sandbox } from '@daytona/sdk'
 import { logger } from './logger'
 import type { SessionSandboxMap, SandboxInfo } from './types'
 import { SessionGitManager } from '../git/session-git-manager'
@@ -112,43 +112,58 @@ export class DaytonaSessionManager {
 
     // If we have a sandboxId but not a full sandbox object, reconnect to it
     if (this.isPartiallyInitialized(existing)) {
-      logger.info(`Reconnecting to existing sandbox: ${existing.id}`)
-      const daytona = new Daytona({ apiKey: this.apiKey })
-      const reconnectStart = Date.now()
-      logger.info(`Daytona get begin sandboxId=${existing.id}`)
-      const sandbox = await daytona.get(existing.id)
-      logger.info(`Daytona get done sandboxId=${existing.id} in ${Date.now() - reconnectStart}ms`)
-      logger.info(`Starting sandbox begin sandboxId=${sandbox.id}`)
-      await sandbox.start()
-      logger.info(`Starting sandbox done sandboxId=${sandbox.id} in ${Date.now() - reconnectStart}ms`)
-      this.sessionSandboxes.set(sessionId, sandbox)
-      // Preserve branch number if it exists for this sandbox
-      let branchNumber = this.dataStorage.getBranchNumberForSandbox(projectId, sandbox.id)
-      if (!branchNumber) {
-        try {
-          branchNumber = SessionGitManager.allocateAndReserveBranchNumber(worktree)
-        } catch {
-          // No local git repo (or git unavailable) shouldn't block sandbox usage.
-          branchNumber = undefined
+      try {
+        logger.info(`Reconnecting to existing sandbox: ${existing.id}`)
+        const daytona = new Daytona({ apiKey: this.apiKey })
+        const reconnectStart = Date.now()
+        logger.info(`Daytona get begin sandboxId=${existing.id}`)
+        const sandbox = await daytona.get(existing.id)
+        logger.info(`Daytona get done sandboxId=${existing.id} in ${Date.now() - reconnectStart}ms`)
+        logger.info(`Starting sandbox begin sandboxId=${sandbox.id}`)
+        await sandbox.start()
+        logger.info(`Starting sandbox done sandboxId=${sandbox.id} in ${Date.now() - reconnectStart}ms`)
+        this.sessionSandboxes.set(sessionId, sandbox)
+        // Preserve branch number if it exists for this sandbox
+        let branchNumber = this.dataStorage.getBranchNumberForSandbox(projectId, sandbox.id)
+        if (!branchNumber) {
+          try {
+            branchNumber = SessionGitManager.allocateAndReserveBranchNumber(worktree)
+          } catch {
+            // No local git repo (or git unavailable) shouldn't block sandbox usage.
+            branchNumber = undefined
+          }
+        }
+        this.dataStorage.updateSession(projectId, worktree, sessionId, sandbox.id, branchNumber)
+        toast.show({
+          title: 'Sandbox connected',
+          message: `Connected to existing sandbox.`,
+          variant: 'info',
+        })
+
+        // Even if git syncing is disabled, ensure the project directory exists in the sandbox.
+        if (!branchNumber) {
+          try {
+            await new DaytonaSandboxGitManager(sandbox, this.repoPath).ensureDirectory()
+          } catch (err) {
+            logger.warn(`Failed to ensure sandbox project directory exists: ${err}`)
+          }
+        }
+
+        return sandbox
+      } catch (err) {
+        // Only treat 404 as "sandbox is confirmed gone" — clear the mapping and fall through
+        // to create a replacement. For transient errors (network, auth, timeout, provisioning),
+        // preserve the mapping and propagate so the caller can retry later without losing the
+        // session→sandbox binding and its branchNumber.
+        if (err instanceof DaytonaNotFoundError) {
+          logger.error(`Sandbox ${existing.id} no longer exists; creating a replacement.`)
+          this.sessionSandboxes.delete(sessionId)
+          this.dataStorage.removeSession(projectId, worktree, sessionId)
+        } else {
+          logger.error(`Failed to reconnect to sandbox ${existing.id}: ${err}`)
+          throw err
         }
       }
-      this.dataStorage.updateSession(projectId, worktree, sessionId, sandbox.id, branchNumber)
-      toast.show({
-        title: 'Sandbox connected',
-        message: `Connected to existing sandbox.`,
-        variant: 'info',
-      })
-
-      // Even if git syncing is disabled, ensure the project directory exists in the sandbox.
-      if (!branchNumber) {
-        try {
-          await new DaytonaSandboxGitManager(sandbox, this.repoPath).ensureDirectory()
-        } catch (err) {
-          logger.warn(`Failed to ensure sandbox project directory exists: ${err}`)
-        }
-      }
-
-      return sandbox
     }
 
     // If not in cache/storage for this project, try to recover from other projects and migrate.
@@ -220,39 +235,59 @@ export class DaytonaSessionManager {
   /**
    * Delete the sandbox associated with the given session ID
    */
-  async deleteSandbox(sessionId: string, projectId: string): Promise<void> {
+  async deleteSandbox(sessionId: string, projectId: string): Promise<boolean> {
     let sandbox = this.sessionSandboxes.get(sessionId)
+
+    // Read-only lookup so deleting never migrates sessions or rewrites project metadata.
+    const stored = this.dataStorage.findSession(sessionId)
+
+    let sandboxGone = false
 
     // If not in cache, try to load from storage and reconnect
     if (!sandbox || this.isPartiallyInitialized(sandbox)) {
-      const storedWorktree = this.dataStorage.load(projectId)?.worktree ?? ''
-      const sessionInfo = this.dataStorage.getSession(projectId, storedWorktree, sessionId)
-      if (sessionInfo?.sandboxId) {
+      if (stored?.session.sandboxId) {
         const daytona = new Daytona({ apiKey: this.apiKey })
         try {
-          sandbox = await daytona.get(sessionInfo.sandboxId)
+          sandbox = await daytona.get(stored.session.sandboxId)
           this.sessionSandboxes.set(sessionId, sandbox)
         } catch (err) {
-          logger.error(`Failed to reconnect to sandbox ${sessionInfo.sandboxId}: ${err}`)
+          if (err instanceof DaytonaNotFoundError) {
+            sandboxGone = true
+            logger.warn(`Sandbox ${stored.session.sandboxId} no longer exists; clearing stale mapping.`)
+          } else {
+            // Non-404: we cannot confirm the sandbox is gone. Surface the error so the
+            // event handler shows a "Delete failed" toast instead of silently reporting
+            // success while leaving a running sandbox on the Daytona account.
+            logger.error(`Failed to reconnect to sandbox ${stored.session.sandboxId}: ${err}`)
+            throw err
+          }
         }
+      } else {
+        sandboxGone = true
       }
     }
 
     // Delete the sandbox if we have a fully initialized one
+    let deleted = false
     if (this.isFullyInitialized(sandbox)) {
       logger.info(`Removing sandbox for session: ${sessionId}`)
       await sandbox.delete()
-      this.sessionSandboxes.delete(sessionId)
-
-      // Remove from storage
-      const projectData = this.dataStorage.load(projectId)
-      if (projectData) {
-        this.dataStorage.removeSession(projectId, projectData.worktree, sessionId)
-      }
-
+      deleted = true
+      sandboxGone = true
       logger.info(`Sandbox deleted successfully.`)
     } else {
       logger.warn(`No sandbox found for session: ${sessionId}`)
     }
+
+    // Clear the local mapping when the sandbox is gone (deleted or already absent) so a
+    // stale entry can't cause repeated reconnect failures. Preserve it on transient errors.
+    if (sandboxGone) {
+      this.sessionSandboxes.delete(sessionId)
+      const cleanupProjectId = stored?.projectId ?? projectId
+      const cleanupWorktree = stored?.worktree ?? this.dataStorage.load(projectId)?.worktree ?? ''
+      this.dataStorage.removeSession(cleanupProjectId, cleanupWorktree, sessionId)
+    }
+
+    return deleted
   }
 }

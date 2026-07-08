@@ -16,7 +16,7 @@ export const getPreviewURLTool = (
 ) => ({
   description: 'Gets a preview URL for the Daytona sandbox',
   args: {
-    port: z.number(),
+    port: z.number().int().min(1).max(65535),
   },
   async execute(args: { port: number }, ctx: ToolContext) {
     const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree, pluginCtx)

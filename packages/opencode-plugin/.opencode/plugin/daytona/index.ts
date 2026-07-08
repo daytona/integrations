@@ -24,6 +24,7 @@
  */
 
 import { join } from 'path'
+import { homedir } from 'os'
 import { xdgData } from 'xdg-basedir'
 import type { PluginInput } from '@opencode-ai/plugin'
 import { setLogFilePath } from './core/logger'
@@ -35,8 +36,9 @@ import { systemPromptTransform } from './plugins/system-transform'
 
 export type { EventSessionDeleted, LogLevel, SandboxInfo, SessionInfo, ProjectSessionData } from './core/types'
 
-const LOG_FILE = join(xdgData, 'opencode', 'log', 'daytona.log')
-const STORAGE_DIR = join(xdgData, 'opencode', 'storage', 'daytona')
+const xdgDataDir = xdgData ?? join(homedir(), '.local', 'share')
+const LOG_FILE = join(xdgDataDir, 'opencode', 'log', 'daytona.log')
+const STORAGE_DIR = join(xdgDataDir, 'opencode', 'storage', 'daytona')
 const REPO_PATH = '/home/daytona/project'
 
 setLogFilePath(LOG_FILE)

@@ -22,6 +22,6 @@ export const writeTool = (
   async execute(args: { filePath: string; content: string }, ctx: ToolContext) {
     const sandbox = await sessionManager.getSandbox(ctx.sessionID, projectId, worktree, pluginCtx)
     await sandbox.fs.uploadFile(Buffer.from(args.content), args.filePath)
-    return `Written ${args.content.length} bytes to ${args.filePath}`
+    return `Written ${Buffer.byteLength(args.content, 'utf8')} bytes to ${args.filePath}`
   },
 })
