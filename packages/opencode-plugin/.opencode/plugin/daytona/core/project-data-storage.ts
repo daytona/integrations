@@ -214,6 +214,10 @@ export class ProjectDataStorage {
       }
     }
 
+    // Refresh worktree from the current call (state that can change over time), but
+    // NEVER refresh projectData.projectId — that's identity, set at creation, and
+    // preserving it is the whole point of save()'s two-parameter API.
+    projectData.worktree = worktree
     this.save(projectId, projectData)
   }
 
