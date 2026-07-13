@@ -12,7 +12,7 @@ description:
     zh_Hans: Run a shell command in a Daytona sandbox and return the output.
     ja_JP: Run a shell command in a Daytona sandbox and return the output.
     pt_BR: Run a shell command in a Daytona sandbox and return the output.
-  llm: Execute a shell command in a Daytona sandbox. Useful for installing packages, running scripts, file operations, and any Linux command. If no sandbox_id is provided, a new ephemeral sandbox is created automatically. Returns stdout, stderr, and exit code.
+  llm: Execute a shell command in a Daytona sandbox. Useful for installing packages, running scripts, file operations, and any Linux command. Supports optional working directory (cwd) and environment variables. If no sandbox_id is provided, a new ephemeral sandbox is created automatically. Returns combined output (stdout and stderr) and exit code.
 parameters:
   - name: command
     type: string
@@ -28,6 +28,53 @@ parameters:
       ja_JP: The shell command to execute in the sandbox.
       pt_BR: The shell command to execute in the sandbox.
     llm_description: The shell command to execute in the Daytona sandbox. This runs in a standard Linux environment.
+    form: llm
+  - name: cwd
+    type: string
+    required: false
+    label:
+      en_US: Working Directory
+      zh_Hans: Working Directory
+      ja_JP: Working Directory
+      pt_BR: Working Directory
+    human_description:
+      en_US: Working directory for command execution (e.g. /home/daytona/project). Defaults to sandbox working directory.
+      zh_Hans: Working directory for command execution (e.g. /home/daytona/project). Defaults to sandbox working directory.
+      ja_JP: Working directory for command execution (e.g. /home/daytona/project). Defaults to sandbox working directory.
+      pt_BR: Working directory for command execution (e.g. /home/daytona/project). Defaults to sandbox working directory.
+    llm_description: Working directory for command execution (e.g. /home/daytona/project). Defaults to sandbox working directory.
+    form: llm
+    default: ""
+  - name: env_vars
+    type: string
+    required: false
+    label:
+      en_US: Environment Variables (JSON)
+      zh_Hans: Environment Variables (JSON)
+      ja_JP: Environment Variables (JSON)
+      pt_BR: Environment Variables (JSON)
+    human_description:
+      en_US: "Environment variables for the command, as a JSON object string. Example: {\"NODE_ENV\": \"production\"}"
+      zh_Hans: "Environment variables for the command, as a JSON object string. Example: {\"NODE_ENV\": \"production\"}"
+      ja_JP: "Environment variables for the command, as a JSON object string. Example: {\"NODE_ENV\": \"production\"}"
+      pt_BR: "Environment variables for the command, as a JSON object string. Example: {\"NODE_ENV\": \"production\"}"
+    llm_description: 'Environment variables for the command, as a JSON object string. Example: {"NODE_ENV": "production"}'
+    form: llm
+    default: ""
+  - name: timeout
+    type: number
+    required: false
+    label:
+      en_US: Timeout (seconds)
+      zh_Hans: Timeout (seconds)
+      ja_JP: Timeout (seconds)
+      pt_BR: Timeout (segundos)
+    human_description:
+      en_US: Maximum execution time in seconds. Leave empty for no timeout.
+      zh_Hans: Maximum execution time in seconds. Leave empty for no timeout.
+      ja_JP: Maximum execution time in seconds. Leave empty for no timeout.
+      pt_BR: Tempo maximo de execucao em segundos. Deixar vazio para sem limite.
+    llm_description: 'Optional timeout in seconds. Use a higher value for long operations like pip install or pytest.'
     form: llm
   - name: sandbox_id
     type: string

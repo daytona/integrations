@@ -1,13 +1,11 @@
-import uuid
+import json
 from collections.abc import Generator
 from typing import Any
 
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from daytona import SessionExecuteRequest
-
-from _client import build_client, get_sandbox
+from _client import build_client, get_sandbox, to_int
 
 
 class RunCommandTool(Tool):
@@ -17,37 +15,46 @@ class RunCommandTool(Tool):
         sandbox_id = tool_parameters.get("sandbox_id", "")
         ephemeral = not sandbox_id
 
+        command = tool_parameters.get("command")
+        if not command:
+            raise ValueError("command is required")
+        cwd = tool_parameters.get("cwd") or None
+        env_vars = self._parse_env_vars(tool_parameters.get("env_vars"))
+
+        timeout = tool_parameters.get("timeout")
+        timeout = None if timeout in (None, "") else to_int(timeout, "timeout")
+
         if sandbox_id:
             sandbox = get_sandbox(daytona, sandbox_id)
         else:
             sandbox = daytona.create()
 
-        session_id = f"dify-{uuid.uuid4().hex[:12]}"
-        session_created = False
-
         try:
-            sandbox.process.create_session(session_id)
-            session_created = True
+            response = sandbox.process.exec(command, cwd=cwd, env=env_vars, timeout=timeout)
 
-            response = sandbox.process.execute_session_command(
-                session_id,
-                SessionExecuteRequest(command=tool_parameters["command"]),
-            )
-
+            yield self.create_text_message(response.result or "(no output)")
             yield self.create_json_message({
                 "exit_code": response.exit_code,
-                "stdout": response.stdout or "",
-                "stderr": response.stderr or "",
+                "output": response.result or "",
                 "sandbox_id": sandbox.id,
             })
         finally:
-            if session_created and not ephemeral:
-                try:
-                    sandbox.process.delete_session(session_id)
-                except Exception:
-                    pass
             if ephemeral:
                 try:
                     sandbox.delete()
                 except Exception:
                     pass
+
+    @staticmethod
+    def _parse_env_vars(raw: Any) -> dict[str, str] | None:
+        if not raw:
+            return None
+        if isinstance(raw, dict):
+            return {str(k): str(v) for k, v in raw.items()}
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"env_vars must be a JSON object string: {e}")
+        if not isinstance(parsed, dict):
+            raise ValueError("env_vars must be a JSON object")
+        return {str(k): str(v) for k, v in parsed.items()}
