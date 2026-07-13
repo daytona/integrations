@@ -22,7 +22,7 @@ Standalone projects **not published to a package registry** live in [`apps/`](ap
 |---|---|
 | [`inngest-agentkit-coding-agent`](apps/inngest-agentkit-coding-agent) | Deployable coding agent that runs tool calls in Daytona sandboxes |
 | [`dify-plugin`](apps/dify-plugin) | Daytona plugin for the Dify marketplace |
-| [`stripe-coding-agent-template`](apps/stripe-coding-agent-template) | Stripe Projects build template — a CopilotKit + OpenRouter coding agent that writes and runs code in Daytona sandboxes with live in-chat preview |
+| [`stripe-coding-agent-template`](apps/stripe-coding-agent-template) | Stripe Projects build template — a CopilotKit + OpenRouter coding agent, deployed on Vercel, that writes and runs code in Daytona sandboxes with live in-chat preview |
 
 ## Releases
 
