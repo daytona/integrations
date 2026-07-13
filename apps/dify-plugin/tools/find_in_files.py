@@ -23,16 +23,17 @@ class FindInFilesTool(Tool):
 
         daytona = build_client(self.runtime.credentials)
         sandbox = get_sandbox(daytona, sandbox_id)
+        # find_files returns list[Match]; each Match has flat .file / .line / .content
         results = sandbox.fs.find_files(path, pattern)
 
-        matches = []
-        for r in results:
-            for match in r.matches:
-                matches.append({
-                    "file": r.file.path,
-                    "line_number": match.line_number,
-                    "line_content": match.lines,
-                })
+        matches = [
+            {
+                "file": m.file,
+                "line_number": m.line,
+                "line_content": m.content,
+            }
+            for m in results
+        ]
 
         yield self.create_json_message({
             "sandbox_id": sandbox_id,

@@ -23,12 +23,14 @@ class SearchFilesTool(Tool):
 
         daytona = build_client(self.runtime.credentials)
         sandbox = get_sandbox(daytona, sandbox_id)
-        matches = sandbox.fs.search_files(path, pattern)
+        # search_files returns a SearchFilesResponse with a .files list, not a list
+        result = sandbox.fs.search_files(path, pattern)
+        files = result.files
 
         yield self.create_json_message({
             "sandbox_id": sandbox_id,
             "path": path,
             "pattern": pattern,
-            "matches": matches,
-            "count": len(matches),
+            "files": files,
+            "count": len(files),
         })

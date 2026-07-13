@@ -34,17 +34,19 @@ class RunCodeTool(Tool):
 
             if charts:
                 for chart in charts:
-                    for element in getattr(chart, "elements", None) or []:
-                        png = getattr(element, "png", None)
-                        if png:
-                            png_bytes = base64.b64decode(png)
-                            yield self.create_blob_message(
-                                blob=png_bytes, meta={"mime_type": "image/png"}
-                            )
-                        charts_meta.append({
-                            "type": getattr(element, "type", None),
-                            "title": getattr(element, "title", None),
-                        })
+                    # The rendered PNG lives on chart.png (base64); chart.elements
+                    # are structured data points (BarData/PointData), not images.
+                    png = getattr(chart, "png", None)
+                    if png:
+                        png_bytes = base64.b64decode(png)
+                        yield self.create_blob_message(
+                            blob=png_bytes, meta={"mime_type": "image/png"}
+                        )
+                    chart_type = getattr(chart, "type", None)
+                    charts_meta.append({
+                        "type": getattr(chart_type, "value", chart_type),
+                        "title": getattr(chart, "title", None),
+                    })
 
             yield self.create_text_message(response.result or "(no output)")
             yield self.create_json_message({

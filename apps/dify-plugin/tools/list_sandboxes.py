@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from typing import Any
 
-from daytona import ListSandboxesQuery, SandboxState
+from daytona import ListSandboxesQuery
 
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage

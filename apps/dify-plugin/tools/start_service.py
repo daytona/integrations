@@ -26,7 +26,7 @@ class StartServiceTool(Tool):
         session_id = f"svc-{int(time.time())}"
         sandbox.process.create_session(session_id)
 
-        req = SessionExecuteRequest(command=command, var_async=True)
+        req = SessionExecuteRequest(command=command, run_async=True)
         response = sandbox.process.execute_session_command(session_id, req)
 
         cmd_id = getattr(response, "cmd_id", None)
