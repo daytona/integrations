@@ -1,0 +1,34 @@
+identity:
+  name: list_sandboxes
+  author: daytonaio
+  label:
+    en_US: List Sandboxes
+    zh_Hans: List Sandboxes
+    ja_JP: List Sandboxes
+    pt_BR: Listar Sandboxes
+description:
+  human:
+    en_US: List all Daytona sandboxes with their IDs and states.
+    zh_Hans: List all Daytona sandboxes with their IDs and states.
+    ja_JP: List all Daytona sandboxes with their IDs and states.
+    pt_BR: Lista todos os sandboxes Daytona com os respetivos IDs e estados.
+  llm: List all existing Daytona sandboxes. Returns each sandbox's ID, name, and state (started, stopped, archived, etc.). Use this to discover existing sandboxes before creating a new one, or to clean up resources.
+parameters:
+  - name: limit
+    type: number
+    required: false
+    label:
+      en_US: Limit
+      zh_Hans: Limit
+      ja_JP: Limit
+      pt_BR: Limite
+    human_description:
+      en_US: Maximum number of sandboxes to return. Defaults to 50.
+      zh_Hans: Maximum number of sandboxes to return. Defaults to 50.
+      ja_JP: Maximum number of sandboxes to return. Defaults to 50.
+      pt_BR: Número máximo de sandboxes a devolver. Por defeito 50.
+    llm_description: Maximum number of sandboxes to return. Defaults to 50.
+    form: llm
+extra:
+  python:
+    source: tools/list_sandboxes.py
