@@ -17,8 +17,8 @@ class GetPreviewUrlTool(Tool):
         if port is None:
             raise ValueError("port is required")
         port = to_int(port, "port")
-        if not (3000 <= port <= 9999):
-            raise ValueError(f"Port must be between 3000 and 9999, got {port}")
+        if not (1 <= port <= 65535):
+            raise ValueError(f"Invalid port number: {port}")
 
         daytona = build_client(self.runtime.credentials)
         sandbox = get_sandbox(daytona, sandbox_id)
