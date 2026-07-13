@@ -1,0 +1,65 @@
+identity:
+  name: get_service_logs
+  author: daytonaio
+  label:
+    en_US: Get Service Logs
+    zh_Hans: Get Service Logs
+    ja_JP: Get Service Logs
+    pt_BR: Obter Logs do Serviço
+description:
+  human:
+    en_US: Retrieve logs from a background service started with start_service.
+    zh_Hans: Retrieve logs from a background service started with start_service.
+    ja_JP: Retrieve logs from a background service started with start_service.
+    pt_BR: Obtém os logs de um serviço em background iniciado com start_service.
+  llm: "Retrieve the current stdout and stderr output from a background service started with start_service. Provide the session_id returned by start_service. If cmd_id is omitted, the latest command in the session is used automatically."
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox running the service.
+      zh_Hans: The ID of the sandbox running the service.
+      ja_JP: The ID of the sandbox running the service.
+      pt_BR: O ID do sandbox onde corre o serviço.
+    llm_description: The ID of the Daytona sandbox running the background service.
+    form: llm
+  - name: session_id
+    type: string
+    required: true
+    label:
+      en_US: Session ID
+      zh_Hans: Session ID
+      ja_JP: Session ID
+      pt_BR: Session ID
+    human_description:
+      en_US: The session ID returned by start_service.
+      zh_Hans: The session ID returned by start_service.
+      ja_JP: The session ID returned by start_service.
+      pt_BR: O ID de sessão devolvido por start_service.
+    llm_description: The session ID returned by start_service when the background service was launched.
+    form: llm
+  - name: cmd_id
+    type: string
+    required: false
+    label:
+      en_US: Command ID
+      zh_Hans: Command ID
+      ja_JP: Command ID
+      pt_BR: Command ID
+    human_description:
+      en_US: The command ID returned by start_service. If omitted, the latest command in the session is used.
+      zh_Hans: The command ID returned by start_service. If omitted, the latest command in the session is used.
+      ja_JP: The command ID returned by start_service. If omitted, the latest command in the session is used.
+      pt_BR: O ID de comando devolvido por start_service. Se omitido, usa o último comando da sessão.
+    llm_description: Optional command ID returned by start_service. If omitted, auto-discovers the latest command in the session.
+    form: llm
+    default: ""
+extra:
+  python:
+    source: tools/get_service_logs.py
