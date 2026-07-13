@@ -6,7 +6,7 @@ from typing import Any
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from _client import build_client, get_sandbox
+from _client import MAX_FILE_SIZE, build_client, get_sandbox
 
 
 class DownloadFileTool(Tool):
@@ -21,7 +21,20 @@ class DownloadFileTool(Tool):
 
         daytona = build_client(self.runtime.credentials)
         sandbox = get_sandbox(daytona, sandbox_id)
+
+        info = sandbox.fs.get_file_info(remote_path)
+        if info.size and info.size > MAX_FILE_SIZE:
+            raise ValueError(
+                f"File size ({info.size} bytes) exceeds maximum allowed size "
+                f"({MAX_FILE_SIZE} bytes)."
+            )
+
         content = sandbox.fs.download_file(remote_path)
+        if len(content) > MAX_FILE_SIZE:
+            raise ValueError(
+                f"Downloaded file size ({len(content)} bytes) exceeds maximum allowed size "
+                f"({MAX_FILE_SIZE} bytes)."
+            )
 
         filename = os.path.basename(remote_path) or "downloaded_file"
         mime_type, _ = mimetypes.guess_type(filename)

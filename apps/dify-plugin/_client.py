@@ -2,6 +2,8 @@ from typing import Any
 
 from daytona import Daytona, DaytonaConfig, DaytonaNotFoundError, Sandbox
 
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+
 
 def to_int(value: Any, name: str) -> int:
     # Dify sends "number" params as float; silent int() truncation (0.5 -> 0)
