@@ -1,0 +1,64 @@
+identity:
+  name: write_file
+  author: daytonaio
+  label:
+    en_US: Write File
+    zh_Hans: Write File
+    ja_JP: Write File
+    pt_BR: Write File
+description:
+  human:
+    en_US: Write text content to a file in a Daytona sandbox (creates or overwrites).
+    zh_Hans: Write text content to a file in a Daytona sandbox (creates or overwrites).
+    ja_JP: Write text content to a file in a Daytona sandbox (creates or overwrites).
+    pt_BR: Write text content to a file in a Daytona sandbox (creates or overwrites).
+  llm: Write text content to a file inside an existing Daytona sandbox. Creates the file if it doesn't exist, or overwrites it if it does. Accepts UTF-8 encoded text as the content parameter. Requires a sandbox_id.
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox to write the file into.
+      zh_Hans: The ID of the sandbox to write the file into.
+      ja_JP: The ID of the sandbox to write the file into.
+      pt_BR: The ID of the sandbox to write the file into.
+    llm_description: The ID of the Daytona sandbox to write the file into.
+    form: llm
+  - name: remote_path
+    type: string
+    required: true
+    label:
+      en_US: Remote Path
+      zh_Hans: Remote Path
+      ja_JP: Remote Path
+      pt_BR: Remote Path
+    human_description:
+      en_US: 'Absolute destination path inside the sandbox (e.g. /home/daytona/script.py).'
+      zh_Hans: 'Absolute destination path inside the sandbox (e.g. /home/daytona/script.py).'
+      ja_JP: 'Absolute destination path inside the sandbox (e.g. /home/daytona/script.py).'
+      pt_BR: 'Absolute destination path inside the sandbox (e.g. /home/daytona/script.py).'
+    llm_description: 'Absolute destination path inside the sandbox where the file will be written (e.g. "/home/daytona/script.py", "/tmp/config.json").'
+    form: llm
+  - name: content
+    type: string
+    required: true
+    label:
+      en_US: Content
+      zh_Hans: Content
+      ja_JP: Content
+      pt_BR: Content
+    human_description:
+      en_US: The text content to write into the file.
+      zh_Hans: The text content to write into the file.
+      ja_JP: The text content to write into the file.
+      pt_BR: The text content to write into the file.
+    llm_description: The text content to write into the file. Supports any UTF-8 text including code, configuration, data, etc.
+    form: llm
+extra:
+  python:
+    source: tools/write_file.py

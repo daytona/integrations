@@ -1,0 +1,49 @@
+identity:
+  name: read_file
+  author: daytonaio
+  label:
+    en_US: Read File
+    zh_Hans: Read File
+    ja_JP: Read File
+    pt_BR: Read File
+description:
+  human:
+    en_US: Read the text content of a file from a Daytona sandbox.
+    zh_Hans: Read the text content of a file from a Daytona sandbox.
+    ja_JP: Read the text content of a file from a Daytona sandbox.
+    pt_BR: Read the text content of a file from a Daytona sandbox.
+  llm: Read the full text content of a file (UTF-8 encoded) from an existing Daytona sandbox. Returns the content as text along with file metadata including size. Requires a sandbox_id.
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox containing the file to read.
+      zh_Hans: The ID of the sandbox containing the file to read.
+      ja_JP: The ID of the sandbox containing the file to read.
+      pt_BR: The ID of the sandbox containing the file to read.
+    llm_description: The ID of the Daytona sandbox containing the file to read.
+    form: llm
+  - name: remote_path
+    type: string
+    required: true
+    label:
+      en_US: Remote Path
+      zh_Hans: Remote Path
+      ja_JP: Remote Path
+      pt_BR: Remote Path
+    human_description:
+      en_US: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/script.py).'
+      zh_Hans: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/script.py).'
+      ja_JP: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/script.py).'
+      pt_BR: 'Absolute path of the file inside the sandbox (e.g. /home/daytona/script.py).'
+    llm_description: 'Absolute path of the text file inside the sandbox to read (e.g. "/home/daytona/script.py", "/tmp/output.txt").'
+    form: llm
+extra:
+  python:
+    source: tools/read_file.py

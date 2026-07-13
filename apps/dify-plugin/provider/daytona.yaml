@@ -58,6 +58,11 @@ tools:
   - tools/download_file.yaml
   - tools/get_preview_url.yaml
   - tools/destroy_sandbox.yaml
+  - tools/list_files.yaml
+  - tools/read_file.yaml
+  - tools/write_file.yaml
+  - tools/search_files.yaml
+  - tools/find_in_files.yaml
 extra:
   python:
     source: provider/daytona.py
