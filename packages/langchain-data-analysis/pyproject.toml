@@ -23,8 +23,16 @@ python = ">=3.9,<4.0"
 langchain-core = ">=0.3.15,<2.0.0"
 daytona = "^0.194.0"
 
+[tool.ruff]
+line-length = 100
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "T201"]
+
+[tool.ruff.lint.per-file-ignores]
+# Docs notebooks are illustrative: `print` output, prose comments, and unsorted
+# demo imports are intentional there.
+"docs/**" = ["T201", "E501", "I001"]
 
 [tool.coverage.run]
 omit = ["tests/*"]
@@ -69,7 +77,7 @@ codespell = "^2.2.6"
 [tool.poetry.group.test_integration.dependencies]
 
 [tool.poetry.group.lint.dependencies]
-ruff = "^0.5"
+ruff = "^0.15.0"
 
 [tool.poetry.group.typing.dependencies]
 mypy = "^1.10"

@@ -35,7 +35,9 @@ class TestDaytonaDataAnalysisToolUnit(ToolsUnitTests):
         result = tool._add_last_line_print(code)
         assert "print(x)" in result
 
-    def test_add_last_line_print_leaves_print_unchanged(self, tool: DaytonaDataAnalysisTool) -> None:
+    def test_add_last_line_print_leaves_print_unchanged(
+        self, tool: DaytonaDataAnalysisTool
+    ) -> None:
         code = "x = 5\nprint(x)"
         result = tool._add_last_line_print(code)
         assert result.strip().endswith("print(x)")

@@ -8,11 +8,11 @@ import shlex
 import uuid
 from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
-
 from daytona import CodeRunParams, Sandbox, SessionExecuteRequest  # type: ignore
 from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 
 class ExecuteCodeTool(BaseTool):
