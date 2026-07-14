@@ -1,0 +1,68 @@
+identity:
+  name: manage_sandbox
+  author: daytonaio
+  label:
+    en_US: Manage Sandbox
+    zh_Hans: Manage Sandbox
+    ja_JP: Manage Sandbox
+    pt_BR: Gerir Sandbox
+description:
+  human:
+    en_US: Start, stop, or archive a Daytona sandbox to manage its lifecycle and costs.
+    zh_Hans: Start, stop, or archive a Daytona sandbox to manage its lifecycle and costs.
+    ja_JP: Start, stop, or archive a Daytona sandbox to manage its lifecycle and costs.
+    pt_BR: Inicia, para ou arquiva um sandbox Daytona para gerir o seu ciclo de vida e custos.
+  llm: "Manage the lifecycle of an existing Daytona sandbox. Actions: 'start' (resume a stopped or archived sandbox), 'stop' (pause a running sandbox to reduce costs — filesystem is preserved), 'archive' (compress for long-term storage at minimal cost — slower to resume). Use 'stop' for temporary pauses and 'archive' for longer-term storage."
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox to manage.
+      zh_Hans: The ID of the sandbox to manage.
+      ja_JP: The ID of the sandbox to manage.
+      pt_BR: O ID do sandbox a gerir.
+    llm_description: The ID of the Daytona sandbox to start, stop, or archive.
+    form: llm
+  - name: action
+    type: select
+    required: true
+    label:
+      en_US: Action
+      zh_Hans: Action
+      ja_JP: Action
+      pt_BR: Ação
+    human_description:
+      en_US: 'The lifecycle action to perform: start (resume), stop (pause), or archive (compress).'
+      zh_Hans: 'The lifecycle action to perform: start (resume), stop (pause), or archive (compress).'
+      ja_JP: 'The lifecycle action to perform: start (resume), stop (pause), or archive (compress).'
+      pt_BR: 'A ação de ciclo de vida a executar: start (retomar), stop (pausar), ou archive (comprimir).'
+    llm_description: 'Lifecycle action: start (resume a stopped/archived sandbox), stop (pause to reduce costs), or archive (compress for long-term storage).'
+    form: llm
+    options:
+      - value: start
+        label:
+          en_US: Start
+          zh_Hans: Start
+          ja_JP: Start
+          pt_BR: Iniciar
+      - value: stop
+        label:
+          en_US: Stop
+          zh_Hans: Stop
+          ja_JP: Stop
+          pt_BR: Parar
+      - value: archive
+        label:
+          en_US: Archive
+          zh_Hans: Archive
+          ja_JP: Archive
+          pt_BR: Arquivar
+extra:
+  python:
+    source: tools/manage_sandbox.py

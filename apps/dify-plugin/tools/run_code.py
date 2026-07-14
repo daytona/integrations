@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Generator
 from typing import Any
 
@@ -26,10 +27,34 @@ class RunCodeTool(Tool):
 
         try:
             response = sandbox.process.code_run(tool_parameters["code"])
+
+            charts_meta: list[dict[str, Any]] = []
+            artifacts = getattr(response, "artifacts", None)
+            charts = getattr(artifacts, "charts", None) if artifacts else None
+
+            if charts:
+                for chart in charts:
+                    # The rendered PNG lives on chart.png (base64); chart.elements
+                    # are structured data points (BarData/PointData), not images.
+                    png = getattr(chart, "png", None)
+                    if png:
+                        png_bytes = base64.b64decode(png)
+                        yield self.create_blob_message(
+                            blob=png_bytes, meta={"mime_type": "image/png"}
+                        )
+                    chart_type = getattr(chart, "type", None)
+                    charts_meta.append({
+                        "type": getattr(chart_type, "value", chart_type),
+                        "title": getattr(chart, "title", None),
+                    })
+
+            yield self.create_text_message(response.result or "(no output)")
             yield self.create_json_message({
                 "exit_code": response.exit_code,
                 "output": response.result,
                 "sandbox_id": sandbox.id,
+                "charts_count": len(charts_meta),
+                "charts": charts_meta,
             })
         finally:
             if ephemeral:

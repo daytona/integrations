@@ -28,7 +28,10 @@ class CreateSandboxTool(Tool):
 
         env_vars = self._parse_env_vars(tool_parameters.get("env_vars"))
 
-        auto_stop = to_int(tool_parameters.get("auto_stop_interval", 15), "auto_stop_interval")
+        auto_stop_raw = tool_parameters.get("auto_stop_interval")
+        if auto_stop_raw is None or auto_stop_raw == "":
+            auto_stop_raw = 15
+        auto_stop = to_int(auto_stop_raw, "auto_stop_interval")
 
         common_kwargs: dict[str, Any] = {
             "language": language,
@@ -76,13 +79,13 @@ class CreateSandboxTool(Tool):
         cpu = tool_parameters.get("cpu")
         memory = tool_parameters.get("memory")
         disk = tool_parameters.get("disk")
-        if cpu is None and memory is None and disk is None:
+        if cpu in (None, "") and memory in (None, "") and disk in (None, ""):
             return None
         kwargs: dict[str, int] = {}
-        if cpu is not None:
+        if cpu not in (None, ""):
             kwargs["cpu"] = to_int(cpu, "cpu")
-        if memory is not None:
+        if memory not in (None, ""):
             kwargs["memory"] = to_int(memory, "memory")
-        if disk is not None:
+        if disk not in (None, ""):
             kwargs["disk"] = to_int(disk, "disk")
         return Resources(**kwargs)

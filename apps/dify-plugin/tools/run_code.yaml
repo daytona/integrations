@@ -12,7 +12,7 @@ description:
     zh_Hans: Run a snippet of code in a Daytona sandbox and return the output.
     ja_JP: Run a snippet of code in a Daytona sandbox and return the output.
     pt_BR: Run a snippet of code in a Daytona sandbox and return the output.
-  llm: Execute a code snippet in a Daytona sandbox using its built-in language runtime. Supports Python, TypeScript, and JavaScript. If no sandbox_id is provided, a new ephemeral sandbox is created with the specified language and destroyed afterward. If a sandbox_id is provided, the language parameter is ignored (the sandbox uses its own configured language). For larger or multi-file scripts, upload them with upload_file and execute via run_command. Returns the combined output (stdout merged with stderr) and the exit code.
+  llm: Execute a code snippet in a Daytona sandbox using its built-in language runtime. Supports Python, TypeScript, and JavaScript. If no sandbox_id is provided, a new ephemeral sandbox is created with the specified language and destroyed afterward. If a sandbox_id is provided, the language parameter is ignored (the sandbox uses its own configured language). For larger or multi-file scripts, upload them with upload_file and execute via run_command. Returns the combined output (stdout merged with stderr) and the exit code. Any charts produced by the code (e.g. matplotlib figures) are returned as PNG image files plus chart metadata (charts_count and charts).
 parameters:
   - name: code
     type: string

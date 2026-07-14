@@ -1,0 +1,127 @@
+identity:
+  name: git_clone
+  author: daytonaio
+  label:
+    en_US: Git Clone
+    zh_Hans: Git Clone
+    ja_JP: Git Clone
+    pt_BR: Git Clone
+description:
+  human:
+    en_US: Clone a Git repository into a Daytona sandbox.
+    zh_Hans: Clone a Git repository into a Daytona sandbox.
+    ja_JP: Clone a Git repository into a Daytona sandbox.
+    pt_BR: Clona um repositório Git num sandbox Daytona.
+  llm: Clone a Git repository into a sandbox. Supports branch selection, specific commit checkout, and authentication for private repositories. After cloning, the code is available at the specified path inside the sandbox for execution or modification.
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox to clone the repository into.
+      zh_Hans: The ID of the sandbox to clone the repository into.
+      ja_JP: The ID of the sandbox to clone the repository into.
+      pt_BR: O ID do sandbox onde o repositório será clonado.
+    llm_description: The ID of an existing Daytona sandbox to clone the repository into.
+    form: llm
+  - name: url
+    type: string
+    required: true
+    label:
+      en_US: Repository URL
+      zh_Hans: Repository URL
+      ja_JP: Repository URL
+      pt_BR: URL do Repositório
+    human_description:
+      en_US: "The Git repository URL (e.g. https://github.com/user/repo.git)."
+      zh_Hans: "The Git repository URL (e.g. https://github.com/user/repo.git)."
+      ja_JP: "The Git repository URL (e.g. https://github.com/user/repo.git)."
+      pt_BR: "O URL do repositório Git (ex: https://github.com/user/repo.git)."
+    llm_description: "The Git repository URL to clone (e.g. https://github.com/user/repo.git)."
+    form: llm
+  - name: path
+    type: string
+    required: true
+    label:
+      en_US: Target Path
+      zh_Hans: Target Path
+      ja_JP: Target Path
+      pt_BR: Caminho de Destino
+    human_description:
+      en_US: The path inside the sandbox where the repository will be cloned (e.g. /home/daytona/workspace/my-repo).
+      zh_Hans: The path inside the sandbox where the repository will be cloned (e.g. /home/daytona/workspace/my-repo).
+      ja_JP: The path inside the sandbox where the repository will be cloned (e.g. /home/daytona/workspace/my-repo).
+      pt_BR: "O caminho dentro do sandbox onde o repositório será clonado (ex: /home/daytona/workspace/my-repo)."
+    llm_description: The destination path inside the sandbox where the repository will be cloned.
+    form: llm
+  - name: branch
+    type: string
+    required: false
+    label:
+      en_US: Branch
+      zh_Hans: Branch
+      ja_JP: Branch
+      pt_BR: Branch
+    human_description:
+      en_US: The branch to checkout after cloning. Defaults to the repository default branch.
+      zh_Hans: The branch to checkout after cloning. Defaults to the repository default branch.
+      ja_JP: The branch to checkout after cloning. Defaults to the repository default branch.
+      pt_BR: A branch a verificar após clonar. Por defeito usa a branch padrão do repositório.
+    llm_description: Optional branch to checkout after cloning. Defaults to the repository's default branch.
+    form: llm
+    default: ""
+  - name: commit_id
+    type: string
+    required: false
+    label:
+      en_US: Commit ID
+      zh_Hans: Commit ID
+      ja_JP: Commit ID
+      pt_BR: Commit ID
+    human_description:
+      en_US: A specific commit hash to checkout after cloning. Overrides branch if both are set.
+      zh_Hans: A specific commit hash to checkout after cloning. Overrides branch if both are set.
+      ja_JP: A specific commit hash to checkout after cloning. Overrides branch if both are set.
+      pt_BR: Um hash de commit específico para verificar após clonar. Sobrepõe-se à branch se ambos forem definidos.
+    llm_description: Optional specific commit hash to checkout after cloning. Overrides branch if both are set.
+    form: llm
+    default: ""
+  - name: username
+    type: string
+    required: false
+    label:
+      en_US: Username
+      zh_Hans: Username
+      ja_JP: Username
+      pt_BR: Username
+    human_description:
+      en_US: Username for authenticating with private repositories.
+      zh_Hans: Username for authenticating with private repositories.
+      ja_JP: Username for authenticating with private repositories.
+      pt_BR: Nome de utilizador para autenticação em repositórios privados.
+    llm_description: Optional username for authenticating with private Git repositories.
+    form: llm
+    default: ""
+  - name: password
+    type: secret-input
+    required: false
+    label:
+      en_US: Password / Token
+      zh_Hans: Password / Token
+      ja_JP: Password / Token
+      pt_BR: Password / Token
+    human_description:
+      en_US: Password or access token for authenticating with private repositories.
+      zh_Hans: Password or access token for authenticating with private repositories.
+      ja_JP: Password or access token for authenticating with private repositories.
+      pt_BR: Password ou token de acesso para autenticação em repositórios privados.
+    llm_description: Optional password or access token for authenticating with private Git repositories.
+    form: form
+extra:
+  python:
+    source: tools/git_clone.py

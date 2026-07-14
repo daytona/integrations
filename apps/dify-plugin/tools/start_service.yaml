@@ -1,0 +1,49 @@
+identity:
+  name: start_service
+  author: daytonaio
+  label:
+    en_US: Start Service
+    zh_Hans: Start Service
+    ja_JP: Start Service
+    pt_BR: Iniciar Serviço
+description:
+  human:
+    en_US: Start a long-running background process (web server, daemon) in a sandbox.
+    zh_Hans: Start a long-running background process (web server, daemon) in a sandbox.
+    ja_JP: Start a long-running background process (web server, daemon) in a sandbox.
+    pt_BR: Inicia um processo longo em background (servidor web, daemon) num sandbox.
+  llm: "Start a long-running background command in a sandbox (e.g. web server, API server, build watcher). Returns a session_id and cmd_id for retrieving logs later with get_service_logs. The command runs asynchronously — this tool returns immediately without waiting for completion."
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox where the service will run.
+      zh_Hans: The ID of the sandbox where the service will run.
+      ja_JP: The ID of the sandbox where the service will run.
+      pt_BR: O ID do sandbox onde o serviço irá correr.
+    llm_description: The ID of an existing Daytona sandbox where the service will run.
+    form: llm
+  - name: command
+    type: string
+    required: true
+    label:
+      en_US: Command
+      zh_Hans: Command
+      ja_JP: Command
+      pt_BR: Comando
+    human_description:
+      en_US: The command to start the service (e.g. "python server.py" or "npm start").
+      zh_Hans: The command to start the service (e.g. "python server.py" or "npm start").
+      ja_JP: The command to start the service (e.g. "python server.py" or "npm start").
+      pt_BR: "O comando para iniciar o serviço (ex: python server.py ou npm start)."
+    llm_description: "The command to start the background service (e.g. python server.py, npm start, uvicorn app:server). If the service should be reachable via get_preview_url, bind it to 0.0.0.0 instead of localhost/127.0.0.1 (e.g. 'uvicorn app:server --host 0.0.0.0', 'streamlit run app.py --server.address 0.0.0.0')."
+    form: llm
+extra:
+  python:
+    source: tools/start_service.py

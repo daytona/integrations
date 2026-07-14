@@ -42,7 +42,7 @@ parameters:
       zh_Hans: The port number inside the sandbox where the service is listening (e.g. 3000, 5000, 8080).
       ja_JP: The port number inside the sandbox where the service is listening (e.g. 3000, 5000, 8080).
       pt_BR: The port number inside the sandbox where the service is listening (e.g. 3000, 5000, 8080).
-    llm_description: 'The port number inside the sandbox where the service is listening (e.g. 3000 for Next.js, 5000 for Flask, 8080 for generic HTTP, 8501 for Streamlit). Range 3000-9999.'
+    llm_description: 'The port number inside the sandbox where the service is listening (e.g. 3000 for Next.js, 5000 for Flask, 8080 for generic HTTP, 8501 for Streamlit). Range 1-65535.'
     form: llm
 extra:
   python:

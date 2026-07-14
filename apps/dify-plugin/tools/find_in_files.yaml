@@ -1,0 +1,64 @@
+identity:
+  name: find_in_files
+  author: daytonaio
+  label:
+    en_US: Find in Files
+    zh_Hans: Find in Files
+    ja_JP: Find in Files
+    pt_BR: Find in Files
+description:
+  human:
+    en_US: Search for a text pattern inside file contents in a Daytona sandbox (like grep).
+    zh_Hans: Search for a text pattern inside file contents in a Daytona sandbox (like grep).
+    ja_JP: Search for a text pattern inside file contents in a Daytona sandbox (like grep).
+    pt_BR: Search for a text pattern inside file contents in a Daytona sandbox (like grep).
+  llm: Search for a text pattern inside the contents of files within an existing Daytona sandbox. Returns matching results with file path, line number, and matching line content. Similar to running grep recursively. Requires a sandbox_id.
+parameters:
+  - name: sandbox_id
+    type: string
+    required: true
+    label:
+      en_US: Sandbox ID
+      zh_Hans: Sandbox ID
+      ja_JP: Sandbox ID
+      pt_BR: Sandbox ID
+    human_description:
+      en_US: The ID of the sandbox to search within.
+      zh_Hans: The ID of the sandbox to search within.
+      ja_JP: The ID of the sandbox to search within.
+      pt_BR: The ID of the sandbox to search within.
+    llm_description: The ID of the Daytona sandbox to search within.
+    form: llm
+  - name: path
+    type: string
+    required: true
+    label:
+      en_US: Path
+      zh_Hans: Path
+      ja_JP: Path
+      pt_BR: Path
+    human_description:
+      en_US: 'Absolute directory path inside the sandbox to search within (e.g. /home/daytona).'
+      zh_Hans: 'Absolute directory path inside the sandbox to search within (e.g. /home/daytona).'
+      ja_JP: 'Absolute directory path inside the sandbox to search within (e.g. /home/daytona).'
+      pt_BR: 'Absolute directory path inside the sandbox to search within (e.g. /home/daytona).'
+    llm_description: 'Absolute directory path inside the sandbox to search within (e.g. "/home/daytona", "/tmp", "/").'
+    form: llm
+  - name: pattern
+    type: string
+    required: true
+    label:
+      en_US: Pattern
+      zh_Hans: Pattern
+      ja_JP: Pattern
+      pt_BR: Pattern
+    human_description:
+      en_US: 'Text pattern to search for inside file contents.'
+      zh_Hans: 'Text pattern to search for inside file contents.'
+      ja_JP: 'Text pattern to search for inside file contents.'
+      pt_BR: 'Text pattern to search for inside file contents.'
+    llm_description: 'Text pattern to search for inside file contents (e.g. "def main", "ERROR", "TODO").'
+    form: llm
+extra:
+  python:
+    source: tools/find_in_files.py
