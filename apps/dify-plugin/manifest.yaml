@@ -8,10 +8,10 @@ label:
   ja_JP: Daytona
   pt_BR: Daytona
 description:
-  en_US: Tool for running code securely in Daytona sandboxes.
-  zh_Hans: Tool for running code securely in Daytona sandboxes.
-  ja_JP: Tool for running code securely in Daytona sandboxes.
-  pt_BR: Tool for running code securely in Daytona sandboxes.
+  en_US: Create and manage Daytona sandboxes — run code and shell commands, manage files, clone Git repositories, run background services, and expose preview URLs.
+  zh_Hans: Create and manage Daytona sandboxes — run code and shell commands, manage files, clone Git repositories, run background services, and expose preview URLs.
+  ja_JP: Create and manage Daytona sandboxes — run code and shell commands, manage files, clone Git repositories, run background services, and expose preview URLs.
+  pt_BR: Create and manage Daytona sandboxes — run code and shell commands, manage files, clone Git repositories, run background services, and expose preview URLs.
 icon: icon.png
 resource:
   memory: 268435456

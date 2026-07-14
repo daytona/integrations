@@ -6,7 +6,8 @@ This plugin connects to the Daytona API to create and manage sandbox environment
 
 - **API Key**: Your Daytona API key is stored by Dify and sent to the Daytona API for authentication. It is never shared with third parties.
 - **Code and Commands**: Code snippets and shell commands you submit are sent to the Daytona API for execution inside isolated sandboxes. Daytona does not use your code to train models or improve services.
-- **File Contents**: Files you upload to a sandbox via the Upload File tool are transmitted through the plugin to the Daytona API and stored inside the sandbox. Files you retrieve via the Download File tool are transferred from the sandbox through the plugin back into Dify. The plugin itself does not retain any file contents; storage is managed by Daytona for the lifetime of the sandbox.
+- **File Contents**: Files and text you send to a sandbox (via the Upload File or Write File tools) are transmitted through the plugin to the Daytona API and stored inside the sandbox. Files and text you retrieve (via the Download File or Read File tools) are transferred from the sandbox through the plugin back into Dify. The plugin itself does not retain any file contents; storage is managed by Daytona for the lifetime of the sandbox.
+- **Git Credentials**: When you clone a private repository via the Git Clone tool, any username and password/token you provide are sent through the plugin to the Daytona API to authenticate the clone. They are not retained or logged by the plugin and are redacted from the tool's output.
 - **Sandbox Identifiers**: Sandbox IDs returned by the Daytona API are surfaced in Dify so subsequent tool calls can target the same sandbox.
 - **Execution Output**: stdout, stderr, and exit codes from code and commands you run are returned by the Daytona API and surfaced in Dify.
 
