@@ -121,7 +121,7 @@ parameters:
       ja_JP: Password or access token for authenticating with private repositories.
       pt_BR: Password ou token de acesso para autenticação em repositórios privados.
     llm_description: Optional password or access token for authenticating with private Git repositories.
-    form: llm
+    form: form
 extra:
   python:
     source: tools/git_clone.py

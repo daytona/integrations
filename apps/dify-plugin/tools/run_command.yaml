@@ -70,11 +70,11 @@ parameters:
       ja_JP: Timeout (seconds)
       pt_BR: Timeout (segundos)
     human_description:
-      en_US: Maximum execution time in seconds. Leave empty for no timeout.
-      zh_Hans: Maximum execution time in seconds. Leave empty for no timeout.
-      ja_JP: Maximum execution time in seconds. Leave empty for no timeout.
-      pt_BR: Tempo maximo de execucao em segundos. Deixar vazio para sem limite.
-    llm_description: 'Optional timeout in seconds. Use a higher value for long operations like pip install or pytest.'
+      en_US: Maximum execution time in seconds. Leave empty to use Daytona's default timeout; use 0 for no timeout.
+      zh_Hans: Maximum execution time in seconds. Leave empty to use Daytona's default timeout; use 0 for no timeout.
+      ja_JP: Maximum execution time in seconds. Leave empty to use Daytona's default timeout; use 0 for no timeout.
+      pt_BR: Tempo maximo de execucao em segundos. Deixar vazio para usar o limite padrao do Daytona; usar 0 para sem limite.
+    llm_description: 'Optional timeout in seconds. Leave empty to use Daytona''s default timeout, or set 0 for no timeout. Use a higher value for long operations like pip install or pytest.'
     form: llm
   - name: sandbox_id
     type: string

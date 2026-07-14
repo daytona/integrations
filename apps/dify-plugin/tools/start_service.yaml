@@ -42,7 +42,7 @@ parameters:
       zh_Hans: The command to start the service (e.g. "python server.py" or "npm start").
       ja_JP: The command to start the service (e.g. "python server.py" or "npm start").
       pt_BR: "O comando para iniciar o serviço (ex: python server.py ou npm start)."
-    llm_description: "The command to start the background service (e.g. python server.py, npm start, uvicorn app:server)."
+    llm_description: "The command to start the background service (e.g. python server.py, npm start, uvicorn app:server). If the service should be reachable via get_preview_url, bind it to 0.0.0.0 instead of localhost/127.0.0.1 (e.g. 'uvicorn app:server --host 0.0.0.0', 'streamlit run app.py --server.address 0.0.0.0')."
     form: llm
 extra:
   python:

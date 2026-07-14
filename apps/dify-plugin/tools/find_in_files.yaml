@@ -12,7 +12,7 @@ description:
     zh_Hans: Search for a text pattern inside file contents in a Daytona sandbox (like grep).
     ja_JP: Search for a text pattern inside file contents in a Daytona sandbox (like grep).
     pt_BR: Search for a text pattern inside file contents in a Daytona sandbox (like grep).
-  llm: Search for a text or regex pattern inside the contents of files within an existing Daytona sandbox. Returns matching results with file path, line number, and matching line content. Similar to running grep recursively. Requires a sandbox_id.
+  llm: Search for a text pattern inside the contents of files within an existing Daytona sandbox. Returns matching results with file path, line number, and matching line content. Similar to running grep recursively. Requires a sandbox_id.
 parameters:
   - name: sandbox_id
     type: string
@@ -53,11 +53,11 @@ parameters:
       ja_JP: Pattern
       pt_BR: Pattern
     human_description:
-      en_US: 'Text or regex pattern to search for inside file contents.'
-      zh_Hans: 'Text or regex pattern to search for inside file contents.'
-      ja_JP: 'Text or regex pattern to search for inside file contents.'
-      pt_BR: 'Text or regex pattern to search for inside file contents.'
-    llm_description: 'Text or regex pattern to search for inside file contents (e.g. "def main", "ERROR", "TODO").'
+      en_US: 'Text pattern to search for inside file contents.'
+      zh_Hans: 'Text pattern to search for inside file contents.'
+      ja_JP: 'Text pattern to search for inside file contents.'
+      pt_BR: 'Text pattern to search for inside file contents.'
+    llm_description: 'Text pattern to search for inside file contents (e.g. "def main", "ERROR", "TODO").'
     form: llm
 extra:
   python:
