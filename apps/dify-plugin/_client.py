@@ -11,7 +11,11 @@ _client_cache: dict[str, Daytona] = {}
 
 
 def _cache_key(credentials: dict[str, Any]) -> str:
-    raw = f"{credentials.get('api_key', '')}:{credentials.get('api_url', '')}"
+    # Length-prefix each field so distinct api_key/api_url pairs can't collide
+    # into the same entry (e.g. "a:" + "b" vs "a" + ":b").
+    api_key = str(credentials.get("api_key", ""))
+    api_url = str(credentials.get("api_url", ""))
+    raw = f"{len(api_key)}:{api_key}{len(api_url)}:{api_url}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
