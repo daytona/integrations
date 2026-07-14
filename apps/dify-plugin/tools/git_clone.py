@@ -1,10 +1,25 @@
 from collections.abc import Generator
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
 from _client import build_client, get_sandbox
+
+
+def _redact_url(url: str) -> str:
+    """Strip embedded userinfo (user:token@host) so credentials aren't echoed back."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    if not (parts.username or parts.password):
+        return url
+    host = parts.hostname or ""
+    if parts.port:
+        host = f"{host}:{parts.port}"
+    return urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))
 
 
 class GitCloneTool(Tool):
@@ -21,8 +36,9 @@ class GitCloneTool(Tool):
         if not path:
             raise ValueError("path is required")
 
-        branch = tool_parameters.get("branch") or None
         commit_id = tool_parameters.get("commit_id") or None
+        # A commit id produces a detached checkout and overrides branch, so don't send both.
+        branch = None if commit_id else (tool_parameters.get("branch") or None)
         username = tool_parameters.get("username") or None
         password = tool_parameters.get("password") or None
 
@@ -38,13 +54,16 @@ class GitCloneTool(Tool):
             password=password,
         )
 
+        # Never echo embedded credentials back into tool output.
+        safe_url = _redact_url(url)
         yield self.create_json_message({
             "success": True,
             "sandbox_id": sandbox_id,
-            "url": url,
+            "url": safe_url,
             "path": path,
             "branch": branch,
+            "commit_id": commit_id,
         })
         yield self.create_text_message(
-            f"Repository '{url}' cloned to '{path}' in sandbox '{sandbox_id}'."
+            f"Repository '{safe_url}' cloned to '{path}' in sandbox '{sandbox_id}'."
         )
