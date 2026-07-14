@@ -1,4 +1,4 @@
-import time
+import uuid
 from collections.abc import Generator
 from typing import Any
 
@@ -23,11 +23,22 @@ class StartServiceTool(Tool):
         daytona = build_client(self.runtime.credentials)
         sandbox = get_sandbox(daytona, sandbox_id)
 
-        session_id = f"svc-{int(time.time())}"
+        # A UUID keeps sessions unique even when several services are started in
+        # the same sandbox within the same second (int(time.time()) collided).
+        session_id = f"svc-{uuid.uuid4().hex}"
         sandbox.process.create_session(session_id)
 
-        req = SessionExecuteRequest(command=command, run_async=True)
-        response = sandbox.process.execute_session_command(session_id, req)
+        try:
+            req = SessionExecuteRequest(command=command, run_async=True)
+            response = sandbox.process.execute_session_command(session_id, req)
+        except Exception:
+            # Keep session creation transactional: drop the empty session if the
+            # command failed to launch so failures don't accumulate stale sessions.
+            try:
+                sandbox.process.delete_session(session_id)
+            except Exception:
+                pass
+            raise
 
         cmd_id = getattr(response, "cmd_id", None)
 
