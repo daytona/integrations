@@ -42,7 +42,7 @@ If you don't pass a `sandbox_id` to **Run Code** or **Run Command**, a temporary
 
 #### Work with a Git repository
 
-Use **Git Clone** to pull a repository into a sandbox, then **Run Command** to build and run it (install dependencies, start the app, etc.), using `cwd` to target the checkout. **Run Code** is best for running snippets that operate on the cloned files. Private repositories can be cloned by supplying a username and a password/token.
+Use **Git Clone** to pull a repository into a sandbox, then **Run Command** for finite build and test steps (install dependencies, compile, run tests), using `cwd` to target the checkout. To launch a long-running server from the repo, use **Start Service** (see below) rather than **Run Command**, which waits for the command to finish and would time out. **Run Code** is best for running snippets that operate on the cloned files. Private repositories can be cloned by supplying a username and a password/token.
 
 #### Run and preview a web service
 
