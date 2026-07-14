@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from itertools import islice
 from typing import Any
 
 from daytona import ListSandboxesQuery
@@ -6,21 +7,22 @@ from daytona import ListSandboxesQuery
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from _client import build_client
+from _client import build_client, to_int
 
 
 class ListSandboxesTool(Tool):
     def _invoke(self, tool_parameters: dict[str, Any]) -> Generator[ToolInvokeMessage]:
         daytona = build_client(self.runtime.credentials)
 
-        limit = tool_parameters.get("limit")
-        if limit in (None, ""):
-            limit = 50
-        else:
-            limit = int(limit)
+        limit_raw = tool_parameters.get("limit")
+        limit = 50 if limit_raw in (None, "") else to_int(limit_raw, "limit")
+        if limit <= 0:
+            raise ValueError("limit must be a positive whole number")
 
+        # ListSandboxesQuery.limit is the page size, and iterating the result
+        # pages through the whole account — cap what we actually collect.
         query = ListSandboxesQuery(limit=limit)
-        sandboxes = list(daytona.list(query=query))
+        sandboxes = list(islice(daytona.list(query), limit))
 
         result = []
         for sb in sandboxes:
