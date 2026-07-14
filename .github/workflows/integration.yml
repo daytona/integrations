@@ -1,25 +1,5 @@
 # Live integration tests that run against REAL Daytona sandboxes and therefore
 # need DAYTONA_API_KEY. These are intentionally kept OUT of ci.yml (per-PR CI).
-#
-# SECURITY MODEL (this repo is public):
-#   * Trigger is `pull_request` (NOT pull_request_target), so PRs from FORKS get
-#     NO secrets from GitHub — a malicious fork PR has no key in the environment
-#     to steal. This is enforced by GitHub and cannot be weakened here.
-#   * Fork PRs are therefore skipped and surfaced as "deferred"; a maintainer
-#     re-runs them via `workflow_dispatch` after reviewing the branch.
-#   * Same-repo (internal) branch PRs and manual dispatches DO get the key, but
-#     every run is gated behind the `integration-tests` Environment's required
-#     reviewers (manual admin approval), which also throttles cost/abuse.
-#
-# ONE-TIME REPO SETUP (Settings → Environments):
-#   1. Create an environment named `integration-tests`.
-#   2. Add a protection rule → Required reviewers (you / admins).
-#   3. Deployment branches → "All branches" (do NOT restrict to main, or PR
-#      branches can't use the env; the reviewer gate is the control).
-#   4. Add an environment secret DAYTONA_API_KEY (+ optionally DAYTONA_API_URL,
-#      DAYTONA_ORGANIZATION_ID). Use a dedicated, low-quota, rotatable CI key.
-#   Note: keep this workflow OUT of required status checks — fork PRs skip it by
-#   design, and requiring it would block their merge.
 
 name: integration
 
