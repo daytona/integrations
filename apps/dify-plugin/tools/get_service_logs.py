@@ -38,9 +38,17 @@ class GetServiceLogsTool(Tool):
         stdout = getattr(logs, "stdout", None) or ""
         stderr = getattr(logs, "stderr", None) or ""
         output = getattr(logs, "output", None) or ""
-        combined = output or (stdout + ("\n" + stderr if stderr else ""))
+        if output:
+            combined = output
+        elif stdout and stderr:
+            # Join the two streams with a single newline, without doubling one
+            # that stdout already ends with.
+            separator = "" if stdout.endswith("\n") else "\n"
+            combined = stdout + separator + stderr
+        else:
+            combined = stdout or stderr
 
-        yield self.create_text_message(combined or "(no output yet)")
+        yield self.create_text_message(combined or "(no output)")
         yield self.create_json_message({
             "session_id": session_id,
             "cmd_id": cmd_id,
