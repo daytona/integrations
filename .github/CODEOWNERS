@@ -1,0 +1,21 @@
+# CODEOWNERS -- Daytona Integrations
+# Listed owners are automatically requested for review on PRs that modify the
+# matching files. Multiple owners = OR semantics (any one can approve).
+
+# Security and compliance policies
+SECURITY.md                @mislavivanda
+CODE_OF_CONDUCT.md         @mislavivanda
+
+# Contributor License Agreement (legal)
+CLA.md                     @mislavivanda
+
+# Licensing and copyright
+LICENSE                    @mislavivanda
+COPYRIGHT                  @mislavivanda
+NOTICE                     @mislavivanda
+
+# CI/CD workflows (includes the CLA and DCO enforcement)
+.github/workflows/         @mislavivanda
+
+# CODEOWNERS itself (must protect itself)
+.github/CODEOWNERS         @mislavivanda
