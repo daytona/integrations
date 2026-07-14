@@ -31,8 +31,8 @@ matching issue doesn't already exist.
 
 1. [Fork](https://help.github.com/articles/working-with-forks/) the repository and create a
    branch for your change.
-2. Keep each PR scoped to **one package or app**. For packages, release routing is by changed
-   file path, not the scope text.
+2. Keep each PR scoped to **no more than one package or app** (docs-only or repo-wide changes
+   are fine). For packages, release routing is by changed file path, not the scope text.
 3. PRs are **squash-merged**, so the **PR title must be a
    [Conventional Commit](https://www.conventionalcommits.org/)** — e.g.
    `feat(pi-extension): add X`, `fix(adk-plugin): handle Y`. That title becomes the squash
