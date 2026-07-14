@@ -32,7 +32,8 @@ class SandboxUploadedFile(BaseModel):
     remote_path: str
     description: str
 
-tool_base_description = """Tool for running python code in a sandboxed environment for data analysis. \
+tool_base_description = """\
+Tool for running python code in a sandboxed environment for data analysis. \
 The environment is long running and exists across multiple executions. \
 You must send the whole script every time and print your outputs. \
 Script should be pure python code that can be evaluated. \
@@ -148,7 +149,9 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         self._on_result = on_result
 
     def _run(
-        self, data_analysis_python_code: str, run_manager: Optional[CallbackManagerForToolRun] = None,
+        self,
+        data_analysis_python_code: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> Union[str, ExecutionArtifacts]:
         python_code_to_exec = self._add_last_line_print(data_analysis_python_code)
 

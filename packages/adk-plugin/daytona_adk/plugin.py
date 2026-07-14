@@ -7,8 +7,6 @@ with lifecycle hooks for monitoring and customization.
 import logging
 from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
-
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.plugins import BasePlugin
@@ -24,6 +22,8 @@ from daytona_adk.tools import (
     ReadFileTool,
     StartLongRunningCommandTool,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DaytonaPlugin(BasePlugin):
