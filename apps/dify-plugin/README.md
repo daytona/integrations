@@ -39,7 +39,7 @@ Use **Destroy Sandbox** to permanently delete a sandbox you provisioned with **C
 | Tool | Inputs | Returns |
 |------|--------|---------|
 | `create_sandbox` | `name`, `snapshot`, `image`, `language`, `env_vars` (JSON string), `cpu`, `memory`, `disk`, `auto_stop_interval` (all optional) | `sandbox_id` |
-| `run_code` | `code` (required), `language` (optional: `python`/`typescript`/`javascript`, default `python`, only used when creating an ephemeral sandbox), `sandbox_id` (optional, ephemeral if omitted) | `exit_code`, `output` (combined stdout+stderr), `sandbox_id` |
+| `run_code` | `code` (required), `language` (optional: `python`/`typescript`/`javascript`, default `python`, only used when creating an ephemeral sandbox), `sandbox_id` (optional, ephemeral if omitted) | `exit_code`, `output` (combined stdout+stderr), `sandbox_id`, `charts_count`, `charts` (list of `{type, title}`); any generated charts (e.g. matplotlib) are also emitted as PNG image blobs |
 | `run_command` | `command` (required), `cwd` (optional), `env_vars` (JSON string, optional), `timeout` (optional, seconds; empty = Daytona default, `0` = no timeout), `sandbox_id` (optional, ephemeral if omitted) | `exit_code`, `output` (combined stdout+stderr), `sandbox_id` |
 | `upload_file` | `sandbox_id`, `file` (Dify file picker), `remote_path` (all required) | `success`, `sandbox_id`, `remote_path`, `size_bytes` |
 | `download_file` | `sandbox_id`, `remote_path` (both required) | File as Dify blob plus `success`, `sandbox_id`, `remote_path`, `size_bytes`, `mime_type`, `filename` |
