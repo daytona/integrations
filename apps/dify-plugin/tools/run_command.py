@@ -23,6 +23,8 @@ class RunCommandTool(Tool):
 
         timeout = tool_parameters.get("timeout")
         timeout = None if timeout in (None, "") else to_int(timeout, "timeout")
+        if timeout is not None and timeout < 0:
+            raise ValueError("timeout must be greater than or equal to 0 (0 means no timeout)")
 
         if sandbox_id:
             sandbox = get_sandbox(daytona, sandbox_id)
