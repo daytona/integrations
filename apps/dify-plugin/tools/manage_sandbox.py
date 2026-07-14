@@ -4,7 +4,7 @@ from typing import Any
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from _client import build_client
+from _client import build_client, get_sandbox
 
 
 class ManageSandboxTool(Tool):
@@ -18,21 +18,25 @@ class ManageSandboxTool(Tool):
             raise ValueError("action is required")
 
         daytona = build_client(self.runtime.credentials)
-        sandbox = daytona.get(sandbox_id)
+        sandbox = get_sandbox(daytona, sandbox_id)
 
         if action == "start":
             sandbox.start()
-            sandbox.wait_for_sandbox_start()
         elif action == "stop":
             sandbox.stop()
         elif action == "archive":
+            # Daytona requires a sandbox to be stopped before it can be archived.
+            # Sandbox.stop() blocks until the sandbox is fully stopped.
+            current = getattr(sandbox.state, "value", sandbox.state)
+            if current not in ("stopped", "archived"):
+                sandbox.stop()
             sandbox.archive()
         else:
             raise ValueError(
                 f"Invalid action: '{action}'. Must be one of: start, stop, archive."
             )
 
-        sandbox = daytona.get(sandbox_id)
+        sandbox = get_sandbox(daytona, sandbox_id)
         state = getattr(sandbox.state, "value", sandbox.state) if sandbox.state else None
 
         yield self.create_json_message({
