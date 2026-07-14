@@ -25,12 +25,14 @@ class ManageSandboxTool(Tool):
         elif action == "stop":
             sandbox.stop()
         elif action == "archive":
-            # Daytona requires a sandbox to be stopped before it can be archived.
+            # Daytona requires a sandbox to be stopped before it can be archived;
+            # an already-archived sandbox is treated as an idempotent no-op.
             # Sandbox.stop() blocks until the sandbox is fully stopped.
             current = getattr(sandbox.state, "value", sandbox.state)
-            if current not in ("stopped", "archived"):
-                sandbox.stop()
-            sandbox.archive()
+            if current != "archived":
+                if current != "stopped":
+                    sandbox.stop()
+                sandbox.archive()
         else:
             raise ValueError(
                 f"Invalid action: '{action}'. Must be one of: start, stop, archive."
