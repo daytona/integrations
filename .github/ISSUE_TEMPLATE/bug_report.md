@@ -27,7 +27,7 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Environment (required fields):**
+**Environment (please provide what's relevant):**
 
 - Package/app + version: [e.g. `@daytona/pi` v0.0.1, `daytona-adk` v0.0.1]
 - Daytona SDK version: [e.g. `daytona` 0.x]

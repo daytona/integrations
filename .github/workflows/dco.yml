@@ -51,7 +51,9 @@ jobs:
               continue
             fi
 
-            # Skip allowlisted bot authors (they cannot add a sign-off).
+            # Skip allowlisted bot authors (they cannot add a sign-off). `.author.login`
+            # is GitHub's resolution of the commit to a real account (null if the email
+            # isn't linked), so it can't be forged by setting an arbitrary git author.
             login=$(jq -r ".[$i].author.login // \"\"" <<<"$commits")
             case ",$ALLOWLIST," in
               *",$login,"*) echo "skip $short (allowlisted: $login)"; continue ;;
@@ -60,9 +62,12 @@ jobs:
             author_email=$(jq -r ".[$i].commit.author.email" <<<"$commits" | tr '[:upper:]' '[:lower:]')
             message=$(jq -r ".[$i].commit.message" <<<"$commits")
 
-            # Collect the email from every `Signed-off-by:` trailer (case-insensitive).
+            # Extract sign-off emails from the actual trailer block only, via
+            # `git interpret-trailers` -- a loose "Signed-off-by:" line elsewhere in
+            # the body must NOT count (case-insensitive email match).
             signoff_emails=$(printf '%s\n' "$message" \
-              | grep -iE '^[[:space:]]*Signed-off-by:[[:space:]]*.+<.+>' \
+              | git interpret-trailers --parse \
+              | grep -iE '^Signed-off-by:[[:space:]]*.+<.+>' \
               | sed -E 's/.*<([^>]+)>.*/\1/' \
               | tr '[:upper:]' '[:lower:]' || true)
 

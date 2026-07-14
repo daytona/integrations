@@ -8,7 +8,7 @@ Summarize the change and its motivation. List any dependencies this change requi
 
 ## Scope
 
-- [ ] This PR touches **only one package/app** (release routing is by changed file path).
+- [ ] This PR touches **no more than one package/app** (release routing is by changed file path).
 - [ ] The **PR title** follows [Conventional Commits](https://www.conventionalcommits.org/)
       (e.g. `feat(pi-extension): ...`, `fix(adk-plugin): ...`) — it becomes the squash-commit
       message that release-please reads.
