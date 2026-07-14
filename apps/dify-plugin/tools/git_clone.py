@@ -16,9 +16,10 @@ def _redact_url(url: str) -> str:
         return url
     if not (parts.username or parts.password):
         return url
-    host = parts.hostname or ""
-    if parts.port:
-        host = f"{host}:{parts.port}"
+    # Keep the netloc after the last '@' so only the userinfo is dropped while
+    # valid host:port / IPv6 syntax (e.g. [::1]:8080) is preserved. parts.hostname
+    # strips IPv6 brackets and parts.port can raise on a malformed port.
+    host = parts.netloc.rsplit("@", 1)[-1]
     return urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))
 
 
