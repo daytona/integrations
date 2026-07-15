@@ -1,0 +1,202 @@
+# Live integration tests that run against REAL Daytona sandboxes and therefore
+# need DAYTONA_API_KEY. These are intentionally kept OUT of ci.yml (per-PR CI).
+
+name: integration
+
+on:
+  pull_request:
+    paths:
+      - 'packages/adk-plugin/**'
+      - 'packages/langchain-data-analysis/**'
+      - 'packages/n8n-nodes-daytona/**'
+      - 'packages/pi-extension/**'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package(s) to run live tests for'
+        type: choice
+        default: all
+        options:
+          - all
+          - adk
+          - langchain
+          - n8n
+          - pi
+
+permissions:
+  contents: read
+
+# Live runs create real sandboxes; don't cancel a run mid-flight (it could orphan
+# sandboxes). Serialize per ref instead.
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Decides which package jobs run. No secrets/environment here, so this is safe
+  # to run for fork PRs too (it only reads the diff).
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      adk: ${{ steps.decide.outputs.adk }}
+      langchain: ${{ steps.decide.outputs.langchain }}
+      n8n: ${{ steps.decide.outputs.n8n }}
+      pi: ${{ steps.decide.outputs.pi }}
+      fork_deferred: ${{ steps.decide.outputs.fork_deferred }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            adk:
+              - 'packages/adk-plugin/**'
+            langchain:
+              - 'packages/langchain-data-analysis/**'
+            n8n:
+              - 'packages/n8n-nodes-daytona/**'
+            pi:
+              - 'packages/pi-extension/**'
+      - name: Decide which packages run
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_PKG: ${{ github.event.inputs.package }}
+          # Fork = the PR's source branch lives in a different repo than ours.
+          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          CH_ADK: ${{ steps.filter.outputs.adk }}
+          CH_LANGCHAIN: ${{ steps.filter.outputs.langchain }}
+          CH_N8N: ${{ steps.filter.outputs.n8n }}
+          CH_PI: ${{ steps.filter.outputs.pi }}
+        run: |
+          set -euo pipefail
+          decide() {
+            local key="$1" changed="$2"
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              if [ "$INPUT_PKG" = "all" ] || [ "$INPUT_PKG" = "$key" ]; then
+                echo true
+              else
+                echo false
+              fi
+            elif [ "$EVENT" = "pull_request" ] && [ "$IS_FORK" != "true" ] && [ "$changed" = "true" ]; then
+              echo true
+            else
+              echo false
+            fi
+          }
+          {
+            echo "adk=$(decide adk "${CH_ADK:-false}")"
+            echo "langchain=$(decide langchain "${CH_LANGCHAIN:-false}")"
+            echo "n8n=$(decide n8n "${CH_N8N:-false}")"
+            echo "pi=$(decide pi "${CH_PI:-false}")"
+          } >> "$GITHUB_OUTPUT"
+          # A fork PR that touched any package → surface a "deferred" notice.
+          if [ "$IS_FORK" = "true" ] && { [ "${CH_ADK:-false}" = "true" ] || [ "${CH_LANGCHAIN:-false}" = "true" ] || [ "${CH_N8N:-false}" = "true" ] || [ "${CH_PI:-false}" = "true" ]; }; then
+            echo "fork_deferred=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fork_deferred=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  adk:
+    needs: changes
+    if: needs.changes.outputs.adk == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install
+        working-directory: packages/adk-plugin
+        run: python -m pip install -e ".[dev]"
+      - name: Integration tests (live Daytona)
+        working-directory: packages/adk-plugin
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: pytest
+
+  langchain:
+    needs: changes
+    if: needs.changes.outputs.langchain == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install
+        working-directory: packages/langchain-data-analysis
+        run: poetry install --with test,test_integration
+      - name: Integration tests (live Daytona)
+        working-directory: packages/langchain-data-analysis
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: poetry run pytest tests/integration_tests
+
+  n8n:
+    needs: changes
+    if: needs.changes.outputs.n8n == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Install
+        working-directory: packages/n8n-nodes-daytona
+        run: npm ci
+      - name: Integration tests (live Daytona)
+        working-directory: packages/n8n-nodes-daytona
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+          # Optional (add as env secrets/vars if your account needs them):
+          # DAYTONA_API_URL: ${{ secrets.DAYTONA_API_URL }}
+          # DAYTONA_ORGANIZATION_ID: ${{ secrets.DAYTONA_ORGANIZATION_ID }}
+          # Optional: widen coverage to ephemeral / create-matrix suites.
+          # DAYTONA_TEST_INCLUDE_EPHEMERAL: '1'
+          # DAYTONA_TEST_INCLUDE_CREATE_MATRIX: '1'
+        run: npm test
+
+  pi:
+    needs: changes
+    if: needs.changes.outputs.pi == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Install
+        working-directory: packages/pi-extension
+        run: npm ci
+      - name: Live tests (real Daytona)
+        working-directory: packages/pi-extension
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: npm run test:live
+
+  # Fork PRs never receive the key, so live tests can't run. Explain that instead
+  # of failing silently. This job uses no secrets/environment.
+  deferred:
+    needs: changes
+    if: needs.changes.outputs.fork_deferred == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain why live tests were deferred
+        run: |
+          echo "::notice title=Integration tests deferred::This PR is from a fork, so it has no access to DAYTONA_API_KEY by design (GitHub never shares secrets with fork PRs). A maintainer will run the live suite via the 'integration' workflow_dispatch after reviewing the changes."
