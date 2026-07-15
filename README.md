@@ -34,8 +34,8 @@ Versioning is **per package**, automated with [release-please](https://github.co
 ## Contributing
 
 - PRs are **squash-merged**, so the **PR title must be a [Conventional Commit](https://www.conventionalcommits.org/)** — e.g. `feat(pi-extension): add X`, `fix(adk-plugin): handle Y`. `feat` → minor, `fix` → patch, `feat!` / `BREAKING CHANGE:` → major; `chore`/`docs`/`ci` → no release.
-- Keep each PR scoped to **one package** — release routing is by changed file path, not the scope text.
-- Each package is self-contained (its own lockfile and dependencies); develop within its folder.
+- Keep each PR scoped to **no more than one package or app** — for packages, release routing is by changed file path, not the scope text.
+- Each package/app is self-contained (its own dependency manifest); develop within its folder.
 
 ## License
 
