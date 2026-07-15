@@ -7,10 +7,10 @@ identity:
     ja_JP: Daytona
     pt_BR: Daytona
   description:
-    en_US: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
-    zh_Hans: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
-    ja_JP: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
-    pt_BR: Secure sandbox infrastructure for AI agents. Create isolated environments, run code, and execute commands via Daytona.
+    en_US: Secure sandbox infrastructure for AI agents. Create and manage isolated sandboxes — run code and commands, manage files, clone Git repositories, run background services, and expose preview URLs — via Daytona.
+    zh_Hans: Secure sandbox infrastructure for AI agents. Create and manage isolated sandboxes — run code and commands, manage files, clone Git repositories, run background services, and expose preview URLs — via Daytona.
+    ja_JP: Secure sandbox infrastructure for AI agents. Create and manage isolated sandboxes — run code and commands, manage files, clone Git repositories, run background services, and expose preview URLs — via Daytona.
+    pt_BR: Secure sandbox infrastructure for AI agents. Create and manage isolated sandboxes — run code and commands, manage files, clone Git repositories, run background services, and expose preview URLs — via Daytona.
   icon: icon.png
 credentials_for_provider:
   api_key:
