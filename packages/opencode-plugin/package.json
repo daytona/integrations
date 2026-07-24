@@ -29,7 +29,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@daytona/sdk": "^0.163.0",
+    "@daytona/sdk": "^0.200.1",
     "@opencode-ai/plugin": "1.1.59",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.2.1"
