@@ -39,7 +39,7 @@
     "test:live": "npm run test:bash-bg && npm run test:recovery"
   },
   "dependencies": {
-    "@daytona/sdk": "^0.184.0"
+    "@daytona/sdk": "^0.200.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "^0.79.0",
