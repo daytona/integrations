@@ -51,6 +51,8 @@ jobs:
       pi_tag: ${{ steps.release.outputs['packages/pi-extension--tag_name'] }}
       opencode_released: ${{ steps.release.outputs['packages/opencode-plugin--release_created'] }}
       opencode_tag: ${{ steps.release.outputs['packages/opencode-plugin--tag_name'] }}
+      pydantic_ai_released: ${{ steps.release.outputs['packages/pydantic-ai-daytona--release_created'] }}
+      pydantic_ai_tag: ${{ steps.release.outputs['packages/pydantic-ai-daytona--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -85,6 +87,31 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: packages/adk-plugin/dist
+
+  # ---- PyPI: pydantic-ai-daytona (setuptools) ------------------------------
+  publish-pydantic-ai:
+    needs: release-please
+    if: needs.release-please.outputs.pydantic_ai_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC -> PyPI Trusted Publishing
+      contents: read
+    # See publish-adk for the pypi environment contract (repo Settings + PyPI).
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Build sdist + wheel
+        working-directory: packages/pydantic-ai-daytona
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/pydantic-ai-daytona/dist
 
   # ---- PyPI: langchain-daytona-data-analysis (Poetry) ---------------------
   publish-langchain:

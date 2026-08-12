@@ -26,6 +26,7 @@ jobs:
       n8n: ${{ steps.filter.outputs.n8n }}
       pi: ${{ steps.filter.outputs.pi }}
       opencode: ${{ steps.filter.outputs.opencode }}
+      pydantic_ai: ${{ steps.filter.outputs.pydantic_ai }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -42,6 +43,8 @@ jobs:
               - 'packages/pi-extension/**'
             opencode:
               - 'packages/opencode-plugin/**'
+            pydantic_ai:
+              - 'packages/pydantic-ai-daytona/**'
 
   adk:
     needs: changes
@@ -175,6 +178,36 @@ jobs:
         working-directory: packages/opencode-plugin
         run: npm run build --if-present
 
+  pydantic-ai:
+    needs: changes
+    if: needs.changes.outputs.pydantic_ai == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned: obstore (pulled via the daytona SDK) ships no wheels for the
+          # newest Python; 3.12 has wheels so `pip install` succeeds.
+          python-version: "3.12"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/pydantic-ai-daytona/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/pydantic-ai-daytona
+        run: python -m pip install -e ".[dev]"
+      - name: Lint (ruff)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/pydantic-ai-daytona
+        run: ruff check .
+      - name: Unit tests (offline)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/pydantic-ai-daytona
+        run: pytest
+      # NOTE: live tests (tests/integration_tests, real Daytona sandboxes) run via
+      # the separate integration workflow, not per-PR CI.
+
   # Single, stable status check to require in branch protection.
   # It ALWAYS runs (if: always()) and fails only if a relevant job failed or
   # was cancelled. A "skipped" job (a package this PR didn't touch) is fine —
@@ -182,7 +215,7 @@ jobs:
   # merges when a touched package's lint/test/build fails.
   ci-success:
     name: ci-success
-    needs: [changes, adk, langchain, n8n, pi, opencode]
+    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai]
     if: always()
     runs-on: ubuntu-latest
     steps:

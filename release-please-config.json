@@ -27,6 +27,11 @@
       "release-type": "node",
       "package-name": "@daytona/opencode",
       "component": "opencode-plugin"
+    },
+    "packages/pydantic-ai-daytona": {
+      "release-type": "python",
+      "package-name": "pydantic-ai-daytona",
+      "component": "pydantic-ai-daytona"
     }
   }
 }
