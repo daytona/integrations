@@ -5,6 +5,16 @@ on:
     types: [created]
   pull_request_target:
     types: [opened, closed, synchronize]
+  # PRs created with the repo's own GITHUB_TOKEN (release-please's release PRs,
+  # always authored by github-actions[bot]) never fire `pull_request_target`,
+  # which leaves the required "CLA signed" check stuck at "Expected" forever.
+  # The plain `pull_request` event does fire for them, so listen to it too; the
+  # step condition below restricts this path to exactly that author, so human
+  # PRs and app-authored bot PRs (dependabot, renovate -- whose
+  # `pull_request_target` works) are not double-checked, and fork PRs
+  # (read-only token) are not picked up here.
+  pull_request:
+    types: [opened, reopened, synchronize]
 
 # Least-privilege token. `pull_request_target` runs in the BASE repo context so
 # that PRs from forks can still write the signature file and set the status
@@ -35,7 +45,10 @@ jobs:
            (github.event.comment.body == 'recheck' ||
             github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')) ||
           (github.event_name == 'pull_request_target' &&
-           (github.event.action != 'closed' || github.event.pull_request.merged == true))
+           (github.event.action != 'closed' || github.event.pull_request.merged == true)) ||
+          (github.event_name == 'pull_request' &&
+           github.event.pull_request.head.repo.full_name == github.repository &&
+           github.event.pull_request.user.login == 'github-actions[bot]')
         # contributor-assistant/github-action v2.6.1 (upstream archived -- pin by SHA)
         uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08
         env:
