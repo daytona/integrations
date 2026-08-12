@@ -232,7 +232,10 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
         """Read a text file from the sandbox and return its contents.
 
         Large files are truncated to a safety cap; the result ends with the next
-        `offset` to use to page through the rest.
+        `offset` to use to page through the rest. Each page re-transfers the whole
+        file from the sandbox (Daytona has no ranged download), so for files of
+        megabytes prefer slicing server-side via `run_command` (e.g. `sed -n`,
+        `head`, `tail`, or `grep`).
 
         Args:
             path: Path to the file inside the sandbox. Relative paths are resolved

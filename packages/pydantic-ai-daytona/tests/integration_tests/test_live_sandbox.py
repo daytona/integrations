@@ -83,13 +83,14 @@ async def test_exec_timeout_is_reported_and_next_command_is_not_blocked(
 async def test_concurrent_commands_run_in_parallel(session: DaytonaSandboxSession) -> None:
     started = time.monotonic()
     results = await asyncio.gather(
-        session.exec("sleep 2 && echo a", timeout=30),
-        session.exec("sleep 2 && echo b", timeout=30),
+        session.exec("sleep 4 && echo a", timeout=30),
+        session.exec("sleep 4 && echo b", timeout=30),
     )
     elapsed = time.monotonic() - started
     assert [r.exit_code for r in results] == [0, 0]
-    # Serialized execution would take >=4s; parallel sessions finish in ~2s.
-    assert elapsed < 3.8, f"commands appear serialized ({elapsed:.1f}s)"
+    # Serialized execution needs >=8s of sleep alone; parallel sessions need ~4s plus
+    # overhead. The 7.5s bound leaves headroom for slow runners on both sides.
+    assert elapsed < 7.5, f"commands appear serialized ({elapsed:.1f}s)"
 
 
 async def test_attach_by_sandbox_id_reuses_sandbox_and_leaves_it_running(

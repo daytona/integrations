@@ -129,7 +129,6 @@ class DaytonaSandboxSession:
         self._sandbox: AsyncSandbox | None = None
         self._owned = False
         self._exec_base: str | None = None
-        self._exec_session_id: str | None = None
 
     @property
     def sandbox_id(self) -> str | None:
@@ -282,8 +281,14 @@ class DaytonaSandboxSession:
         request = SessionExecuteRequest(
             command=self._wrap_command(command), run_async=False, suppress_input_echo=True
         )
+        # Session setup gets no timed-out interpretation: a connection timeout while
+        # creating the session is an infrastructure failure, not the command hitting
+        # its deadline, so it must surface as a retryable error instead.
         try:
             await sandbox.process.create_session(session_id)
+        except DaytonaError as e:
+            raise self._map_error(e, "running the command") from e
+        try:
             try:
                 response = await sandbox.process.execute_session_command(
                     session_id, request, timeout=timeout

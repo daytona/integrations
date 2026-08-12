@@ -38,6 +38,18 @@ class TestModeValidation:
         with pytest.raises(ValueError, match="labels"):
             DaytonaSandbox(sandbox_id="sb-123", labels={"team": "ai"})
 
+    def test_explicit_false_booleans_are_allowed_in_reuse_modes(self) -> None:
+        DaytonaSandbox(sandbox_id="sb-123", ephemeral=False, network_block_all=False)
+        DaytonaSandbox(session=DaytonaSandboxSession(), ephemeral=False)
+
+    def test_attach_still_rejects_true_booleans(self) -> None:
+        with pytest.raises(ValueError, match="ephemeral"):
+            DaytonaSandbox(sandbox_id="sb-123", ephemeral=True)
+
+    def test_attach_rejects_zero_intervals(self) -> None:
+        with pytest.raises(ValueError, match="auto_stop_interval"):
+            DaytonaSandbox(sandbox_id="sb-123", auto_stop_interval=0)
+
     def test_session_rejects_sandbox_id(self) -> None:
         session = DaytonaSandboxSession()
         with pytest.raises(ValueError, match="sandbox_id.*cannot be combined with `session`"):

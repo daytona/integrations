@@ -242,7 +242,9 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
             raise ValueError(f"instructions must be a string or None, got {self.instructions!r}.")
 
     def _non_default_owned_settings(self) -> list[str]:
-        return [
+        # Any explicit value for these is a creation request a reused sandbox cannot
+        # honor; None is the only no-op.
+        flagged = [
             name
             for name, value in (
                 ("snapshot", self.snapshot),
@@ -250,8 +252,6 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
                 ("env", self.env),
                 ("labels", self.labels),
                 ("os_user", self.os_user),
-                ("ephemeral", self.ephemeral),
-                ("network_block_all", self.network_block_all),
                 ("network_allow_list", self.network_allow_list),
                 ("domain_allow_list", self.domain_allow_list),
                 ("auto_stop_interval", self.auto_stop_interval),
@@ -259,6 +259,15 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
             )
             if value is not None
         ]
+        # Boolean settings declare their Daytona server default: explicitly requesting
+        # the default is a no-op for a reused sandbox, anything else is flagged.
+        for name, value, server_default in (
+            ("ephemeral", self.ephemeral, False),
+            ("network_block_all", self.network_block_all, False),
+        ):
+            if value is not None and value is not server_default:
+                flagged.append(name)
+        return flagged
 
     def _non_default_reused_settings(self) -> list[str]:
         conflicts = self._non_default_owned_settings()

@@ -40,7 +40,7 @@ The capability contributes four tools:
 | Tool | Purpose |
 |---|---|
 | `run_command` | Run a shell command (pipes, redirection, and `&&` work). |
-| `read_file` | Read a UTF-8 text file; large files are read in line-numbered pages via `offset`/`limit`. |
+| `read_file` | Read a UTF-8 text file (up to `max_read_bytes`); pageable with explicit `offset`/`limit`. |
 | `write_file` | Write a UTF-8 text file, creating the parent directory. |
 | `list_directory` | List directory entries, marking directories with `/`. |
 
