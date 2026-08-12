@@ -2,6 +2,7 @@
   "name": "daytona-coding-agent",
   "version": "1.0.0",
   "description": "AgentKit coding agent powered by Daytona",
+  "author": "Daytona Platforms Inc.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

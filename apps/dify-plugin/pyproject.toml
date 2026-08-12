@@ -5,6 +5,9 @@ description = "Dify plugin for Daytona sandbox infrastructure"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"
+authors = [
+    {name = "Daytona Platforms Inc.", email = "support@daytona.io"}
+]
 
 # uv pip compile pyproject.toml -o ./requirements.txt
 dependencies = [
