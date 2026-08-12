@@ -10,6 +10,7 @@ on:
       - 'packages/langchain-data-analysis/**'
       - 'packages/n8n-nodes-daytona/**'
       - 'packages/pi-extension/**'
+      - 'packages/pydantic-ai-daytona/**'
   workflow_dispatch:
     inputs:
       package:
@@ -22,6 +23,7 @@ on:
           - langchain
           - n8n
           - pi
+          - pydantic-ai
 
 permissions:
   contents: read
@@ -45,6 +47,7 @@ jobs:
       langchain: ${{ steps.decide.outputs.langchain }}
       n8n: ${{ steps.decide.outputs.n8n }}
       pi: ${{ steps.decide.outputs.pi }}
+      pydantic_ai: ${{ steps.decide.outputs.pydantic_ai }}
       fork_deferred: ${{ steps.decide.outputs.fork_deferred }}
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +64,8 @@ jobs:
               - 'packages/n8n-nodes-daytona/**'
             pi:
               - 'packages/pi-extension/**'
+            pydantic_ai:
+              - 'packages/pydantic-ai-daytona/**'
       - name: Decide which packages run
         id: decide
         env:
@@ -72,6 +77,7 @@ jobs:
           CH_LANGCHAIN: ${{ steps.filter.outputs.langchain }}
           CH_N8N: ${{ steps.filter.outputs.n8n }}
           CH_PI: ${{ steps.filter.outputs.pi }}
+          CH_PYDANTIC_AI: ${{ steps.filter.outputs.pydantic_ai }}
         run: |
           set -euo pipefail
           decide() {
@@ -93,9 +99,10 @@ jobs:
             echo "langchain=$(decide langchain "${CH_LANGCHAIN:-false}")"
             echo "n8n=$(decide n8n "${CH_N8N:-false}")"
             echo "pi=$(decide pi "${CH_PI:-false}")"
+            echo "pydantic_ai=$(decide pydantic-ai "${CH_PYDANTIC_AI:-false}")"
           } >> "$GITHUB_OUTPUT"
           # A fork PR that touched any package → surface a "deferred" notice.
-          if [ "$IS_FORK" = "true" ] && { [ "${CH_ADK:-false}" = "true" ] || [ "${CH_LANGCHAIN:-false}" = "true" ] || [ "${CH_N8N:-false}" = "true" ] || [ "${CH_PI:-false}" = "true" ]; }; then
+          if [ "$IS_FORK" = "true" ] && { [ "${CH_ADK:-false}" = "true" ] || [ "${CH_LANGCHAIN:-false}" = "true" ] || [ "${CH_N8N:-false}" = "true" ] || [ "${CH_PI:-false}" = "true" ] || [ "${CH_PYDANTIC_AI:-false}" = "true" ]; }; then
             echo "fork_deferred=true" >> "$GITHUB_OUTPUT"
           else
             echo "fork_deferred=false" >> "$GITHUB_OUTPUT"
@@ -189,6 +196,27 @@ jobs:
         env:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: npm run test:live
+
+  pydantic-ai:
+    needs: changes
+    if: needs.changes.outputs.pydantic_ai == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
+          python-version: "3.12"
+      - name: Install
+        working-directory: packages/pydantic-ai-daytona
+        run: python -m pip install -e ".[dev]"
+      - name: Integration tests (live Daytona)
+        working-directory: packages/pydantic-ai-daytona
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: pytest tests/integration_tests
 
   # Fork PRs never receive the key, so live tests can't run. Explain that instead
   # of failing silently. This job uses no secrets/environment.
