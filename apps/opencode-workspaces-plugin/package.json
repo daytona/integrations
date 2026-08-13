@@ -1,0 +1,38 @@
+{
+  "name": "opencode-workspaces-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenCode workspace plugin that provisions Daytona sandboxes as remote development environments",
+  "main": "./.opencode/plugin/index.js",
+  "types": "./.opencode/plugin/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daytona/integrations.git",
+    "directory": "apps/opencode-workspaces-plugin"
+  },
+  "author": "Daytona Platforms Inc.",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/daytona/integrations/issues"
+  },
+  "keywords": [
+    "daytona",
+    "opencode",
+    "plugin"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test --timeout 180000"
+  },
+  "dependencies": {
+    "@daytona/sdk": "^0.163.0",
+    "@opencode-ai/plugin": "^1.4.11"
+  },
+  "devDependencies": {
+    "@opencode-ai/sdk": "^1.14.33",
+    "@types/node": "^22",
+    "opencode-ai": "^1.18.15",
+    "typescript": "^5.6.0"
+  }
+}
