@@ -1,16 +1,28 @@
 # Live integration tests that run against REAL Daytona sandboxes and therefore
 # need DAYTONA_API_KEY. These are intentionally kept OUT of ci.yml (per-PR CI).
+#
+# MERGE GATE: `integration-success` below is a required status check in the
+# `protect-main` ruleset, and the workflow runs in two lanes so that check can
+# always report:
+#   - `pull_request` (no `paths:` filter -- a required check that never
+#     reports would leave PRs stuck at "Expected") covers same-repo PRs:
+#     humans, dependabot, and GITHUB_TOKEN-authored release-please PRs, which
+#     fire no other PR event.
+#   - `pull_request_target` covers fork PRs, which never receive secrets on
+#     `pull_request`. This lane runs the workflow file from main (a fork
+#     cannot alter the pipeline) and checks out the fork's head SHA as of the
+#     triggering event; the `integration-tests` environment approval is the
+#     gate in front of secret exposure, so REVIEW THE DIFF BEFORE APPROVING.
+# The `changes` job routes which package suites run; suites wait for approval
+# of the `integration-tests` environment, so a PR touching a package cannot
+# merge before its live suite was approved AND passed.
 
 name: integration
 
 on:
   pull_request:
-    paths:
-      - 'packages/adk-plugin/**'
-      - 'packages/langchain-data-analysis/**'
-      - 'packages/n8n-nodes-daytona/**'
-      - 'packages/pi-extension/**'
-      - 'packages/pydantic-ai-daytona/**'
+  pull_request_target:
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
     inputs:
       package:
@@ -29,9 +41,11 @@ permissions:
   contents: read
 
 # Live runs create real sandboxes; don't cancel a run mid-flight (it could orphan
-# sandboxes). Serialize per ref instead.
+# sandboxes). Serialize per PR instead (ref as the dispatch fallback): under
+# `pull_request_target`, `github.ref` is the BASE branch, which would collapse
+# every fork-lane run repo-wide into a single queue.
 concurrency:
-  group: integration-${{ github.ref }}
+  group: integration-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -48,12 +62,11 @@ jobs:
       n8n: ${{ steps.decide.outputs.n8n }}
       pi: ${{ steps.decide.outputs.pi }}
       pydantic_ai: ${{ steps.decide.outputs.pydantic_ai }}
-      fork_deferred: ${{ steps.decide.outputs.fork_deferred }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
         with:
           filters: |
             adk:
@@ -72,7 +85,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           INPUT_PKG: ${{ github.event.inputs.package }}
           # Fork = the PR's source branch lives in a different repo than ours.
-          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          IS_FORK: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.repo.full_name != github.repository }}
           CH_ADK: ${{ steps.filter.outputs.adk }}
           CH_LANGCHAIN: ${{ steps.filter.outputs.langchain }}
           CH_N8N: ${{ steps.filter.outputs.n8n }}
@@ -80,6 +93,9 @@ jobs:
           CH_PYDANTIC_AI: ${{ steps.filter.outputs.pydantic_ai }}
         run: |
           set -euo pipefail
+          # Two lanes, one lane per PR type: same-repo PRs run on `pull_request`,
+          # fork PRs run on `pull_request_target` (the only event where they have
+          # secrets). The other event's run leaves every suite skipped.
           decide() {
             local key="$1" changed="$2"
             if [ "$EVENT" = "workflow_dispatch" ]; then
@@ -89,6 +105,8 @@ jobs:
                 echo false
               fi
             elif [ "$EVENT" = "pull_request" ] && [ "$IS_FORK" != "true" ] && [ "$changed" = "true" ]; then
+              echo true
+            elif [ "$EVENT" = "pull_request_target" ] && [ "$IS_FORK" = "true" ] && [ "$changed" = "true" ]; then
               echo true
             else
               echo false
@@ -101,12 +119,6 @@ jobs:
             echo "pi=$(decide pi "${CH_PI:-false}")"
             echo "pydantic_ai=$(decide pydantic-ai "${CH_PYDANTIC_AI:-false}")"
           } >> "$GITHUB_OUTPUT"
-          # A fork PR that touched any package → surface a "deferred" notice.
-          if [ "$IS_FORK" = "true" ] && { [ "${CH_ADK:-false}" = "true" ] || [ "${CH_LANGCHAIN:-false}" = "true" ] || [ "${CH_N8N:-false}" = "true" ] || [ "${CH_PI:-false}" = "true" ] || [ "${CH_PYDANTIC_AI:-false}" = "true" ]; }; then
-            echo "fork_deferred=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "fork_deferred=false" >> "$GITHUB_OUTPUT"
-          fi
 
   adk:
     needs: changes
@@ -115,7 +127,13 @@ jobs:
     environment: integration-tests
     timeout-minutes: 30
     steps:
+      # In the fork lane (`pull_request_target`) the default checkout is the
+      # BASE branch; test the fork's actual code by pinning its head SHA as of
+      # the triggering event (later pushes produce a new run needing a fresh
+      # environment approval). Same-repo lanes keep the default (merge ref).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
@@ -135,7 +153,10 @@ jobs:
     environment: integration-tests
     timeout-minutes: 30
     steps:
+      # Fork lane checks out the PR head (see the adk job note).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
       - uses: actions/setup-python@v5
         with:
           # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
@@ -158,7 +179,10 @@ jobs:
     environment: integration-tests
     timeout-minutes: 30
     steps:
+      # Fork lane checks out the PR head (see the adk job note).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
@@ -184,7 +208,10 @@ jobs:
     environment: integration-tests
     timeout-minutes: 30
     steps:
+      # Fork lane checks out the PR head (see the adk job note).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
@@ -204,7 +231,10 @@ jobs:
     environment: integration-tests
     timeout-minutes: 30
     steps:
+      # Fork lane checks out the PR head (see the adk job note).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
       - uses: actions/setup-python@v5
         with:
           # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
@@ -218,13 +248,30 @@ jobs:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: pytest tests/integration_tests
 
-  # Fork PRs never receive the key, so live tests can't run. Explain that instead
-  # of failing silently. This job uses no secrets/environment.
-  deferred:
-    needs: changes
-    if: needs.changes.outputs.fork_deferred == 'true'
+  # Single, stable status check to require in branch protection -- the
+  # integration counterpart of ci.yml's ci-success. Suites skipped because a PR
+  # does not touch their package pass through; a failed, cancelled, or
+  # rejected-deployment suite blocks the merge. The job only runs in the lane
+  # that owns the PR (same-repo PRs on `pull_request`, fork PRs on
+  # `pull_request_target`): the other lane's roll-up stays skipped, which
+  # required checks treat as satisfied, so the owning lane's verdict governs.
+  integration-success:
+    name: integration-success
+    needs: [changes, adk, langchain, n8n, pi, pydantic-ai]
+    if: >-
+      always() && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'pull_request' &&
+         github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name == 'pull_request_target' &&
+         github.event.pull_request.head.repo.full_name != github.repository)
+      )
     runs-on: ubuntu-latest
     steps:
-      - name: Explain why live tests were deferred
+      - name: Fail if a live suite failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo "::notice title=Integration tests deferred::This PR is from a fork, so it has no access to DAYTONA_API_KEY by design (GitHub never shares secrets with fork PRs). A maintainer will run the live suite via the 'integration' workflow_dispatch after reviewing the changes."
+          echo "A live integration suite failed or was cancelled."
+          exit 1
+      - name: All required live suites passed
+        run: echo "All live integration suites for touched packages passed (or none were needed)."
