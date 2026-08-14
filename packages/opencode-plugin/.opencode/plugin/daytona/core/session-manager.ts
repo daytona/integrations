@@ -25,6 +25,7 @@ export class DaytonaSessionManager {
   // so without this tombstone a sync queued behind a deletion would resurrect a fresh
   // sandbox for a session that no longer exists (invisible, billed, never cleaned up).
   private readonly deletingSessions = new Set<string>()
+  private readonly deletionPromises = new Map<string, Promise<boolean>>()
   private currentProjectId?: string
   public readonly repoPath: string
 
@@ -113,6 +114,7 @@ export class DaytonaSessionManager {
         logger.info(`Starting sandbox ${existing.id} (current state: ${existing.state})`)
         await existing.start()
       }
+      this.ensureNotDeleted(sessionId)
       this.dataStorage.updateSession(projectId, worktree, sessionId, existing.id)
       return existing
     }
@@ -129,6 +131,7 @@ export class DaytonaSessionManager {
         logger.info(`Starting sandbox begin sandboxId=${sandbox.id}`)
         await sandbox.start()
         logger.info(`Starting sandbox done sandboxId=${sandbox.id} in ${Date.now() - reconnectStart}ms`)
+        this.ensureNotDeleted(sessionId)
         this.sessionSandboxes.set(sessionId, sandbox)
         // Preserve branch number if it exists for this sandbox
         let branchNumber = this.dataStorage.getBranchNumberForSandbox(projectId, sandbox.id)
@@ -194,6 +197,13 @@ export class DaytonaSessionManager {
     }, 15_000)
     const sandbox = await daytona.create().finally(() => clearTimeout(waitingLog))
     logger.info(`Daytona create done sessionId=${sessionId} sandboxId=${sandbox.id} in ${Date.now() - createStart}ms`)
+    if (this.deletingSessions.has(sessionId)) {
+      // The session was deleted while creation was in flight. The fresh sandbox is not
+      // registered anywhere, so nothing else will ever clean it up - discard it here.
+      logger.warn(`Session ${sessionId} was deleted during sandbox creation; discarding sandbox ${sandbox.id}`)
+      await sandbox.delete()
+      throw new Error(`Session ${sessionId} is deleted; the newly created sandbox was discarded.`)
+    }
     this.sessionSandboxes.set(sessionId, sandbox)
 
     // Get or assign branch number for this sandbox
@@ -243,16 +253,27 @@ export class DaytonaSessionManager {
    * Delete the sandbox associated with the given session ID
    */
   async deleteSandbox(sessionId: string, projectId: string): Promise<boolean> {
+    // Concurrent deletes share one promise: a second teardown racing the first would
+    // observe the already-deleted sandbox, throw, and wrongly clear the tombstone.
+    const inFlight = this.deletionPromises.get(sessionId)
+    if (inFlight) return inFlight
+
     // Tombstone first, removed again on failure: while set, no code path may create or
     // reconnect a sandbox for this session. Kept after success on purpose - the session
     // is gone, and any late event for it must no-op instead of resurrecting a sandbox.
     this.deletingSessions.add(sessionId)
-    try {
-      return await this.deleteSandboxInner(sessionId, projectId)
-    } catch (err) {
-      this.deletingSessions.delete(sessionId)
-      throw err
-    }
+    const run = (async () => {
+      try {
+        return await this.deleteSandboxInner(sessionId, projectId)
+      } catch (err) {
+        this.deletingSessions.delete(sessionId)
+        throw err
+      } finally {
+        this.deletionPromises.delete(sessionId)
+      }
+    })()
+    this.deletionPromises.set(sessionId, run)
+    return run
   }
 
   private async deleteSandboxInner(sessionId: string, projectId: string): Promise<boolean> {
@@ -363,5 +384,16 @@ export class DaytonaSessionManager {
 
   isSessionDeleting(sessionId: string): boolean {
     return this.deletingSessions.has(sessionId)
+  }
+
+  /**
+   * Guard for registration points that follow an await: deletion may have started (and
+   * finished) while a sandbox was being refreshed or reconnected, and persisting the
+   * mapping afterwards would resurrect state for a session that no longer exists.
+   */
+  private ensureNotDeleted(sessionId: string): void {
+    if (this.deletingSessions.has(sessionId)) {
+      throw new Error(`Session ${sessionId} was deleted while its sandbox was being prepared.`)
+    }
   }
 }
