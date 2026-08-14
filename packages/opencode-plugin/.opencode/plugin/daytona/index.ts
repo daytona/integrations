@@ -28,8 +28,9 @@ import { join } from 'path'
 import { homedir } from 'os'
 import { xdgData } from 'xdg-basedir'
 import type { PluginInput } from '@opencode-ai/plugin'
-import { setLogFilePath } from './core/logger'
+import { logger, setLogFilePath } from './core/logger'
 import { DaytonaSessionManager } from './core/session-manager'
+import { SessionGitManager } from './git/session-git-manager'
 import { toast } from './core/toast'
 import { customTools } from './plugins/custom-tools'
 import { eventHandlers } from './plugins/session-events'
@@ -56,6 +57,16 @@ async function daytonaPlugin(ctx: PluginInput) {
     tool: await customTools(ctx, sessionManager),
     event: await eventHandlers(ctx, sessionManager, REPO_PATH),
     'experimental.chat.system.transform': await systemPromptTransform(ctx, REPO_PATH),
+    // Awaited by OpenCode when the plugin scope closes (newer than the published Hooks
+    // type, ignored by older versions). Draining here keeps a graceful shutdown from
+    // abandoning a git sync that the unawaited `event` hook started on session.idle.
+    // Bounded so a sync stalled on an unreachable sandbox cannot wedge process exit.
+    dispose: async () => {
+      const drained = await SessionGitManager.waitForAllPendingSyncs(60_000)
+      if (!drained) {
+        logger.warn('[dispose] exiting with git syncs still pending after 60s; a sync may be stalled')
+      }
+    },
   }
 }
 

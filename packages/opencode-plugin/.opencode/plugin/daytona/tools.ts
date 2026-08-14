@@ -16,6 +16,7 @@ import { lsTool } from './tools/ls'
 import { globTool } from './tools/glob'
 import { grepTool } from './tools/grep'
 import { getPreviewURLTool } from './tools/get-preview-url'
+import { gitSyncTool } from './tools/git-sync'
 
 import type { DaytonaSessionManager } from './core/session-manager'
 import type { PluginInput } from '@opencode-ai/plugin'
@@ -37,5 +38,6 @@ export function createDaytonaTools(
     glob: globTool(sessionManager, projectId, worktree, pluginCtx),
     grep: grepTool(sessionManager, projectId, worktree, pluginCtx),
     getPreviewURL: getPreviewURLTool(sessionManager, projectId, worktree, pluginCtx),
+    gitSync: gitSyncTool(sessionManager, projectId, worktree, pluginCtx),
   }
 }

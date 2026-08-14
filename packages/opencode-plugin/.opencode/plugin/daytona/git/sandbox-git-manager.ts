@@ -61,6 +61,19 @@ export class DaytonaSandboxGitManager {
     return branch.trim()
   }
 
+  /**
+   * Commit OID of the sandbox HEAD, or '' on an unborn branch (no commits yet).
+   * Any other git failure throws: callers use '' as "nothing to pull", and the delete
+   * path acts on it, so a masked error here could destroy unsynced commits.
+   */
+  async getHeadOid(): Promise<string> {
+    const out = await this.runGitCommand(
+      'if oid=$(git rev-parse --verify --quiet HEAD); then echo "$oid"; else git rev-parse --is-inside-work-tree > /dev/null && echo UNBORN; fi',
+    )
+    const trimmed = out.trim()
+    return trimmed === 'UNBORN' ? '' : trimmed
+  }
+
   async resetToRemote(branch: string): Promise<void> {
     // Check out the branch the host just pushed. Using -f (not -B) checks out the
     // pushed commit instead of resetting the branch ref to the sandbox's current HEAD.

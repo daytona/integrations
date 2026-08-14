@@ -198,6 +198,12 @@ export class HostGitManager {
     return execGit(['show-ref', '--verify', '--quiet', ref], { cwd }).ok
   }
 
+  /** Commit OID a local ref points at, or '' if the ref does not exist. */
+  getRefOid(cwd: string, ref: string): string {
+    const res = execGit(['rev-parse', '--verify', '--quiet', ref], { cwd })
+    return res.ok ? res.stdout.trim() : ''
+  }
+
   /**
    * Returns a commit OID that branch refs can point at. Uses HEAD if the repo has commits,
    * otherwise creates and caches an empty commit (empty tree + commit). Branch refs must

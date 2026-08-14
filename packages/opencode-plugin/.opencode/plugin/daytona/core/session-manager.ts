@@ -16,7 +16,7 @@ import {
   type Sandbox,
 } from '@daytona/sdk'
 import { logger } from './logger'
-import type { SessionSandboxMap, SandboxInfo } from './types'
+import type { SessionSandboxMap, SandboxInfo, SessionInfo } from './types'
 import { SessionGitManager } from '../git/session-git-manager'
 import { DaytonaSandboxGitManager } from '../git/sandbox-git-manager'
 import { ProjectDataStorage } from './project-data-storage'
@@ -27,6 +27,11 @@ export class DaytonaSessionManager {
   private readonly apiKey: string
   private readonly dataStorage: ProjectDataStorage
   private sessionSandboxes: SessionSandboxMap
+  // Sessions whose sandbox teardown has begun. getSandbox creates sandboxes on demand,
+  // so without this tombstone a sync queued behind a deletion would resurrect a fresh
+  // sandbox for a session that no longer exists (invisible, billed, never cleaned up).
+  private readonly deletingSessions = new Set<string>()
+  private readonly deletionPromises = new Map<string, Promise<boolean>>()
   private currentProjectId?: string
   public readonly repoPath: string
   /** Snapshot new sandboxes are created from; undefined uses Daytona's default snapshot. */
@@ -92,6 +97,9 @@ export class DaytonaSessionManager {
     if (pluginCtx?.client?.tui) {
       toast.initialize(pluginCtx.client.tui)
     }
+    if (this.deletingSessions.has(sessionId)) {
+      throw new Error(`Session ${sessionId} is deleted; not creating a new sandbox for it.`)
+    }
     if (!this.apiKey) {
       logger.error('DAYTONA_API_KEY is not set. Cannot create or retrieve sandbox.')
       toast.show({
@@ -115,6 +123,7 @@ export class DaytonaSessionManager {
         logger.info(`Starting sandbox ${existing.id} (current state: ${existing.state})`)
         await existing.start()
       }
+      this.ensureNotDeleted(sessionId)
       this.dataStorage.updateSession(projectId, worktree, sessionId, existing.id)
       return existing
     }
@@ -131,6 +140,7 @@ export class DaytonaSessionManager {
         logger.info(`Starting sandbox begin sandboxId=${sandbox.id}`)
         await sandbox.start()
         logger.info(`Starting sandbox done sandboxId=${sandbox.id} in ${Date.now() - reconnectStart}ms`)
+        this.ensureNotDeleted(sessionId)
         this.sessionSandboxes.set(sessionId, sandbox)
         // Preserve branch number if it exists for this sandbox
         let branchNumber = this.dataStorage.getBranchNumberForSandbox(projectId, sandbox.id)
@@ -216,6 +226,20 @@ export class DaytonaSessionManager {
       })
       .finally(() => clearTimeout(waitingLog))
     logger.info(`Daytona create done sessionId=${sessionId} sandboxId=${sandbox.id} in ${Date.now() - createStart}ms`)
+    if (this.deletingSessions.has(sessionId)) {
+      // The session was deleted while creation was in flight. The fresh sandbox is not
+      // registered anywhere, so nothing else will ever clean it up - discard it here.
+      logger.warn(`Session ${sessionId} was deleted during sandbox creation; discarding sandbox ${sandbox.id}`)
+      try {
+        await sandbox.delete()
+      } catch (err) {
+        logger.error(`Failed to discard sandbox ${sandbox.id} for deleted session ${sessionId}: ${err}`)
+        throw new Error(
+          `Session ${sessionId} is deleted and discarding newly created sandbox ${sandbox.id} failed; if it still exists, delete it from the Daytona dashboard.`,
+        )
+      }
+      throw new Error(`Session ${sessionId} is deleted; the newly created sandbox was discarded.`)
+    }
     this.sessionSandboxes.set(sessionId, sandbox)
 
     // Get or assign branch number for this sandbox
@@ -253,6 +277,10 @@ export class DaytonaSessionManager {
         variant: 'error',
       })
     }
+    // Deletion may have raced the initialization awaits above; the mapping was already
+    // registered, so the delete flow owns (and removes) the sandbox itself - returning
+    // it would hand callers a destroyed sandbox that fails confusingly on first use.
+    this.ensureNotDeleted(sessionId)
     toast.show({
       title: 'Sandbox created',
       message: `Created new sandbox for session.`,
@@ -265,6 +293,32 @@ export class DaytonaSessionManager {
    * Delete the sandbox associated with the given session ID
    */
   async deleteSandbox(sessionId: string, projectId: string): Promise<boolean> {
+    // Concurrent deletes share one promise: a second teardown racing the first would
+    // observe the already-deleted sandbox, throw, and wrongly clear the tombstone.
+    const inFlight = this.deletionPromises.get(sessionId)
+    if (inFlight) return inFlight
+
+    // Tombstone first, removed again on failure: while set, no code path may create or
+    // reconnect a sandbox for this session. Kept after success on purpose - the session
+    // is gone, and any late event for it must no-op instead of resurrecting a sandbox.
+    this.deletingSessions.add(sessionId)
+    const run = (async () => {
+      try {
+        return await this.deleteSandboxInner(sessionId, projectId)
+      } catch (err) {
+        this.deletingSessions.delete(sessionId)
+        throw err
+      } finally {
+        this.deletionPromises.delete(sessionId)
+      }
+    })()
+    this.deletionPromises.set(sessionId, run)
+    return run
+  }
+
+  private async deleteSandboxInner(sessionId: string, projectId: string): Promise<boolean> {
+    await SessionGitManager.waitForPendingSync(sessionId)
+
     let sandbox = this.sessionSandboxes.get(sessionId)
 
     // Read-only lookup so deleting never migrates sessions or rewrites project metadata.
@@ -299,8 +353,15 @@ export class DaytonaSessionManager {
     // Delete the sandbox if we have a fully initialized one
     let deleted = false
     if (this.isFullyInitialized(sandbox)) {
-      logger.info(`Removing sandbox for session: ${sessionId}`)
-      await sandbox.delete()
+      // Final sync and deletion run as ONE queue entry, so a sync enqueued between the
+      // wait above and this point is drained first, and nothing can slot in between
+      // pulling the last changes and destroying the sandbox.
+      const target = sandbox
+      await SessionGitManager.enqueueSessionSync(sessionId, async () => {
+        await this.syncBeforeDelete(target, stored)
+        logger.info(`Removing sandbox for session: ${sessionId}`)
+        await target.delete()
+      })
       deleted = true
       sandboxGone = true
       logger.info(`Sandbox deleted successfully.`)
@@ -318,5 +379,61 @@ export class DaytonaSessionManager {
     }
 
     return deleted
+  }
+
+  /**
+   * Pull not-yet-synced sandbox changes into the local repo before the sandbox is
+   * destroyed. Throws — aborting deletion so the sandbox is preserved — when unsynced
+   * changes cannot be pulled, including when the local repository itself is no longer
+   * accessible (a silent skip there would destroy the only copy of the work). A sandbox
+   * that is not running is deleted without being started: anything in it was either
+   * synced while it ran or is abandoned by the explicit delete.
+   *
+   * Runs inside the session's sync queue; it must NOT enqueue (that would deadlock).
+   */
+  private async syncBeforeDelete(sandbox: Sandbox, stored: { worktree: string; session: SessionInfo } | undefined) {
+    const branchNumber = stored?.session.branchNumber
+    if (!branchNumber || !stored?.worktree) return
+    await sandbox.refreshData()
+    if (sandbox.state !== 'started') return
+    const sessionGit = new SessionGitManager(sandbox, this.repoPath, stored.worktree, branchNumber)
+    if (!sessionGit.hasLocalRepo()) {
+      throw new Error(
+        `Local repository at ${stored.worktree} is not accessible, so unsynced sandbox changes cannot be pulled; the sandbox was not deleted. Restore the repository or delete the sandbox from the Daytona dashboard.`,
+      )
+    }
+    try {
+      await sessionGit.autoCommitAndPull()
+    } catch (err: any) {
+      throw new Error(
+        `Sandbox has changes that could not be synced to the local repository; the sandbox was not deleted. ${err?.message ?? err}`,
+      )
+    }
+  }
+
+  /**
+   * Read-only check for a session→sandbox mapping (memory or storage); never creates,
+   * migrates, or connects.
+   */
+  hasSandbox(sessionId: string, projectId: string): boolean {
+    if (this.deletingSessions.has(sessionId)) return false
+    this.setProjectContext(projectId)
+    if (this.sessionSandboxes.has(sessionId)) return true
+    return this.dataStorage.findSession(sessionId) !== undefined
+  }
+
+  isSessionDeleting(sessionId: string): boolean {
+    return this.deletingSessions.has(sessionId)
+  }
+
+  /**
+   * Guard for registration points that follow an await: deletion may have started (and
+   * finished) while a sandbox was being refreshed or reconnected, and persisting the
+   * mapping afterwards would resurrect state for a session that no longer exists.
+   */
+  private ensureNotDeleted(sessionId: string): void {
+    if (this.deletingSessions.has(sessionId)) {
+      throw new Error(`Session ${sessionId} was deleted while its sandbox was being prepared.`)
+    }
   }
 }
