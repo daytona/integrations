@@ -11,6 +11,7 @@
 import {
   Daytona,
   DaytonaNotFoundError,
+  DaytonaValidationError,
   type CreateSandboxFromSnapshotParams,
   type Sandbox,
 } from '@daytona/sdk'
@@ -198,11 +199,16 @@ export class DaytonaSessionManager {
     const sandbox = await daytona
       .create(createParams)
       .catch((err: unknown) => {
-        if (this.snapshot) {
+        // Only blame the snapshot when the request itself was rejected. The create
+        // params contain nothing but the snapshot name, so a validation error means
+        // Daytona refused that name (empirically: "Snapshot <name> not found" is a
+        // DaytonaValidationError). Auth, network, quota, and timeout failures are
+        // unrelated to DAYTONA_SNAPSHOT and propagate unattributed, as before.
+        if (this.snapshot && err instanceof DaytonaValidationError) {
           logger.error(`Failed to create sandbox from snapshot '${this.snapshot}': ${err}`)
           toast.show({
             title: 'Sandbox error',
-            message: `Failed to create sandbox from snapshot '${this.snapshot}'. Verify DAYTONA_SNAPSHOT names an available snapshot.`,
+            message: `${err.message} Verify DAYTONA_SNAPSHOT names an available snapshot.`,
             variant: 'error',
           })
         }

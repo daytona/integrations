@@ -143,7 +143,17 @@ async function withServer(cwd: string, snapshot: string, fn: (port: number) => P
     if (!(await waitForServer(port))) throw new Error('opencode server did not start')
     await fn(port)
   } finally {
-    proc?.kill('SIGTERM')
+    // Wait for the child to actually exit: both tests run servers against the
+    // same projectDir, so a still-terminating server from one case can bleed
+    // into the next. SIGKILL is the bounded fallback if SIGTERM is ignored.
+    const p = proc
+    if (p && p.exitCode === null && p.signalCode === null) {
+      const exited = new Promise<void>((resolve) => p.once('close', () => resolve()))
+      p.kill('SIGTERM')
+      const killTimer = setTimeout(() => p.kill('SIGKILL'), 5000)
+      await exited
+      clearTimeout(killTimer)
+    }
   }
 }
 

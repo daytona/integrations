@@ -71,7 +71,7 @@ export DAYTONA_SNAPSHOT="my-snapshot"
 DAYTONA_SNAPSHOT=my-snapshot
 ```
 
-The snapshot must already exist and be active in your organization; create one via the [Daytona Dashboard](https://app.daytona.io/dashboard/snapshots) or the Daytona CLI. If the name doesn't resolve, workspace creation fails with a `Snapshot <name> not found` error rather than silently falling back to the default.
+The snapshot must already exist and be active in your organization; create one via the [Daytona Dashboard](https://app.daytona.io/dashboard/snapshots) or the Daytona CLI. If the name doesn't resolve, workspace creation fails with an error naming the missing snapshot rather than silently falling back to the default.
 
 Leave `DAYTONA_SNAPSHOT` unset to keep the default behavior.
 
