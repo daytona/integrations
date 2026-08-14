@@ -42,6 +42,22 @@ Or create a `.env` file in your project root:
 DAYTONA_API_KEY=your-api-key
 ```
 
+#### Creating sandboxes from a snapshot
+
+By default, sandboxes are created from the Daytona default snapshot. To create them from a specific [snapshot](https://www.daytona.io/docs/snapshots) instead — for example one that pre-installs your project's toolchain and dependencies — set `DAYTONA_SNAPSHOT` to the snapshot name:
+
+```bash
+export DAYTONA_SNAPSHOT="my-snapshot"
+```
+
+```env
+DAYTONA_SNAPSHOT=my-snapshot
+```
+
+The snapshot must already exist and be active in your organization; create one via the [Daytona Dashboard](https://app.daytona.io/dashboard/snapshots) or the Daytona CLI. If the name doesn't resolve, sandbox creation fails with a `Snapshot <name> not found` error rather than silently falling back to the default.
+
+Leave `DAYTONA_SNAPSHOT` unset to keep the default behavior. The plugin still creates `/home/daytona/project` and syncs your git branch into it.
+
 ### Running OpenCode
 
 Before starting OpenCode, ensure that your project is a git repository:

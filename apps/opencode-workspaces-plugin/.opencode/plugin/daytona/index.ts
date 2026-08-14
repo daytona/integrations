@@ -46,10 +46,24 @@ function sandboxName(name: string): string {
   return `opencode-${name}`
 }
 
-const REPO_PATH = '/home/daytona/workspace/repo'
-const ROOT_PATH = '/home/daytona/workspace'
-const LOCAL_BIN = '/home/daytona/opencode'
-const INSTALL_BIN = '/home/daytona/.opencode/bin/opencode'
+// Snapshot new sandboxes are created from. Read at use-time (like the API key)
+// so the env doesn't have to be set before module load. Unset means Daytona
+// applies its default snapshot.
+function configuredSnapshot(): string | undefined {
+  return process.env.DAYTONA_SNAPSHOT?.trim() || undefined
+}
+
+// Everything below is anchored to this absolute path rather than $HOME. A custom
+// snapshot may run as a different user (root, $HOME=/root), and `fs.uploadFile`
+// with a relative path resolves against the toolbox's own root, not $HOME — so
+// mixing the two silently uploads to one place and untars from another.
+const HOME_PATH = '/home/daytona'
+const REPO_PATH = `${HOME_PATH}/workspace/repo`
+const ROOT_PATH = `${HOME_PATH}/workspace`
+const TARBALL_PATH = `${HOME_PATH}/repo.tgz`
+const INSTALL_DIR = `${HOME_PATH}/.opencode/bin`
+const LOCAL_BIN = `${HOME_PATH}/opencode`
+const INSTALL_BIN = `${INSTALL_DIR}/opencode`
 const SERVER_PORT = 3096
 const HEALTH_URL = `http://127.0.0.1:${SERVER_PORT}/global/health`
 
@@ -209,8 +223,9 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
       // concurrent creates never share a scratch dir and race on clone/tar.
       let temp = ''
       const d = getDaytona()
+      const snapshot = configuredSnapshot()
       debug(
-        `create: calling d.create() sandbox=${sandboxName(config.name)} envKeys=${Object.keys(toEnvVars(env)).join(',')}`,
+        `create: calling d.create() sandbox=${sandboxName(config.name)} snapshot=${snapshot ?? '(default)'} envKeys=${Object.keys(toEnvVars(env)).join(',')}`,
       )
       const sandbox = await d.create({
         name: sandboxName(config.name),
@@ -220,6 +235,9 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
         // sync". Idle sandboxes only auto-stop (pause); target() resumes them on
         // demand. (-1 disables auto-delete regardless of account default.)
         autoDeleteInterval: -1,
+        // Spread so the key is absent (not undefined) when unconfigured, letting
+        // Daytona fall back to its default snapshot.
+        ...(snapshot ? { snapshot } : {}),
       })
       debug(`create: d.create() returned sandbox id=${sandbox.id} state=${sandbox.state}`)
 
@@ -267,15 +285,17 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
         })
         debug('create: tarball built; uploading repo.tgz')
 
-        await sandbox.fs.uploadFile(tar, 'repo.tgz')
+        await sandbox.fs.uploadFile(tar, TARBALL_PATH)
         debug('create: repo.tgz uploaded; extracting in sandbox')
         await run(
-          `rm -rf ${sh(REPO_PATH)} && mkdir -p ${sh(ROOT_PATH)} && tar -xzf "$HOME/repo.tgz" -C "$HOME/workspace" && rm "$HOME/repo.tgz"`,
+          `rm -rf ${sh(REPO_PATH)} && mkdir -p ${sh(ROOT_PATH)} && tar -xzf ${sh(TARBALL_PATH)} -C ${sh(ROOT_PATH)} && rm ${sh(TARBALL_PATH)}`,
         )
 
-        debug(`create: installing opencode ${OPENCODE_VERSION} in sandbox`)
+        // A custom snapshot may already ship an opencode binary at LOCAL_BIN, which
+        // serverLaunchCmd() prefers anyway; skip the installer download in that case.
+        debug(`create: installing opencode ${OPENCODE_VERSION} in sandbox (unless pre-baked)`)
         await run(
-          `mkdir -p "$HOME/.opencode/bin" && curl -fsSL https://opencode.ai/install | VERSION=${OPENCODE_VERSION} OPENCODE_INSTALL_DIR="$HOME/.opencode/bin" bash`,
+          `if [ -x ${sh(LOCAL_BIN)} ]; then echo 'using pre-baked opencode'; else mkdir -p ${sh(INSTALL_DIR)} && curl -fsSL https://opencode.ai/install | VERSION=${OPENCODE_VERSION} OPENCODE_INSTALL_DIR=${sh(INSTALL_DIR)} bash; fi`,
         )
         debug('create: opencode install done; uploading project id')
 

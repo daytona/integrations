@@ -59,6 +59,24 @@ Or create a `.env` file in your project root:
 DAYTONA_API_KEY=your-api-key
 ```
 
+#### Creating sandboxes from a snapshot
+
+By default, workspaces are created from the Daytona default snapshot. To create them from a specific [snapshot](https://www.daytona.io/docs/snapshots) instead, set `DAYTONA_SNAPSHOT` to the snapshot name:
+
+```bash
+export DAYTONA_SNAPSHOT="my-snapshot"
+```
+
+```env
+DAYTONA_SNAPSHOT=my-snapshot
+```
+
+The snapshot must already exist and be active in your organization; create one via the [Daytona Dashboard](https://app.daytona.io/dashboard/snapshots) or the Daytona CLI. If the name doesn't resolve, workspace creation fails with a `Snapshot <name> not found` error rather than silently falling back to the default.
+
+Leave `DAYTONA_SNAPSHOT` unset to keep the default behavior.
+
+Snapshots are also the way to skip the per-workspace OpenCode install. Workspace creation normally downloads OpenCode into each new sandbox; if your snapshot ships an executable at `/home/daytona/opencode`, the plugin detects it, skips the download, and serves from that binary instead. Pinning the binary in the snapshot is the single biggest win for workspace startup time.
+
 ### Running OpenCode
 
 Start OpenCode with the experimental workspaces flag:
