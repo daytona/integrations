@@ -151,7 +151,9 @@ async function withServer(cwd: string, snapshot: string, fn: (port: number) => P
       const exited = new Promise<void>((resolve) => p.once('close', () => resolve()))
       p.kill('SIGTERM')
       const killTimer = setTimeout(() => p.kill('SIGKILL'), 5000)
-      await exited
+      // 'close' also waits for stdio to drain, which a descendant inheriting the
+      // pipes can block past SIGKILL - cap the wait so teardown can never hang.
+      await Promise.race([exited, sleep(10_000)])
       clearTimeout(killTimer)
     }
   }

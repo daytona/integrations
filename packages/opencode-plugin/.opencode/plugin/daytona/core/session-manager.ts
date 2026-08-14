@@ -208,7 +208,7 @@ export class DaytonaSessionManager {
           logger.error(`Failed to create sandbox from snapshot '${this.snapshot}': ${err}`)
           toast.show({
             title: 'Sandbox error',
-            message: `${err.message} Verify DAYTONA_SNAPSHOT names an available snapshot.`,
+            message: `Verify DAYTONA_SNAPSHOT names an available snapshot: ${err.message}`,
             variant: 'error',
           })
         }
