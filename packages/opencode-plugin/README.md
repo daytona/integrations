@@ -65,11 +65,12 @@ Git syncing transfers commits between your machine and the sandbox over SSH (`ss
 To make syncing noninteractive and independently verifiable, point `DAYTONA_SSH_KNOWN_HOSTS` at a `known_hosts` file containing the `ssh.app.daytona.io` host keys:
 
 ```bash
+mkdir -p ~/.config/daytona
 ssh-keyscan ssh.app.daytona.io > ~/.config/daytona/known_hosts
 export DAYTONA_SSH_KNOWN_HOSTS=~/.config/daytona/known_hosts
 ```
 
-Verify the collected fingerprints out of band (`ssh-keygen -lf ~/.config/daytona/known_hosts`) before trusting the file. When `DAYTONA_SSH_KNOWN_HOSTS` is set, sandbox git transfers use exactly that file with `StrictHostKeyChecking=yes`; SSH behavior for every other remote is unaffected. When unset, behavior is unchanged.
+Verify the collected fingerprints out of band (`ssh-keygen -lf ~/.config/daytona/known_hosts`) before trusting the file. When `DAYTONA_SSH_KNOWN_HOSTS` is set, sandbox git transfers use that file as the only host-key database (`StrictHostKeyChecking=yes`, system-wide known hosts ignored); SSH behavior for every other remote is unaffected. When unset, behavior is unchanged. Paths containing spaces are supported; a literal `"` in the path is rejected.
 
 ### Running OpenCode
 

@@ -45,12 +45,24 @@ function shellQuote(value: string): string {
 // host keys, pin host verification to it for sandbox git transfers. This lets the
 // first noninteractive sync succeed without trust-on-first-use, and without changing
 // SSH behavior for any other remote. Unset means inherited SSH behavior, as before.
+//
+// The value crosses two parsers. sh splits GIT_SSH_COMMAND into ssh's argv (outer
+// single quotes), then OpenSSH splits the UserKnownHostsFile VALUE on whitespace as
+// a file list (inner double quotes keep a spaced path as one file). OpenSSH's config
+// grammar has no escape for a literal double quote inside a quoted value, so such
+// paths are rejected instead of being silently mis-pinned.
 function networkEnv(): NodeJS.ProcessEnv | undefined {
   const knownHosts = process.env.DAYTONA_SSH_KNOWN_HOSTS?.trim()
   if (!knownHosts) return undefined
+  if (knownHosts.includes('"')) {
+    throw new Error('DAYTONA_SSH_KNOWN_HOSTS must not contain a double quote (") character')
+  }
   return {
     ...process.env,
-    GIT_SSH_COMMAND: `ssh -o UserKnownHostsFile=${shellQuote(knownHosts)} -o StrictHostKeyChecking=yes`,
+    // GlobalKnownHostsFile=/dev/null: otherwise a matching entry in the system-wide
+    // /etc/ssh/ssh_known_hosts would also be accepted and verification would not be
+    // pinned to the configured file alone.
+    GIT_SSH_COMMAND: `ssh -o ${shellQuote(`UserKnownHostsFile="${knownHosts}"`)} -o GlobalKnownHostsFile=/dev/null -o StrictHostKeyChecking=yes`,
   }
 }
 
