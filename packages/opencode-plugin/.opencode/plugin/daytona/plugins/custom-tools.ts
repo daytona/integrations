@@ -14,6 +14,8 @@ import type { DaytonaSessionManager } from '../core/session-manager'
 export async function customTools(ctx: PluginInput, sessionManager: DaytonaSessionManager) {
   logger.info('OpenCode started with Daytona plugin')
   const projectId = ctx.project.id
-  const worktree = ctx.project.worktree
+  // Active worktree (not ctx.project.worktree, which is the first-seen checkout persisted
+  // per project); see the matching comment in plugins/session-events.ts.
+  const worktree = ctx.worktree
   return createDaytonaTools(sessionManager, projectId, worktree, ctx)
 }
