@@ -201,7 +201,14 @@ export class DaytonaSessionManager {
       // The session was deleted while creation was in flight. The fresh sandbox is not
       // registered anywhere, so nothing else will ever clean it up - discard it here.
       logger.warn(`Session ${sessionId} was deleted during sandbox creation; discarding sandbox ${sandbox.id}`)
-      await sandbox.delete()
+      try {
+        await sandbox.delete()
+      } catch (err) {
+        logger.error(`Failed to discard sandbox ${sandbox.id} for deleted session ${sessionId}: ${err}`)
+        throw new Error(
+          `Session ${sessionId} is deleted and discarding newly created sandbox ${sandbox.id} failed; if it still exists, delete it from the Daytona dashboard.`,
+        )
+      }
       throw new Error(`Session ${sessionId} is deleted; the newly created sandbox was discarded.`)
     }
     this.sessionSandboxes.set(sessionId, sandbox)
@@ -241,6 +248,10 @@ export class DaytonaSessionManager {
         variant: 'error',
       })
     }
+    // Deletion may have raced the initialization awaits above; the mapping was already
+    // registered, so the delete flow owns (and removes) the sandbox itself - returning
+    // it would hand callers a destroyed sandbox that fails confusingly on first use.
+    this.ensureNotDeleted(sessionId)
     toast.show({
       title: 'Sandbox created',
       message: `Created new sandbox for session.`,
