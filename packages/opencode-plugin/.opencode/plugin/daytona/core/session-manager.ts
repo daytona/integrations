@@ -8,7 +8,13 @@
  * Stores data per-project in ~/.local/share/opencode/storage/daytona/{projectId}.json
  */
 
-import { Daytona, DaytonaNotFoundError, type Sandbox } from '@daytona/sdk'
+import {
+  Daytona,
+  DaytonaNotFoundError,
+  DaytonaValidationError,
+  type CreateSandboxFromSnapshotParams,
+  type Sandbox,
+} from '@daytona/sdk'
 import { logger } from './logger'
 import type { SessionSandboxMap, SandboxInfo } from './types'
 import { SessionGitManager } from '../git/session-git-manager'
@@ -23,11 +29,14 @@ export class DaytonaSessionManager {
   private sessionSandboxes: SessionSandboxMap
   private currentProjectId?: string
   public readonly repoPath: string
+  /** Snapshot new sandboxes are created from; undefined uses Daytona's default snapshot. */
+  public readonly snapshot?: string
 
-  constructor(apiKey: string, storageDir: string, repoPath: string) {
+  constructor(apiKey: string, storageDir: string, repoPath: string, snapshot?: string) {
     this.apiKey = apiKey
     this.dataStorage = new ProjectDataStorage(storageDir)
     this.repoPath = repoPath
+    this.snapshot = snapshot?.trim() || undefined
     this.sessionSandboxes = new Map()
   }
 
@@ -180,12 +189,32 @@ export class DaytonaSessionManager {
     // Otherwise, create a new sandbox
     logger.info(`Creating new sandbox for session: ${sessionId} in project: ${projectId}`)
     const daytona = new Daytona({ apiKey: this.apiKey })
+    // Omit the key entirely when unset so Daytona applies its default snapshot.
+    const createParams: CreateSandboxFromSnapshotParams = this.snapshot ? { snapshot: this.snapshot } : {}
     const createStart = Date.now()
-    logger.info(`Daytona create begin sessionId=${sessionId}`)
+    logger.info(`Daytona create begin sessionId=${sessionId} snapshot=${this.snapshot ?? '(default)'}`)
     const waitingLog = setTimeout(() => {
       logger.warn(`Daytona create still waiting after ${Date.now() - createStart}ms (sessionId=${sessionId})`)
     }, 15_000)
-    const sandbox = await daytona.create().finally(() => clearTimeout(waitingLog))
+    const sandbox = await daytona
+      .create(createParams)
+      .catch((err: unknown) => {
+        // Only blame the snapshot when the request itself was rejected. The create
+        // params contain nothing but the snapshot name, so a validation error means
+        // Daytona refused that name (empirically: "Snapshot <name> not found" is a
+        // DaytonaValidationError). Auth, network, quota, and timeout failures are
+        // unrelated to DAYTONA_SNAPSHOT and propagate unattributed, as before.
+        if (this.snapshot && err instanceof DaytonaValidationError) {
+          logger.error(`Failed to create sandbox from snapshot '${this.snapshot}': ${err}`)
+          toast.show({
+            title: 'Sandbox error',
+            message: `Verify DAYTONA_SNAPSHOT names an available snapshot: ${err.message}`,
+            variant: 'error',
+          })
+        }
+        throw err
+      })
+      .finally(() => clearTimeout(waitingLog))
     logger.info(`Daytona create done sessionId=${sessionId} sandboxId=${sandbox.id} in ${Date.now() - createStart}ms`)
     this.sessionSandboxes.set(sessionId, sandbox)
 

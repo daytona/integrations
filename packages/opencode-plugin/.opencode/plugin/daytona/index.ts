@@ -21,6 +21,7 @@
  * Requires:
  * - npm install @daytona/sdk
  * - Environment: DAYTONA_API_KEY
+ * - Environment (optional): DAYTONA_SNAPSHOT - snapshot to create sandboxes from
  */
 
 import { join } from 'path'
@@ -42,7 +43,12 @@ const STORAGE_DIR = join(xdgDataDir, 'opencode', 'storage', 'daytona')
 const REPO_PATH = '/home/daytona/project'
 
 setLogFilePath(LOG_FILE)
-const sessionManager = new DaytonaSessionManager(process.env.DAYTONA_API_KEY || '', STORAGE_DIR, REPO_PATH)
+const sessionManager = new DaytonaSessionManager(
+  process.env.DAYTONA_API_KEY || '',
+  STORAGE_DIR,
+  REPO_PATH,
+  process.env.DAYTONA_SNAPSHOT,
+)
 
 async function daytonaPlugin(ctx: PluginInput) {
   toast.initialize(ctx.client?.tui)
