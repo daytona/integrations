@@ -15,7 +15,11 @@ import type { DaytonaSessionManager } from '../core/session-manager'
  */
 export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSessionManager, repoPath: string) {
   const projectId = ctx.project.id
-  const worktree = ctx.project.worktree
+  // Use the ACTIVE worktree, not ctx.project.worktree: the project worktree is persisted
+  // the first time a project is opened and never updated, so in linked-worktree setups
+  // (`git worktree add`) it can point at a different checkout than the one this OpenCode
+  // instance is running in. Git syncs must land in the active checkout.
+  const worktree = ctx.worktree
   return async (args: any) => {
     const event = args.event
     if (event.type === EVENT_TYPE_SESSION_DELETED) {
