@@ -37,6 +37,9 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
         // dispose() or delete arriving while the sandbox is still being resolved cannot
         // observe an empty queue and proceed mid-operation.
         const didSync = await SessionGitManager.enqueueSessionSync(sessionId, async () => {
+          // Re-checked inside the queue entry: a deletion may have completed while this
+          // callback waited its turn, and syncing must not resurrect the sandbox.
+          if (sessionManager.isSessionDeleting(sessionId)) return false
           const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree, ctx)
           const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
           if (!branchNumber) return false

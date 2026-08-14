@@ -21,6 +21,10 @@ export class DaytonaSessionManager {
   private readonly apiKey: string
   private readonly dataStorage: ProjectDataStorage
   private sessionSandboxes: SessionSandboxMap
+  // Sessions whose sandbox teardown has begun. getSandbox creates sandboxes on demand,
+  // so without this tombstone a sync queued behind a deletion would resurrect a fresh
+  // sandbox for a session that no longer exists (invisible, billed, never cleaned up).
+  private readonly deletingSessions = new Set<string>()
   private currentProjectId?: string
   public readonly repoPath: string
 
@@ -82,6 +86,9 @@ export class DaytonaSessionManager {
   async getSandbox(sessionId: string, projectId: string, worktree: string, pluginCtx?: PluginInput): Promise<Sandbox> {
     if (pluginCtx?.client?.tui) {
       toast.initialize(pluginCtx.client.tui)
+    }
+    if (this.deletingSessions.has(sessionId)) {
+      throw new Error(`Session ${sessionId} is deleted; not creating a new sandbox for it.`)
     }
     if (!this.apiKey) {
       logger.error('DAYTONA_API_KEY is not set. Cannot create or retrieve sandbox.')
@@ -236,6 +243,19 @@ export class DaytonaSessionManager {
    * Delete the sandbox associated with the given session ID
    */
   async deleteSandbox(sessionId: string, projectId: string): Promise<boolean> {
+    // Tombstone first, removed again on failure: while set, no code path may create or
+    // reconnect a sandbox for this session. Kept after success on purpose - the session
+    // is gone, and any late event for it must no-op instead of resurrecting a sandbox.
+    this.deletingSessions.add(sessionId)
+    try {
+      return await this.deleteSandboxInner(sessionId, projectId)
+    } catch (err) {
+      this.deletingSessions.delete(sessionId)
+      throw err
+    }
+  }
+
+  private async deleteSandboxInner(sessionId: string, projectId: string): Promise<boolean> {
     await SessionGitManager.waitForPendingSync(sessionId)
 
     let sandbox = this.sessionSandboxes.get(sessionId)
@@ -335,8 +355,13 @@ export class DaytonaSessionManager {
    * migrates, or connects.
    */
   hasSandbox(sessionId: string, projectId: string): boolean {
+    if (this.deletingSessions.has(sessionId)) return false
     this.setProjectContext(projectId)
     if (this.sessionSandboxes.has(sessionId)) return true
     return this.dataStorage.findSession(sessionId) !== undefined
+  }
+
+  isSessionDeleting(sessionId: string): boolean {
+    return this.deletingSessions.has(sessionId)
   }
 }
