@@ -37,7 +37,7 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
         const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
         if (!branchNumber) return
         const sessionGit = new SessionGitManager(sandbox, repoPath, worktree, branchNumber)
-        const didSync = await sessionGit.autoCommitAndPull(ctx)
+        const didSync = await SessionGitManager.enqueueSessionSync(sessionId, () => sessionGit.autoCommitAndPull(ctx))
         logger.info(
           `[idle] done sessionId=${sessionId} sandboxId=${sandbox.id} synced=${didSync} in ${Date.now() - start}ms`,
         )

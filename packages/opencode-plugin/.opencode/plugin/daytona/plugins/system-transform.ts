@@ -20,6 +20,7 @@ export async function systemPromptTransform(ctx: PluginInput, repoPath: string) 
         'Put all projects in the project directory. Do NOT try to use the current working directory of the host system.',
         "When executing long-running commands, use the 'background' option to run them asynchronously.",
         'Before showing a preview URL, ensure the server is running in the sandbox on that port.',
+        'When the user asks to sync, hand off, or finalize changes, run the gitSync tool and report its result.',
       ].join('\n'),
     )
   }

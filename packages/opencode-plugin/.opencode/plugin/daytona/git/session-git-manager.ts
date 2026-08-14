@@ -43,6 +43,48 @@ export class SessionGitManager {
     return new HostGitManager().allocateAndReserveBranchNumber(worktree, prefix)
   }
 
+  // In-flight syncs per session. OpenCode dispatches the `event` hook without awaiting it,
+  // so syncs started on session.idle are invisible to callers; tracking them here lets the
+  // delete path and plugin shutdown wait instead of destroying a sandbox mid-sync.
+  private static pendingSyncs = new Map<string, Promise<void>>()
+
+  /**
+   * Run `fn` after any in-flight sync for this session and track it until it settles.
+   * The caller of this invocation sees failures; waiters only observe completion.
+   */
+  static enqueueSessionSync<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+    const prev = SessionGitManager.pendingSyncs.get(sessionId) ?? Promise.resolve()
+    const operation = prev.then(fn)
+    const stored: Promise<void> = operation.then(
+      () => undefined,
+      () => undefined,
+    )
+    SessionGitManager.pendingSyncs.set(sessionId, stored)
+    stored.then(() => {
+      if (SessionGitManager.pendingSyncs.get(sessionId) === stored) {
+        SessionGitManager.pendingSyncs.delete(sessionId)
+      }
+    })
+    return operation
+  }
+
+  /** Resolves when the session has no in-flight sync. Never rejects. */
+  static async waitForPendingSync(sessionId: string): Promise<void> {
+    let pending = SessionGitManager.pendingSyncs.get(sessionId)
+    while (pending) {
+      await pending
+      const next = SessionGitManager.pendingSyncs.get(sessionId)
+      pending = next === pending ? undefined : next
+    }
+  }
+
+  /** Resolves when no session has an in-flight sync. Never rejects. */
+  static async waitForAllPendingSyncs(): Promise<void> {
+    while (SessionGitManager.pendingSyncs.size > 0) {
+      await Promise.all([...SessionGitManager.pendingSyncs.values()])
+    }
+  }
+
   private async getSshUrl(): Promise<string> {
     const sshAccess = await this.sandbox.createSshAccess(10)
     return `ssh://${sshAccess.token}@ssh.app.daytona.io${this.repoPath}`
