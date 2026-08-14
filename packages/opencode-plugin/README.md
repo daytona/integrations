@@ -58,6 +58,20 @@ The snapshot must already exist and be active in your organization; create one v
 
 Leave `DAYTONA_SNAPSHOT` unset to keep the default behavior. The plugin still creates `/home/daytona/project` and syncs your git branch into it.
 
+#### Pinning the sandbox SSH host key
+
+Git syncing transfers commits between your machine and the sandbox over SSH (`ssh.app.daytona.io`). By default, host verification follows your normal SSH configuration — on a machine that has never connected before, this means an interactive trust-on-first-use prompt, which blocks noninteractive environments such as CI or supervised agent runs.
+
+To make syncing noninteractive and independently verifiable, point `DAYTONA_SSH_KNOWN_HOSTS` at a `known_hosts` file containing the `ssh.app.daytona.io` host keys:
+
+```bash
+mkdir -p ~/.config/daytona
+ssh-keyscan ssh.app.daytona.io > ~/.config/daytona/known_hosts
+export DAYTONA_SSH_KNOWN_HOSTS=~/.config/daytona/known_hosts
+```
+
+Verify the collected fingerprints out of band (`ssh-keygen -lf ~/.config/daytona/known_hosts`) before trusting the file. When `DAYTONA_SSH_KNOWN_HOSTS` is set, sandbox git transfers use that file as the only host-key database (`StrictHostKeyChecking=yes`, system-wide known hosts ignored); SSH behavior for every other remote is unaffected. When unset, behavior is unchanged. Paths containing spaces are supported; a literal `"` in the path is rejected.
+
 ### Running OpenCode
 
 Before starting OpenCode, ensure that your project is a git repository:
