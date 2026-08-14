@@ -272,9 +272,15 @@ export class DaytonaSessionManager {
     // Delete the sandbox if we have a fully initialized one
     let deleted = false
     if (this.isFullyInitialized(sandbox)) {
-      await this.syncBeforeDelete(sessionId, sandbox, stored)
-      logger.info(`Removing sandbox for session: ${sessionId}`)
-      await sandbox.delete()
+      // Final sync and deletion run as ONE queue entry, so a sync enqueued between the
+      // wait above and this point is drained first, and nothing can slot in between
+      // pulling the last changes and destroying the sandbox.
+      const target = sandbox
+      await SessionGitManager.enqueueSessionSync(sessionId, async () => {
+        await this.syncBeforeDelete(target, stored)
+        logger.info(`Removing sandbox for session: ${sessionId}`)
+        await target.delete()
+      })
       deleted = true
       sandboxGone = true
       logger.info(`Sandbox deleted successfully.`)
@@ -297,22 +303,26 @@ export class DaytonaSessionManager {
   /**
    * Pull not-yet-synced sandbox changes into the local repo before the sandbox is
    * destroyed. Throws — aborting deletion so the sandbox is preserved — when unsynced
-   * changes cannot be pulled, since deleting would lose them permanently. A sandbox
+   * changes cannot be pulled, including when the local repository itself is no longer
+   * accessible (a silent skip there would destroy the only copy of the work). A sandbox
    * that is not running is deleted without being started: anything in it was either
    * synced while it ran or is abandoned by the explicit delete.
+   *
+   * Runs inside the session's sync queue; it must NOT enqueue (that would deadlock).
    */
-  private async syncBeforeDelete(
-    sessionId: string,
-    sandbox: Sandbox,
-    stored: { worktree: string; session: SessionInfo } | undefined,
-  ): Promise<void> {
+  private async syncBeforeDelete(sandbox: Sandbox, stored: { worktree: string; session: SessionInfo } | undefined) {
     const branchNumber = stored?.session.branchNumber
     if (!branchNumber || !stored?.worktree) return
     await sandbox.refreshData()
     if (sandbox.state !== 'started') return
     const sessionGit = new SessionGitManager(sandbox, this.repoPath, stored.worktree, branchNumber)
+    if (!sessionGit.hasLocalRepo()) {
+      throw new Error(
+        `Local repository at ${stored.worktree} is not accessible, so unsynced sandbox changes cannot be pulled; the sandbox was not deleted. Restore the repository or delete the sandbox from the Daytona dashboard.`,
+      )
+    }
     try {
-      await SessionGitManager.enqueueSessionSync(sessionId, () => sessionGit.autoCommitAndPull())
+      await sessionGit.autoCommitAndPull()
     } catch (err: any) {
       throw new Error(
         `Sandbox has changes that could not be synced to the local repository; the sandbox was not deleted. ${err?.message ?? err}`,

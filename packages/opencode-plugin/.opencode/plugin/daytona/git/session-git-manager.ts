@@ -78,16 +78,38 @@ export class SessionGitManager {
     }
   }
 
-  /** Resolves when no session has an in-flight sync. Never rejects. */
-  static async waitForAllPendingSyncs(): Promise<void> {
+  /**
+   * Resolves when no session has an in-flight sync, or when `timeoutMs` elapses first
+   * (returns false in that case). Never rejects. The bound exists for shutdown, where a
+   * sync stalled on an unreachable sandbox must not wedge process exit; the delete path
+   * intentionally waits unbounded instead, because deleting mid-sync loses data.
+   */
+  static async waitForAllPendingSyncs(timeoutMs?: number): Promise<boolean> {
+    const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs
     while (SessionGitManager.pendingSyncs.size > 0) {
-      await Promise.all([...SessionGitManager.pendingSyncs.values()])
+      const waits: Promise<unknown>[] = [Promise.all([...SessionGitManager.pendingSyncs.values()])]
+      if (deadline !== undefined) {
+        const remaining = deadline - Date.now()
+        if (remaining <= 0) return false
+        waits.push(
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, remaining).unref()
+          }),
+        )
+      }
+      await Promise.race(waits)
+      if (deadline !== undefined && Date.now() >= deadline && SessionGitManager.pendingSyncs.size > 0) return false
     }
+    return true
   }
 
   private async getSshUrl(): Promise<string> {
     const sshAccess = await this.sandbox.createSshAccess(10)
     return `ssh://${sshAccess.token}@ssh.app.daytona.io${this.repoPath}`
+  }
+
+  hasLocalRepo(): boolean {
+    return this.hostGit.hasRepo(this.worktree)
   }
 
   /**
@@ -145,10 +167,14 @@ export class SessionGitManager {
       }
 
       await this.sandboxGit.ensureRepo()
-      const hasChanges = await this.sandboxGit.autoCommit()
+      await this.sandboxGit.autoCommit()
 
-      // Only sync and notify if there were actual changes
-      if (!hasChanges) {
+      // Pull whenever the sandbox tip differs from the local opencode/N ref, not only
+      // when this call created a commit: a previous sync may have committed in the
+      // sandbox and then failed to pull, and a status-only check would skip those
+      // stranded commits forever (and let the delete path destroy them).
+      const sandboxHead = await this.sandboxGit.getHeadOid()
+      if (!sandboxHead || sandboxHead === this.hostGit.getRefOid(this.worktree, `refs/heads/${this.localBranch}`)) {
         return false
       }
 

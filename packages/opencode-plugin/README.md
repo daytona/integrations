@@ -109,8 +109,8 @@ The plugin only synchronizes changes from the sandbox to your system. To pass lo
 The per-turn sync runs in the background: OpenCode dispatches the `session.idle` event without waiting for plugin work, so observing that event does not mean the changes have reached your local repository yet. The plugin provides three stronger boundaries:
 
 - **`gitSync` tool** — commits pending sandbox changes and pulls them into the local `opencode/N` branch, returning only after they are in the local repository. Failures are returned as tool errors. Automation that needs a reliable handoff (for example, a supervisor driving OpenCode through the SDK) should ask the agent to run `gitSync` as its final step and check the tool result instead of treating `session.idle` as proof that changes have landed.
-- **Session deletion** — before deleting a sandbox, the plugin waits for any in-flight sync and pulls remaining changes from a running sandbox. If unsynced changes cannot be pulled, deletion is aborted and the sandbox is preserved. A sandbox that is not running is deleted without being started: anything in it was either synced while it ran or is abandoned by the explicit delete.
-- **Shutdown** — when OpenCode shuts down gracefully, it waits for the plugin to finish in-flight syncs before exiting.
+- **Session deletion** — before deleting a sandbox, the plugin waits for any in-flight sync and pulls remaining changes from a running sandbox. If unsynced changes cannot be pulled — including when the local repository is no longer accessible — deletion is aborted and the sandbox is preserved. A sandbox that is not running is deleted without being started: anything in it was either synced while it ran or is abandoned by the explicit delete.
+- **Shutdown** — when OpenCode shuts down gracefully, it waits (up to 60 seconds) for the plugin to finish in-flight syncs before exiting.
 
 ### Session to sandbox mapping
 

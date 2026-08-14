@@ -33,14 +33,17 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
       const sessionId = event.properties.sessionID
       const start = Date.now()
       try {
-        const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree, ctx)
-        const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
-        if (!branchNumber) return
-        const sessionGit = new SessionGitManager(sandbox, repoPath, worktree, branchNumber)
-        const didSync = await SessionGitManager.enqueueSessionSync(sessionId, () => sessionGit.autoCommitAndPull(ctx))
-        logger.info(
-          `[idle] done sessionId=${sessionId} sandboxId=${sandbox.id} synced=${didSync} in ${Date.now() - start}ms`,
-        )
+        // The WHOLE pipeline is enqueued (synchronously, before any await) so that a
+        // dispose() or delete arriving while the sandbox is still being resolved cannot
+        // observe an empty queue and proceed mid-operation.
+        const didSync = await SessionGitManager.enqueueSessionSync(sessionId, async () => {
+          const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree, ctx)
+          const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
+          if (!branchNumber) return false
+          const sessionGit = new SessionGitManager(sandbox, repoPath, worktree, branchNumber)
+          return sessionGit.autoCommitAndPull(ctx)
+        })
+        logger.info(`[idle] done sessionId=${sessionId} synced=${didSync} in ${Date.now() - start}ms`)
       } catch (err: any) {
         // autoCommitAndPull already shows a toast; only log here to avoid a duplicate
         // error toast and noisy propagation out of the idle event hook.
