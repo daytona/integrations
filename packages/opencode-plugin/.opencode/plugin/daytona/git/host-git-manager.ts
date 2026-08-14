@@ -35,6 +35,25 @@ function execGit(args: string[], options: ExecOptions = {}): ExecResult {
   return { ok: status === 0, stdout: res.stdout ?? '', stderr: res.stderr ?? '', status }
 }
 
+// POSIX sh single-quoting (close, escape, reopen): GIT_SSH_COMMAND is parsed by the
+// shell, so an unquoted known_hosts path containing spaces would split into ssh args.
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+// When DAYTONA_SSH_KNOWN_HOSTS names a known_hosts file with the ssh.app.daytona.io
+// host keys, pin host verification to it for sandbox git transfers. This lets the
+// first noninteractive sync succeed without trust-on-first-use, and without changing
+// SSH behavior for any other remote. Unset means inherited SSH behavior, as before.
+function networkEnv(): NodeJS.ProcessEnv | undefined {
+  const knownHosts = process.env.DAYTONA_SSH_KNOWN_HOSTS?.trim()
+  if (!knownHosts) return undefined
+  return {
+    ...process.env,
+    GIT_SSH_COMMAND: `ssh -o UserKnownHostsFile=${shellQuote(knownHosts)} -o StrictHostKeyChecking=yes`,
+  }
+}
+
 export class HostGitManager {
   // Per-repo serialization: one queue per git-common-dir. Linked worktrees (git worktree
   // add) of the same repo share `.git/config` and refs, so they must share a queue to
@@ -240,7 +259,7 @@ export class HostGitManager {
       this.setRemote(remoteName, sshUrl, cwd)
       let attempts = 0
       while (attempts < 3) {
-        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd })
+        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: networkEnv() })
         if (pushRes.ok) {
           logger.info(`✓ Pushed local changes to ${remoteName}`)
           return
@@ -276,7 +295,7 @@ export class HostGitManager {
           if (localBranch) {
             // Fetch into FETCH_HEAD only (never into refs/heads) so we don't hit
             // "refusing to fetch into branch checked out" when this branch is checked out.
-            const fetchRes = execGit(['fetch', remoteName, branch], { cwd })
+            const fetchRes = execGit(['fetch', remoteName, branch], { cwd, env: networkEnv() })
             if (!fetchRes.ok) throw new Error(fetchRes.stderr)
 
             const updateRefRes = execGit(['update-ref', `refs/heads/${localBranch}`, 'FETCH_HEAD'], { cwd })
@@ -292,7 +311,7 @@ export class HostGitManager {
 
             logger.info(`✓ Force pulled latest changes from sandbox into ${localBranch}`)
           } else {
-            const pullRes = execGit(['pull', remoteName, branch], { cwd })
+            const pullRes = execGit(['pull', remoteName, branch], { cwd, env: networkEnv() })
             if (!pullRes.ok) throw new Error(pullRes.stderr)
             logger.info('✓ Pulled latest changes from sandbox')
           }
@@ -318,7 +337,7 @@ export class HostGitManager {
       this.setRemote(remoteName, sshUrl, cwd)
       let attempts = 0
       while (attempts < 3) {
-        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd })
+        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: networkEnv() })
         if (pushRes.ok) {
           logger.info('✓ Pushed changes to sandbox')
           return
