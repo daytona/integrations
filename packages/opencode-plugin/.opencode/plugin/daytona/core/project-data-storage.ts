@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { logger } from './logger'
-import type { ProjectSessionData, SessionInfo } from './types'
+import type { GitReturnState, ProjectSessionData, SessionInfo } from './types'
 
 export class ProjectDataStorage {
   private readonly storageDir: string
@@ -226,6 +226,20 @@ export class ProjectDataStorage {
     // preserving it is the whole point of save()'s two-parameter API.
     projectData.worktree = worktree
     this.save(projectId, projectData)
+  }
+
+  /**
+   * Record the git-return state for a session, wherever its project file lives.
+   * No-ops when the session is unknown (e.g. already removed by deletion).
+   */
+  recordGitReturn(sessionId: string, state: GitReturnState, message?: string): void {
+    const found = this.findSession(sessionId)
+    if (!found) return
+    const projectData = this.load(found.projectId)
+    const session = projectData?.sessions?.[sessionId]
+    if (!projectData || !session) return
+    session.gitReturn = { state, ...(message !== undefined ? { message } : {}), updatedAt: Date.now() }
+    this.save(found.projectId, projectData)
   }
 
   /**

@@ -138,7 +138,8 @@ The plugin only synchronizes changes from the sandbox to your system. To pass lo
 
 The per-turn sync runs in the background: OpenCode dispatches the `session.idle` event without waiting for plugin work, so observing that event does not mean the changes have reached your local repository yet. The plugin provides three stronger boundaries:
 
-- **`gitSync` tool** — commits pending sandbox changes and pulls them into the local `opencode/N` branch, returning only after they are in the local repository. Failures are returned as tool errors. Automation that needs a reliable handoff (for example, a supervisor driving OpenCode through the SDK) should ask the agent to run `gitSync` as its final step and check the tool result instead of treating `session.idle` as proof that changes have landed.
+- **`gitSync` tool** — commits pending sandbox changes and pulls them into the local `opencode/N` branch, returning only after they are in the local repository. Failures are returned as tool errors, and its result also reports when a previous automatic sync or the initial git setup had failed. Automation that needs a reliable handoff (for example, a supervisor driving OpenCode through the SDK) should ask the agent to run `gitSync` as its final step and check the tool result instead of treating `session.idle` as proof that changes have landed.
+- **Persistent git-return state** — every transition of a session's return path is recorded in the session's entry in the [per-project state file](#session-to-sandbox-mapping) under `gitReturn`: `pending` (established, no sync yet), `synced`, `failed` (with the git error), `setup-failed` (the initial push at sandbox creation failed), or `disabled` (no local git repository). Failures on the automatic paths — initial setup, idle syncs, and a shutdown that exceeded the drain window — are all recorded there, so a host can verify a session's return completed by reading that field instead of parsing logs or trusting silence.
 - **Session deletion** — before deleting a sandbox, the plugin waits for any in-flight sync and pulls remaining changes from a running sandbox. If unsynced changes cannot be pulled — including when the local repository is no longer accessible — deletion is aborted and the sandbox is preserved. A sandbox that is not running is deleted without being started: anything in it was either synced while it ran or is abandoned by the explicit delete.
 - **Shutdown** — when OpenCode shuts down gracefully, it waits (up to 60 seconds) for the plugin to finish in-flight syncs before exiting.
 
@@ -149,7 +150,7 @@ The plugin keeps track of which sandbox belongs to each OpenCode project using l
 - Default (when `XDG_DATA_HOME` is unset): `~/.local/share/opencode/storage/daytona/[projectid].json`.
 - When `XDG_DATA_HOME` is set: `$XDG_DATA_HOME/opencode/storage/daytona/[projectid].json`.
 
-Each JSON file contains the sandbox metadata for each session in the project, including when the sandbox was created, and when it was last used.
+Each JSON file contains the sandbox metadata for each session in the project, including when the sandbox was created, when it was last used, the worktree the session runs in, and the session's current `gitReturn` state (see [Sync guarantees](#sync-guarantees)).
 
 The plugin uses [XDG Base Directory](https://specifications.freedesktop.org/basedir/latest/) specifically to resolve the path to this directory, using the convention [set by OpenCode](https://github.com/anomalyco/opencode/blob/052f887a9a7aaf79d9f1a560f9b686d59faa8348/packages/opencode/src/global/index.ts#L8).
 

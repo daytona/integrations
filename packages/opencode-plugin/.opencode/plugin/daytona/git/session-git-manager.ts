@@ -68,6 +68,11 @@ export class SessionGitManager {
     return operation
   }
 
+  /** Sessions that currently have an in-flight or queued sync. */
+  static pendingSessionIds(): string[] {
+    return [...SessionGitManager.pendingSyncs.keys()]
+  }
+
   /** Resolves when the session has no in-flight sync. Never rejects. */
   static async waitForPendingSync(sessionId: string): Promise<void> {
     let pending = SessionGitManager.pendingSyncs.get(sessionId)

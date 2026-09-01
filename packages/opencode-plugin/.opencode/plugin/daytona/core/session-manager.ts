@@ -16,7 +16,7 @@ import {
   type Sandbox,
 } from '@daytona/sdk'
 import { logger } from './logger'
-import type { SessionSandboxMap, SandboxInfo, SessionInfo } from './types'
+import type { GitReturnState, GitReturnStatus, SessionSandboxMap, SandboxInfo, SessionInfo } from './types'
 import { SessionGitManager } from '../git/session-git-manager'
 import { DaytonaSandboxGitManager } from '../git/sandbox-git-manager'
 import { ProjectDataStorage } from './project-data-storage'
@@ -265,12 +265,15 @@ export class DaytonaSessionManager {
       if (branchNumber) {
         const sessionGit = new SessionGitManager(sandbox, this.repoPath, worktree, branchNumber)
         await sessionGit.initializeAndSync(pluginCtx)
+        this.recordGitReturn(sessionId, 'pending', 'return path established; no sync has run yet')
       } else {
         // Git disabled; still ensure the directory exists so tools can operate.
         await new DaytonaSandboxGitManager(sandbox, this.repoPath).ensureDirectory()
+        this.recordGitReturn(sessionId, 'disabled', 'no local git repository; syncing is disabled')
       }
     } catch (err: any) {
       logger.error(`Failed to initialize git repo or push local changes in sandbox: ${err}`)
+      this.recordGitReturn(sessionId, 'setup-failed', String(err?.message ?? err))
       toast.show({
         title: 'Git error',
         message: err?.message || 'Failed to initialize git repo in sandbox.',
@@ -358,7 +361,7 @@ export class DaytonaSessionManager {
       // pulling the last changes and destroying the sandbox.
       const target = sandbox
       await SessionGitManager.enqueueSessionSync(sessionId, async () => {
-        await this.syncBeforeDelete(target, stored)
+        await this.syncBeforeDelete(sessionId, target, stored)
         logger.info(`Removing sandbox for session: ${sessionId}`)
         await target.delete()
       })
@@ -391,7 +394,11 @@ export class DaytonaSessionManager {
    *
    * Runs inside the session's sync queue; it must NOT enqueue (that would deadlock).
    */
-  private async syncBeforeDelete(sandbox: Sandbox, stored: { worktree: string; session: SessionInfo } | undefined) {
+  private async syncBeforeDelete(
+    sessionId: string,
+    sandbox: Sandbox,
+    stored: { worktree: string; session: SessionInfo } | undefined,
+  ) {
     const branchNumber = stored?.session.branchNumber
     if (!branchNumber || !stored?.worktree) return
     await sandbox.refreshData()
@@ -405,6 +412,7 @@ export class DaytonaSessionManager {
     try {
       await sessionGit.autoCommitAndPull()
     } catch (err: any) {
+      this.recordGitReturn(sessionId, 'failed', String(err?.message ?? err))
       throw new Error(
         `Sandbox has changes that could not be synced to the local repository; the sandbox was not deleted. ${err?.message ?? err}`,
       )
@@ -424,6 +432,14 @@ export class DaytonaSessionManager {
 
   isSessionDeleting(sessionId: string): boolean {
     return this.deletingSessions.has(sessionId)
+  }
+
+  recordGitReturn(sessionId: string, state: GitReturnState, message?: string): void {
+    this.dataStorage.recordGitReturn(sessionId, state, message)
+  }
+
+  getGitReturn(sessionId: string): GitReturnStatus | undefined {
+    return this.dataStorage.findSession(sessionId)?.session.gitReturn
   }
 
   /**
