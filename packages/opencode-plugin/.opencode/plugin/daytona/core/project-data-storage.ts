@@ -98,26 +98,28 @@ export class ProjectDataStorage {
       return currentSession
     }
 
-    // Look in other projects and migrate if found.
+    // Look in other projects and migrate if found. Each file is re-read and modified
+    // under its own lock (destination first, then source, never nested) so a stale
+    // snapshot can't overwrite another process's concurrent session updates.
     for (const otherProjectId of this.listProjectIds()) {
       if (otherProjectId === projectId) continue
 
-      const otherData = this.load(otherProjectId)
-      const found = otherData?.sessions?.[sessionId]
+      const found = this.load(otherProjectId)?.sessions?.[sessionId]
       if (!found) continue
-
-      const destination: ProjectSessionData = current ?? {
-        projectId,
-        worktree,
-        sessions: {},
-      }
 
       // Write the destination first and confirm it landed on disk, so a write
       // failure can never delete the source before the copy is safely persisted.
-      destination.sessions[sessionId] = found
-      // Prefer the worktree for the project we're actually operating on.
-      destination.worktree = worktree
-      this.save(projectId, destination)
+      this.withFileLock(projectId, () => {
+        const destination: ProjectSessionData = this.load(projectId) ?? {
+          projectId,
+          worktree,
+          sessions: {},
+        }
+        destination.sessions[sessionId] = found
+        // Prefer the worktree for the project we're actually operating on.
+        destination.worktree = worktree
+        this.save(projectId, destination)
+      })
 
       if (!this.load(projectId)?.sessions?.[sessionId]) {
         logger.error(`Migration of session ${sessionId} to project ${projectId} did not persist; leaving source intact`)
@@ -126,8 +128,13 @@ export class ProjectDataStorage {
 
       // Destination is safe; now remove from the source (best effort).
       try {
-        delete otherData!.sessions[sessionId]
-        this.save(otherProjectId, otherData!)
+        this.withFileLock(otherProjectId, () => {
+          const source = this.load(otherProjectId)
+          if (source?.sessions?.[sessionId]) {
+            delete source.sessions[sessionId]
+            this.save(otherProjectId, source)
+          }
+        })
       } catch (err) {
         logger.warn(`Failed to remove session ${sessionId} from project ${otherProjectId}: ${err}`)
       }
@@ -211,7 +218,10 @@ export class ProjectDataStorage {
         break
       } catch {
         try {
-          if (Date.now() - statSync(lockPath).mtimeMs > 5000) {
+          // Steal only when stale AND the recorded owner is confirmed dead (signal 0
+          // probes liveness without signalling). A live-but-slow holder keeps its lock;
+          // we wait out the deadline instead of running concurrently with it.
+          if (Date.now() - statSync(lockPath).mtimeMs > 5000 && !this.isPidAlive(readFileSync(lockPath, 'utf8'))) {
             rmSync(lockPath, { force: true })
             continue
           }
@@ -226,6 +236,18 @@ export class ProjectDataStorage {
       return fn()
     } finally {
       if (locked) rmSync(lockPath, { force: true })
+    }
+  }
+
+  private isPidAlive(rawPid: string): boolean {
+    const pid = Number.parseInt(rawPid.trim(), 10)
+    if (!Number.isFinite(pid) || pid <= 0) return false
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch (err: any) {
+      // EPERM means the process exists but belongs to another user.
+      return err?.code === 'EPERM'
     }
   }
 

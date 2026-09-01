@@ -117,6 +117,10 @@ export class SessionGitManager {
     return this.hostGit.hasRepo(this.worktree)
   }
 
+  static hasRepo(worktree: string): boolean {
+    return new HostGitManager().hasRepo(worktree)
+  }
+
   /**
    * Initialize git in the sandbox and sync with host
    * Used when a new sandbox is created for a session

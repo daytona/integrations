@@ -27,6 +27,15 @@ export const gitSyncTool = (
       const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree, pluginCtx)
       const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
       if (!branchNumber) {
+        // A missing branch number means "no repo, syncing intentionally off" ONLY when
+        // the worktree really has no repo. With a healthy repo it means branch
+        // allocation failed earlier - a broken return path, not a disabled one.
+        if (SessionGitManager.hasRepo(worktree)) {
+          const message =
+            'no sync branch was allocated for this session even though a local repository exists; recreate the session to re-enable syncing'
+          sessionManager.recordGitReturn(sessionId, 'failed', message)
+          throw new Error(`Cannot sync: ${message}.`)
+        }
         sessionManager.recordGitReturn(sessionId, 'disabled', 'no local git repository; syncing is disabled')
         return 'Git syncing is disabled for this session (no local git repository); nothing to sync.'
       }
