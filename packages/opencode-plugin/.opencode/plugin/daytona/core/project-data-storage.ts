@@ -8,7 +8,19 @@
  * Stores data per-project in ~/.local/share/opencode/storage/daytona/{projectId}.json
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs'
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  writeSync,
+} from 'fs'
 import { join } from 'path'
 import { logger } from './logger'
 import type { GitReturnState, ProjectSessionData, SessionInfo } from './types'
@@ -165,10 +177,55 @@ export class ProjectDataStorage {
   save(storageKey: string, projectData: ProjectSessionData): void {
     const filePath = this.getProjectFilePath(storageKey)
     try {
-      writeFileSync(filePath, JSON.stringify(projectData, null, 2))
+      // Write-to-temp + rename so a crash mid-write can never leave a torn JSON file.
+      const tmpPath = `${filePath}.${process.pid}.tmp`
+      writeFileSync(tmpPath, JSON.stringify(projectData, null, 2))
+      renameSync(tmpPath, filePath)
       logger.info(`Saved project data for ${projectData.projectId}`)
     } catch (err) {
       logger.error(`Failed to save project data for ${projectData.projectId} at ${filePath}: ${err}`)
+    }
+  }
+
+  /**
+   * Run a read-modify-write against a project file while holding a cross-process lock,
+   * so two OpenCode instances sharing a project cannot overwrite each other's session
+   * updates (each save replaces the whole file). Within one process the storage methods
+   * are synchronous, so this only guards against OTHER processes. Locks from crashed
+   * processes are stolen after 5s; if the lock cannot be acquired within 6s we proceed
+   * unlocked (availability over strictness) with a warning.
+   */
+  private withFileLock<T>(storageKey: string, fn: () => T): T {
+    const lockPath = `${this.getProjectFilePath(storageKey)}.lock`
+    const deadline = Date.now() + 6000
+    let locked = false
+    while (Date.now() < deadline) {
+      try {
+        const fd = openSync(lockPath, 'wx')
+        try {
+          writeSync(fd, String(process.pid))
+        } finally {
+          closeSync(fd)
+        }
+        locked = true
+        break
+      } catch {
+        try {
+          if (Date.now() - statSync(lockPath).mtimeMs > 5000) {
+            rmSync(lockPath, { force: true })
+            continue
+          }
+        } catch {
+          continue
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10)
+      }
+    }
+    if (!locked) logger.warn(`Proceeding without storage lock for ${storageKey}; lock at ${lockPath} never freed`)
+    try {
+      return fn()
+    } finally {
+      if (locked) rmSync(lockPath, { force: true })
     }
   }
 
@@ -194,38 +251,40 @@ export class ProjectDataStorage {
     sandboxId: string,
     branchNumber?: number,
   ): void {
-    const projectData = this.load(projectId) || {
-      projectId,
-      worktree,
-      sessions: {},
-    }
-
-    const now = Date.now()
-    if (!projectData.sessions[sessionId]) {
-      projectData.sessions[sessionId] = {
-        sandboxId,
-        ...(branchNumber !== undefined ? { branchNumber } : {}),
+    this.withFileLock(projectId, () => {
+      const projectData = this.load(projectId) || {
+        projectId,
         worktree,
-        created: now,
-        lastAccessed: now,
+        sessions: {},
       }
-    } else {
-      projectData.sessions[sessionId].sandboxId = sandboxId
-      projectData.sessions[sessionId].lastAccessed = now
-      projectData.sessions[sessionId].worktree = worktree
-      // Only update branch number if it wasn't set before
-      if (projectData.sessions[sessionId].branchNumber === undefined) {
-        if (branchNumber !== undefined) {
-          projectData.sessions[sessionId].branchNumber = branchNumber
+
+      const now = Date.now()
+      if (!projectData.sessions[sessionId]) {
+        projectData.sessions[sessionId] = {
+          sandboxId,
+          ...(branchNumber !== undefined ? { branchNumber } : {}),
+          worktree,
+          created: now,
+          lastAccessed: now,
+        }
+      } else {
+        projectData.sessions[sessionId].sandboxId = sandboxId
+        projectData.sessions[sessionId].lastAccessed = now
+        projectData.sessions[sessionId].worktree = worktree
+        // Only update branch number if it wasn't set before
+        if (projectData.sessions[sessionId].branchNumber === undefined) {
+          if (branchNumber !== undefined) {
+            projectData.sessions[sessionId].branchNumber = branchNumber
+          }
         }
       }
-    }
 
-    // Refresh worktree from the current call (state that can change over time), but
-    // NEVER refresh projectData.projectId — that's identity, set at creation, and
-    // preserving it is the whole point of save()'s two-parameter API.
-    projectData.worktree = worktree
-    this.save(projectId, projectData)
+      // Refresh worktree from the current call (state that can change over time), but
+      // NEVER refresh projectData.projectId — that's identity, set at creation, and
+      // preserving it is the whole point of save()'s two-parameter API.
+      projectData.worktree = worktree
+      this.save(projectId, projectData)
+    })
   }
 
   /**
@@ -235,21 +294,25 @@ export class ProjectDataStorage {
   recordGitReturn(sessionId: string, state: GitReturnState, message?: string): void {
     const found = this.findSession(sessionId)
     if (!found) return
-    const projectData = this.load(found.projectId)
-    const session = projectData?.sessions?.[sessionId]
-    if (!projectData || !session) return
-    session.gitReturn = { state, ...(message !== undefined ? { message } : {}), updatedAt: Date.now() }
-    this.save(found.projectId, projectData)
+    this.withFileLock(found.projectId, () => {
+      const projectData = this.load(found.projectId)
+      const session = projectData?.sessions?.[sessionId]
+      if (!projectData || !session) return
+      session.gitReturn = { state, ...(message !== undefined ? { message } : {}), updatedAt: Date.now() }
+      this.save(found.projectId, projectData)
+    })
   }
 
   /**
    * Remove a session from the project file
    */
   removeSession(projectId: string, worktree: string, sessionId: string): void {
-    const projectData = this.load(projectId)
-    if (projectData && projectData.sessions[sessionId]) {
-      delete projectData.sessions[sessionId]
-      this.save(projectId, projectData)
-    }
+    this.withFileLock(projectId, () => {
+      const projectData = this.load(projectId)
+      if (projectData && projectData.sessions[sessionId]) {
+        delete projectData.sessions[sessionId]
+        this.save(projectId, projectData)
+      }
+    })
   }
 }

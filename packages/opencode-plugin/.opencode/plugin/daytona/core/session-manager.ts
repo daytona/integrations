@@ -263,6 +263,9 @@ export class DaytonaSessionManager {
     // Initialize git repo in the sandbox and sync with host
     try {
       if (branchNumber) {
+        // Recorded BEFORE the await so a process dying mid-setup leaves a trace instead
+        // of an absent record that hosts cannot tell apart from an unobserved session.
+        this.recordGitReturn(sessionId, 'pending', 'establishing the return path')
         const sessionGit = new SessionGitManager(sandbox, this.repoPath, worktree, branchNumber)
         await sessionGit.initializeAndSync(pluginCtx)
         this.recordGitReturn(sessionId, 'pending', 'return path established; no sync has run yet')
@@ -401,21 +404,27 @@ export class DaytonaSessionManager {
   ) {
     const branchNumber = stored?.session.branchNumber
     if (!branchNumber || !stored?.worktree) return
-    await sandbox.refreshData()
-    if (sandbox.state !== 'started') return
-    const sessionGit = new SessionGitManager(sandbox, this.repoPath, stored.worktree, branchNumber)
-    if (!sessionGit.hasLocalRepo()) {
-      const message = `Local repository at ${stored.worktree} is not accessible, so unsynced sandbox changes cannot be pulled; the sandbox was not deleted. Restore the repository or delete the sandbox from the Daytona dashboard.`
-      this.recordGitReturn(sessionId, 'failed', message)
-      throw new Error(message)
-    }
     try {
-      await sessionGit.autoCommitAndPull()
+      await sandbox.refreshData()
+      if (sandbox.state !== 'started') return
+      const sessionGit = new SessionGitManager(sandbox, this.repoPath, stored.worktree, branchNumber)
+      if (!sessionGit.hasLocalRepo()) {
+        throw new Error(
+          `Local repository at ${stored.worktree} is not accessible, so unsynced sandbox changes cannot be pulled; the sandbox was not deleted. Restore the repository or delete the sandbox from the Daytona dashboard.`,
+        )
+      }
+      try {
+        await sessionGit.autoCommitAndPull()
+      } catch (err: any) {
+        throw new Error(
+          `Sandbox has changes that could not be synced to the local repository; the sandbox was not deleted. ${err?.message ?? err}`,
+        )
+      }
     } catch (err: any) {
+      // Single recording point so EVERY delete-time failure (refresh, repo check, sync)
+      // is visible to hosts, not just the sync itself.
       this.recordGitReturn(sessionId, 'failed', String(err?.message ?? err))
-      throw new Error(
-        `Sandbox has changes that could not be synced to the local repository; the sandbox was not deleted. ${err?.message ?? err}`,
-      )
+      throw err
     }
   }
 
