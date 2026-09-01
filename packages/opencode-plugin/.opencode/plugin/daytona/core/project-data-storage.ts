@@ -142,7 +142,12 @@ export class ProjectDataStorage {
         // and it doesn't round-trip identically (e.g. legacy files with a different
         // sanitization scheme), the cleanup would silently target a different file and
         // leave the stale mapping behind.
-        return { projectId, worktree: data.worktree, session }
+        //
+        // Prefer the session's own worktree: the project-level field is overwritten by
+        // whichever session touched the project last, which in linked-worktree setups
+        // can be a DIFFERENT checkout than the one this session runs in. Project-level
+        // remains as fallback for storage files written by older plugin versions.
+        return { projectId, worktree: session.worktree ?? data.worktree, session }
       }
     }
     return undefined
@@ -200,12 +205,14 @@ export class ProjectDataStorage {
       projectData.sessions[sessionId] = {
         sandboxId,
         ...(branchNumber !== undefined ? { branchNumber } : {}),
+        worktree,
         created: now,
         lastAccessed: now,
       }
     } else {
       projectData.sessions[sessionId].sandboxId = sandboxId
       projectData.sessions[sessionId].lastAccessed = now
+      projectData.sessions[sessionId].worktree = worktree
       // Only update branch number if it wasn't set before
       if (projectData.sessions[sessionId].branchNumber === undefined) {
         if (branchNumber !== undefined) {

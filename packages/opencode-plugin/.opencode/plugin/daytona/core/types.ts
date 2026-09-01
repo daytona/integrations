@@ -53,6 +53,12 @@ export type SessionInfo = {
    * Only set when the local worktree is a git repo (used to create opencode/N branches/remotes).
    */
   branchNumber?: number
+  /**
+   * Worktree this session last ran in. Sessions of one project can live in different
+   * linked worktrees, while the project-level field only remembers the last one any
+   * session touched. Absent in storage files written by older plugin versions.
+   */
+  worktree?: string
   created: number
   lastAccessed: number
 }
