@@ -405,9 +405,9 @@ export class DaytonaSessionManager {
     if (sandbox.state !== 'started') return
     const sessionGit = new SessionGitManager(sandbox, this.repoPath, stored.worktree, branchNumber)
     if (!sessionGit.hasLocalRepo()) {
-      throw new Error(
-        `Local repository at ${stored.worktree} is not accessible, so unsynced sandbox changes cannot be pulled; the sandbox was not deleted. Restore the repository or delete the sandbox from the Daytona dashboard.`,
-      )
+      const message = `Local repository at ${stored.worktree} is not accessible, so unsynced sandbox changes cannot be pulled; the sandbox was not deleted. Restore the repository or delete the sandbox from the Daytona dashboard.`
+      this.recordGitReturn(sessionId, 'failed', message)
+      throw new Error(message)
     }
     try {
       await sessionGit.autoCommitAndPull()

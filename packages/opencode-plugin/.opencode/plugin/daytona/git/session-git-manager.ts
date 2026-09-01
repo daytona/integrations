@@ -165,10 +165,12 @@ export class SessionGitManager {
       toast.initialize(pluginCtx.client.tui)
     }
     try {
-      // Check if local git repo exists before attempting any git operations
+      // Sessions without a local repo never get a branch number, so no caller reaches
+      // this with syncing legitimately disabled. A missing repo here means the worktree
+      // vanished after setup - report it as the failure it is rather than as "no
+      // changes", which callers would record as a healthy sync.
       if (!this.hostGit.hasRepo(this.worktree)) {
-        logger.warn('No local git repository found. Git syncing is disabled.')
-        return false
+        throw new Error(`Local repository at ${this.worktree} is not accessible; sandbox changes cannot be pulled.`)
       }
 
       await this.sandboxGit.ensureRepo()
