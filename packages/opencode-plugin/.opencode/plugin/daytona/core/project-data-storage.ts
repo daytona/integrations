@@ -103,9 +103,16 @@ export class ProjectDataStorage {
     // snapshot can't overwrite another process's concurrent session updates.
     for (const otherProjectId of this.listProjectIds()) {
       if (otherProjectId === projectId) continue
+      if (!this.load(otherProjectId)?.sessions?.[sessionId]) continue
 
-      const found = this.load(otherProjectId)?.sessions?.[sessionId]
+      // Snapshot the record under the SOURCE lock so the copy cannot be older than
+      // what cleanup later compares against.
+      let found: SessionInfo | undefined
+      this.withFileLock(otherProjectId, () => {
+        found = this.load(otherProjectId)?.sessions?.[sessionId]
+      })
       if (!found) continue
+      const snapshot = found
 
       // Write the destination first and confirm it landed on disk, so a write
       // failure can never delete the source before the copy is safely persisted.
@@ -115,7 +122,7 @@ export class ProjectDataStorage {
           worktree,
           sessions: {},
         }
-        destination.sessions[sessionId] = found
+        destination.sessions[sessionId] = snapshot
         // Prefer the worktree for the project we're actually operating on.
         destination.worktree = worktree
         this.save(projectId, destination)
@@ -123,24 +130,33 @@ export class ProjectDataStorage {
 
       if (!this.load(projectId)?.sessions?.[sessionId]) {
         logger.error(`Migration of session ${sessionId} to project ${projectId} did not persist; leaving source intact`)
-        return found
+        return snapshot
       }
 
-      // Destination is safe; now remove from the source (best effort).
+      // Compare-and-delete: only remove the source record if it is still exactly what
+      // we copied. If another instance updated it mid-migration, their newer record
+      // survives (the stale destination copy is overwritten on the session's next
+      // updateSession) - migration must never destroy data it did not copy.
       try {
         this.withFileLock(otherProjectId, () => {
           const source = this.load(otherProjectId)
-          if (source?.sessions?.[sessionId]) {
-            delete source.sessions[sessionId]
-            this.save(otherProjectId, source)
+          const currentRecord = source?.sessions?.[sessionId]
+          if (!source || !currentRecord) return
+          if (JSON.stringify(currentRecord) !== JSON.stringify(snapshot)) {
+            logger.warn(
+              `Session ${sessionId} changed in project ${otherProjectId} during migration; leaving the newer record in place`,
+            )
+            return
           }
+          delete source.sessions[sessionId]
+          this.save(otherProjectId, source)
         })
       } catch (err) {
         logger.warn(`Failed to remove session ${sessionId} from project ${otherProjectId}: ${err}`)
       }
 
       logger.info(`Migrated session ${sessionId} from project ${otherProjectId} to project ${projectId}`)
-      return found
+      return snapshot
     }
 
     return undefined

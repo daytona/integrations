@@ -28,9 +28,18 @@ export const gitSyncTool = (
       const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
       if (!branchNumber) {
         // A missing branch number means "no repo, syncing intentionally off" ONLY when
-        // the worktree really has no repo. With a healthy repo it means branch
-        // allocation failed earlier - a broken return path, not a disabled one.
+        // the worktree really has no repo. With a healthy repo it means either the
+        // session legitimately started before the repo existed (prior state
+        // 'disabled': a repo cannot be adopted mid-session, since the initial push
+        // would clobber the agent's sandbox work) or branch allocation failed - a
+        // broken return path, not a disabled one.
         if (SessionGitManager.hasRepo(worktree)) {
+          if (sessionManager.getGitReturn(sessionId)?.state === 'disabled') {
+            const message =
+              'syncing was disabled when this session started (no git repository at the time) and cannot be enabled mid-session; start a new session to sync'
+            sessionManager.recordGitReturn(sessionId, 'disabled', message)
+            return `Git syncing is disabled for this session: ${message}.`
+          }
           const message =
             'no sync branch was allocated for this session even though a local repository exists; recreate the session to re-enable syncing'
           sessionManager.recordGitReturn(sessionId, 'failed', message)
