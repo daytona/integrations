@@ -156,9 +156,11 @@ export class SessionGitManager {
   }
 
   /**
-   * Auto-commit in the sandbox and pull latest from host
-   * Used on session idle
-   * Returns true if changes were synced, false if no changes or no local repo
+   * Commit pending sandbox changes and pull them into the local opencode/N branch
+   * whenever the sandbox tip differs from the local ref. Used by idle syncs, the
+   * gitSync tool, and the pre-deletion sync.
+   * Returns true when commits were pulled, false when both sides already match.
+   * Throws when the local repository is inaccessible or any git step fails.
    */
   async autoCommitAndPull(pluginCtx?: PluginInput): Promise<boolean> {
     if (pluginCtx?.client?.tui) {
