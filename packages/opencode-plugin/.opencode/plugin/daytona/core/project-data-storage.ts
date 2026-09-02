@@ -120,8 +120,11 @@ export class ProjectDataStorage {
    * while it still equals that snapshot. If the source changed, the copy is retried
    * from the newer record; if it keeps changing, our destination copy is withdrawn so
    * the newest source record stays the single authoritative one, and migration is
-   * retried on the next access. Cleanup ERRORS (as opposed to races) keep the old
-   * best-effort semantics: the duplicate they leave is byte-identical, hence harmless.
+   * retried on the next access. Both removals are conditional — source cleanup and
+   * destination withdrawal each delete only a record still byte-identical to what this
+   * migration copied — so a concurrent update on either side is never destroyed.
+   * Cleanup ERRORS (as opposed to races) keep the old best-effort semantics: the
+   * duplicate they leave is byte-identical, hence harmless.
    */
   private migrateSession(
     projectId: string,
@@ -129,6 +132,7 @@ export class ProjectDataStorage {
     sessionId: string,
     otherProjectId: string,
   ): SessionInfo | undefined {
+    let lastCopied: SessionInfo | undefined
     for (let attempt = 0; attempt < 3; attempt++) {
       let found: SessionInfo | undefined
       this.withFileLock(otherProjectId, () => {
@@ -150,6 +154,7 @@ export class ProjectDataStorage {
         destination.worktree = worktree
         this.save(projectId, destination)
       })
+      lastCopied = snapshot
 
       if (!this.load(projectId)?.sessions?.[sessionId]) {
         logger.error(`Migration of session ${sessionId} to project ${projectId} did not persist; leaving source intact`)
@@ -187,13 +192,27 @@ export class ProjectDataStorage {
 
     // The source kept changing while we copied: withdraw our stale destination copy so
     // the newest source record cannot be shadowed, and let a later access re-migrate.
+    // Compare-and-withdraw, mirroring the source cleanup: only OUR copy is removed. If
+    // another instance updated the destination record after our last copy, that record
+    // is newer than anything we hold, so it stays and is returned to the caller.
+    let survivingDestination: SessionInfo | undefined
     this.withFileLock(projectId, () => {
       const destination = this.load(projectId)
-      if (destination?.sessions?.[sessionId]) {
-        delete destination.sessions[sessionId]
-        this.save(projectId, destination)
+      const currentRecord = destination?.sessions?.[sessionId]
+      if (!destination || !currentRecord) return
+      if (JSON.stringify(currentRecord) !== JSON.stringify(lastCopied)) {
+        survivingDestination = currentRecord
+        return
       }
+      delete destination.sessions[sessionId]
+      this.save(projectId, destination)
     })
+    if (survivingDestination) {
+      logger.warn(
+        `Session ${sessionId} was updated in project ${projectId} after the migration copy; keeping that record instead of withdrawing it`,
+      )
+      return survivingDestination
+    }
     logger.warn(
       `Migration of session ${sessionId} from project ${otherProjectId} withdrawn after repeated concurrent updates; will retry on next access`,
     )
