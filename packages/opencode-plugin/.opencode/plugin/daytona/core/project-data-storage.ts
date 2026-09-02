@@ -422,11 +422,12 @@ export class ProjectDataStorage {
   removeSession(sessionId: string): void {
     // The file list and the existence check are read outside the per-file locks, so a
     // record written into an already-visited file (another instance migrating or
-    // re-registering the session while we purge) would survive a single pass. A second
-    // pass catches that. Closing the window completely would need one global lock
-    // across all project files, serializing every unrelated project behind it.
+    // re-registering the session while we purge) would survive a single pass. Both
+    // passes therefore run unconditionally: a first pass that removed nothing proves
+    // nothing about files it had already walked past. Closing the window completely
+    // would need one global lock across all project files, serializing every unrelated
+    // project behind it.
     for (let pass = 0; pass < 2; pass++) {
-      let removedAny = false
       for (const projectId of this.listProjectIds()) {
         if (!this.load(projectId)?.sessions?.[sessionId]) continue
         this.withFileLock(projectId, () => {
@@ -434,11 +435,9 @@ export class ProjectDataStorage {
           if (projectData?.sessions?.[sessionId]) {
             delete projectData.sessions[sessionId]
             this.save(projectId, projectData)
-            removedAny = true
           }
         })
       }
-      if (!removedAny) return
     }
   }
 }
