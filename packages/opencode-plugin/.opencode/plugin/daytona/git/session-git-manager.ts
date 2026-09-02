@@ -68,6 +68,11 @@ export class SessionGitManager {
     return operation
   }
 
+  /** Sessions that currently have an in-flight or queued sync. */
+  static pendingSessionIds(): string[] {
+    return [...SessionGitManager.pendingSyncs.keys()]
+  }
+
   /** Resolves when the session has no in-flight sync. Never rejects. */
   static async waitForPendingSync(sessionId: string): Promise<void> {
     let pending = SessionGitManager.pendingSyncs.get(sessionId)
@@ -112,6 +117,10 @@ export class SessionGitManager {
     return this.hostGit.hasRepo(this.worktree)
   }
 
+  static hasRepo(worktree: string): boolean {
+    return new HostGitManager().hasRepo(worktree)
+  }
+
   /**
    * Initialize git in the sandbox and sync with host
    * Used when a new sandbox is created for a session
@@ -151,19 +160,23 @@ export class SessionGitManager {
   }
 
   /**
-   * Auto-commit in the sandbox and pull latest from host
-   * Used on session idle
-   * Returns true if changes were synced, false if no changes or no local repo
+   * Commit pending sandbox changes and pull them into the local opencode/N branch
+   * whenever the sandbox tip differs from the local ref. Used by idle syncs, the
+   * gitSync tool, and the pre-deletion sync.
+   * Returns true when commits were pulled, false when both sides already match.
+   * Throws when the local repository is inaccessible or any git step fails.
    */
   async autoCommitAndPull(pluginCtx?: PluginInput): Promise<boolean> {
     if (pluginCtx?.client?.tui) {
       toast.initialize(pluginCtx.client.tui)
     }
     try {
-      // Check if local git repo exists before attempting any git operations
+      // Sessions without a local repo never get a branch number, so no caller reaches
+      // this with syncing legitimately disabled. A missing repo here means the worktree
+      // vanished after setup - report it as the failure it is rather than as "no
+      // changes", which callers would record as a healthy sync.
       if (!this.hostGit.hasRepo(this.worktree)) {
-        logger.warn('No local git repository found. Git syncing is disabled.')
-        return false
+        throw new Error(`Local repository at ${this.worktree} is not accessible; sandbox changes cannot be pulled.`)
       }
 
       await this.sandboxGit.ensureRepo()

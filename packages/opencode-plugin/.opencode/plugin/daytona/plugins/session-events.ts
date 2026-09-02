@@ -48,12 +48,21 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
           const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
           if (!branchNumber) return false
           const sessionGit = new SessionGitManager(sandbox, repoPath, worktree, branchNumber)
-          return sessionGit.autoCommitAndPull(ctx)
+          const synced = await sessionGit.autoCommitAndPull(ctx)
+          sessionManager.recordGitReturn(
+            sessionId,
+            'synced',
+            synced ? 'changes pulled into the local repository' : 'no changes to sync',
+            projectId,
+          )
+          return synced
         })
         logger.info(`[idle] done sessionId=${sessionId} synced=${didSync} in ${Date.now() - start}ms`)
       } catch (err: any) {
         // autoCommitAndPull already shows a toast; only log here to avoid a duplicate
-        // error toast and noisy propagation out of the idle event hook.
+        // error toast and noisy propagation out of the idle event hook. The persisted
+        // git-return record is what makes this failure observable to hosts.
+        sessionManager.recordGitReturn(sessionId, 'failed', String(err?.message ?? err), projectId)
         logger.error(`[idle] error sessionId=${sessionId} in ${Date.now() - start}ms: ${err}`)
       }
     }

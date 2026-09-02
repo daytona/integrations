@@ -47,12 +47,38 @@ export type SandboxInfo = {
   id: string
 }
 
+/**
+ * Last known state of a session's git return path (sandbox → local repository).
+ * Persisted so hosts and supervisors can distinguish "agent finished and the
+ * changes are back" from "the model finished but the return is pending/broken"
+ * without parsing logs:
+ * - pending:      return path established, no sync has completed yet
+ * - synced:       last sync completed; local opencode/N matches the sandbox
+ * - failed:       last sync attempt errored (message carries the git error)
+ * - setup-failed: the initial local→sandbox push failed at sandbox creation
+ * - disabled:     no local git repository; syncing is off for this session
+ */
+export type GitReturnState = 'pending' | 'synced' | 'failed' | 'setup-failed' | 'disabled'
+
+export type GitReturnStatus = {
+  state: GitReturnState
+  message?: string
+  updatedAt: number
+}
+
 export type SessionInfo = {
   sandboxId: string
   /**
    * Only set when the local worktree is a git repo (used to create opencode/N branches/remotes).
    */
   branchNumber?: number
+  /**
+   * Worktree this session last ran in. Sessions of one project can live in different
+   * linked worktrees, while the project-level field only remembers the last one any
+   * session touched. Absent in storage files written by older plugin versions.
+   */
+  worktree?: string
+  gitReturn?: GitReturnStatus
   created: number
   lastAccessed: number
 }

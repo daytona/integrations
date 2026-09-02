@@ -64,6 +64,9 @@ async function daytonaPlugin(ctx: PluginInput) {
     dispose: async () => {
       const drained = await SessionGitManager.waitForAllPendingSyncs(60_000)
       if (!drained) {
+        for (const sessionId of SessionGitManager.pendingSessionIds()) {
+          sessionManager.recordGitReturn(sessionId, 'failed', 'shutdown proceeded before the sync completed')
+        }
         logger.warn('[dispose] exiting with git syncs still pending after 60s; a sync may be stalled')
       }
     },

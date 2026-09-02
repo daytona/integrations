@@ -6,6 +6,7 @@
 import type { PluginInput } from '@opencode-ai/plugin'
 import type { ToolContext } from '@opencode-ai/plugin/tool'
 import type { DaytonaSessionManager } from '../core/session-manager'
+import type { GitReturnStatus } from '../core/types'
 import { SessionGitManager } from '../git/session-git-manager'
 
 export const gitSyncTool = (
@@ -22,15 +23,60 @@ export const gitSyncTool = (
     if (!sessionManager.hasSandbox(sessionId, projectId)) {
       return 'No sandbox exists for this session; nothing to sync.'
     }
-    const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree, pluginCtx)
-    const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
-    if (!branchNumber) {
-      return 'Git syncing is disabled for this session (no local git repository); nothing to sync.'
+    try {
+      const sandbox = await sessionManager.getSandbox(sessionId, projectId, worktree, pluginCtx)
+      const branchNumber = sessionManager.getBranchNumberForSandbox(projectId, sandbox.id)
+      if (!branchNumber) {
+        // A missing branch number means "no repo, syncing intentionally off" ONLY when
+        // the worktree really has no repo. With a healthy repo it means either the
+        // session legitimately started before the repo existed (prior state
+        // 'disabled': a repo cannot be adopted mid-session, since the initial push
+        // would clobber the agent's sandbox work) or branch allocation failed - a
+        // broken return path, not a disabled one.
+        if (SessionGitManager.hasRepo(worktree)) {
+          if (sessionManager.getGitReturn(sessionId)?.state === 'disabled') {
+            const message =
+              'syncing was disabled when this session started (no git repository at the time) and cannot be enabled mid-session; start a new session to sync'
+            sessionManager.recordGitReturn(sessionId, 'disabled', message, projectId)
+            return `Git syncing is disabled for this session: ${message}.`
+          }
+          const message =
+            'no sync branch was allocated for this session even though a local repository exists; recreate the session to re-enable syncing'
+          sessionManager.recordGitReturn(sessionId, 'failed', message, projectId)
+          throw new Error(`Cannot sync: ${message}.`)
+        }
+        sessionManager.recordGitReturn(sessionId, 'disabled', 'no local git repository; syncing is disabled', projectId)
+        return 'Git syncing is disabled for this session (no local git repository); nothing to sync.'
+      }
+      const sessionGit = new SessionGitManager(sandbox, sessionManager.repoPath, worktree, branchNumber)
+      // Read inside the queue entry, after queued syncs have settled, so the note
+      // reflects a failure they persisted while this call was waiting its turn.
+      let previous: GitReturnStatus | undefined
+      const didSync = await SessionGitManager.enqueueSessionSync(sessionId, () => {
+        previous = sessionManager.getGitReturn(sessionId)
+        return sessionGit.autoCommitAndPull(pluginCtx)
+      })
+      const note =
+        previous?.state === 'setup-failed'
+          ? `Warning: the initial git setup for this sandbox failed (${previous.message ?? 'unknown error'}), so the synced branch may not share history with your local HEAD. `
+          : previous?.state === 'failed'
+            ? `Note: the last sync attempt failed (${previous.message ?? 'unknown error'}); retried now. `
+            : ''
+      sessionManager.recordGitReturn(
+        sessionId,
+        'synced',
+        didSync ? 'changes pulled into the local repository' : 'no changes to sync',
+        projectId,
+      )
+      return (
+        note +
+        (didSync
+          ? `Synced sandbox changes to local branch opencode/${branchNumber}.`
+          : 'No changes to sync; the local repository is already up to date.')
+      )
+    } catch (err: any) {
+      sessionManager.recordGitReturn(sessionId, 'failed', String(err?.message ?? err), projectId)
+      throw err
     }
-    const sessionGit = new SessionGitManager(sandbox, sessionManager.repoPath, worktree, branchNumber)
-    const didSync = await SessionGitManager.enqueueSessionSync(sessionId, () => sessionGit.autoCommitAndPull(pluginCtx))
-    return didSync
-      ? `Synced sandbox changes to local branch opencode/${branchNumber}.`
-      : 'No changes to sync; the local repository is already up to date.'
   },
 })
