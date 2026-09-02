@@ -265,18 +265,18 @@ export class DaytonaSessionManager {
       if (branchNumber) {
         // Recorded BEFORE the await so a process dying mid-setup leaves a trace instead
         // of an absent record that hosts cannot tell apart from an unobserved session.
-        this.recordGitReturn(sessionId, 'pending', 'establishing the return path')
+        this.recordGitReturn(sessionId, 'pending', 'establishing the return path', projectId)
         const sessionGit = new SessionGitManager(sandbox, this.repoPath, worktree, branchNumber)
         await sessionGit.initializeAndSync(pluginCtx)
-        this.recordGitReturn(sessionId, 'pending', 'return path established; no sync has run yet')
+        this.recordGitReturn(sessionId, 'pending', 'return path established; no sync has run yet', projectId)
       } else {
         // Git disabled; still ensure the directory exists so tools can operate.
         await new DaytonaSandboxGitManager(sandbox, this.repoPath).ensureDirectory()
-        this.recordGitReturn(sessionId, 'disabled', 'no local git repository; syncing is disabled')
+        this.recordGitReturn(sessionId, 'disabled', 'no local git repository; syncing is disabled', projectId)
       }
     } catch (err: any) {
       logger.error(`Failed to initialize git repo or push local changes in sandbox: ${err}`)
-      this.recordGitReturn(sessionId, 'setup-failed', String(err?.message ?? err))
+      this.recordGitReturn(sessionId, 'setup-failed', String(err?.message ?? err), projectId)
       toast.show({
         title: 'Git error',
         message: err?.message || 'Failed to initialize git repo in sandbox.',
@@ -364,7 +364,7 @@ export class DaytonaSessionManager {
       // pulling the last changes and destroying the sandbox.
       const target = sandbox
       await SessionGitManager.enqueueSessionSync(sessionId, async () => {
-        await this.syncBeforeDelete(sessionId, target, stored)
+        await this.syncBeforeDelete(sessionId, projectId, target, stored)
         logger.info(`Removing sandbox for session: ${sessionId}`)
         await target.delete()
       })
@@ -397,6 +397,7 @@ export class DaytonaSessionManager {
    */
   private async syncBeforeDelete(
     sessionId: string,
+    projectId: string,
     sandbox: Sandbox,
     stored: { worktree: string; session: SessionInfo } | undefined,
   ) {
@@ -421,7 +422,7 @@ export class DaytonaSessionManager {
     } catch (err: any) {
       // Single recording point so EVERY delete-time failure (refresh, repo check, sync)
       // is visible to hosts, not just the sync itself.
-      this.recordGitReturn(sessionId, 'failed', String(err?.message ?? err))
+      this.recordGitReturn(sessionId, 'failed', String(err?.message ?? err), projectId)
       throw err
     }
   }
@@ -441,8 +442,14 @@ export class DaytonaSessionManager {
     return this.deletingSessions.has(sessionId)
   }
 
-  recordGitReturn(sessionId: string, state: GitReturnState, message?: string): void {
-    this.dataStorage.recordGitReturn(sessionId, state, message, this.currentProjectId)
+  /**
+   * `projectId` targets the record explicitly; callers that know which project they act
+   * for must pass it, since the ambient project context can point at another project
+   * (deletion, for instance, never selects a context) and a session can briefly exist
+   * in two project files.
+   */
+  recordGitReturn(sessionId: string, state: GitReturnState, message?: string, projectId?: string): void {
+    this.dataStorage.recordGitReturn(sessionId, state, message, projectId ?? this.currentProjectId)
   }
 
   getGitReturn(sessionId: string): GitReturnStatus | undefined {

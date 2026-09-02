@@ -53,6 +53,7 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
             sessionId,
             'synced',
             synced ? 'changes pulled into the local repository' : 'no changes to sync',
+            projectId,
           )
           return synced
         })
@@ -61,7 +62,7 @@ export async function eventHandlers(ctx: PluginInput, sessionManager: DaytonaSes
         // autoCommitAndPull already shows a toast; only log here to avoid a duplicate
         // error toast and noisy propagation out of the idle event hook. The persisted
         // git-return record is what makes this failure observable to hosts.
-        sessionManager.recordGitReturn(sessionId, 'failed', String(err?.message ?? err))
+        sessionManager.recordGitReturn(sessionId, 'failed', String(err?.message ?? err), projectId)
         logger.error(`[idle] error sessionId=${sessionId} in ${Date.now() - start}ms: ${err}`)
       }
     }

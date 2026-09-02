@@ -37,15 +37,15 @@ export const gitSyncTool = (
           if (sessionManager.getGitReturn(sessionId)?.state === 'disabled') {
             const message =
               'syncing was disabled when this session started (no git repository at the time) and cannot be enabled mid-session; start a new session to sync'
-            sessionManager.recordGitReturn(sessionId, 'disabled', message)
+            sessionManager.recordGitReturn(sessionId, 'disabled', message, projectId)
             return `Git syncing is disabled for this session: ${message}.`
           }
           const message =
             'no sync branch was allocated for this session even though a local repository exists; recreate the session to re-enable syncing'
-          sessionManager.recordGitReturn(sessionId, 'failed', message)
+          sessionManager.recordGitReturn(sessionId, 'failed', message, projectId)
           throw new Error(`Cannot sync: ${message}.`)
         }
-        sessionManager.recordGitReturn(sessionId, 'disabled', 'no local git repository; syncing is disabled')
+        sessionManager.recordGitReturn(sessionId, 'disabled', 'no local git repository; syncing is disabled', projectId)
         return 'Git syncing is disabled for this session (no local git repository); nothing to sync.'
       }
       const sessionGit = new SessionGitManager(sandbox, sessionManager.repoPath, worktree, branchNumber)
@@ -66,6 +66,7 @@ export const gitSyncTool = (
         sessionId,
         'synced',
         didSync ? 'changes pulled into the local repository' : 'no changes to sync',
+        projectId,
       )
       return (
         note +
@@ -74,7 +75,7 @@ export const gitSyncTool = (
           : 'No changes to sync; the local repository is already up to date.')
       )
     } catch (err: any) {
-      sessionManager.recordGitReturn(sessionId, 'failed', String(err?.message ?? err))
+      sessionManager.recordGitReturn(sessionId, 'failed', String(err?.message ?? err), projectId)
       throw err
     }
   },
