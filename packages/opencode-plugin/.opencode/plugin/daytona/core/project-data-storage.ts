@@ -208,8 +208,11 @@ export class ProjectDataStorage {
       this.save(projectId, destination)
     })
     if (survivingDestination) {
+      // Both files now hold a record and neither can be proven older, so neither is
+      // deleted. Lookups all prefer the project they operate as (findSession's
+      // preferProjectId), so they agree on this one, and deletion purges every file.
       logger.warn(
-        `Session ${sessionId} was updated in project ${projectId} after the migration copy; keeping that record instead of withdrawing it`,
+        `Session ${sessionId} was updated in project ${projectId} after the migration copy; keeping that record and leaving the ${otherProjectId} copy in place`,
       )
       return survivingDestination
     }
@@ -222,18 +225,30 @@ export class ProjectDataStorage {
   /**
    * Read-only lookup of a session across all project files. Unlike getSession, this never
    * migrates or writes, so it is safe to use on the delete path.
+   *
+   * `preferProjectId` is searched first. A session can briefly exist in two files (an
+   * abandoned migration that had to keep a concurrently-updated destination record), and
+   * every caller passes the project it is operating as, so ledger reads, ledger writes
+   * and deletion all resolve to the SAME record instead of picking different copies.
    */
-  findSession(sessionId: string): { projectId: string; worktree: string; session: SessionInfo } | undefined {
-    for (const projectId of this.listProjectIds()) {
+  findSession(
+    sessionId: string,
+    preferProjectId?: string,
+  ): { projectId: string; worktree: string; session: SessionInfo } | undefined {
+    const projectIds = this.listProjectIds()
+    const ordered =
+      preferProjectId && projectIds.includes(preferProjectId)
+        ? [preferProjectId, ...projectIds.filter((id) => id !== preferProjectId)]
+        : projectIds
+    for (const projectId of ordered) {
       const data = this.load(projectId)
       const session = data?.sessions?.[sessionId]
       if (session && data) {
         // Return the filename-derived projectId (the value that maps back to the file we
-        // just loaded), NOT data.projectId. The delete cleanup path passes this value to
-        // removeSession → load → getProjectFilePath; if we returned the raw canonical id
-        // and it doesn't round-trip identically (e.g. legacy files with a different
-        // sanitization scheme), the cleanup would silently target a different file and
-        // leave the stale mapping behind.
+        // just loaded), NOT data.projectId: callers use it to write back to THIS file
+        // (e.g. recordGitReturn), and a raw canonical id that doesn't round-trip
+        // identically through getProjectFilePath (legacy files with a different
+        // sanitization scheme) would silently target a different file.
         //
         // Prefer the session's own worktree: the project-level field is overwritten by
         // whichever session touched the project last, which in linked-worktree setups
@@ -386,8 +401,8 @@ export class ProjectDataStorage {
    * Record the git-return state for a session, wherever its project file lives.
    * No-ops when the session is unknown (e.g. already removed by deletion).
    */
-  recordGitReturn(sessionId: string, state: GitReturnState, message?: string): void {
-    const found = this.findSession(sessionId)
+  recordGitReturn(sessionId: string, state: GitReturnState, message?: string, preferProjectId?: string): void {
+    const found = this.findSession(sessionId, preferProjectId)
     if (!found) return
     this.withFileLock(found.projectId, () => {
       const projectData = this.load(found.projectId)
@@ -399,15 +414,21 @@ export class ProjectDataStorage {
   }
 
   /**
-   * Remove a session from the project file
+   * Remove a session from EVERY project file. Used once a sandbox is confirmed gone:
+   * any record for it is stale by definition, and a copy left in another file (from an
+   * abandoned migration) would otherwise be found on a later resume and reconnected to
+   * a destroyed sandbox.
    */
-  removeSession(projectId: string, worktree: string, sessionId: string): void {
-    this.withFileLock(projectId, () => {
-      const projectData = this.load(projectId)
-      if (projectData && projectData.sessions[sessionId]) {
-        delete projectData.sessions[sessionId]
-        this.save(projectId, projectData)
-      }
-    })
+  removeSession(sessionId: string): void {
+    for (const projectId of this.listProjectIds()) {
+      if (!this.load(projectId)?.sessions?.[sessionId]) continue
+      this.withFileLock(projectId, () => {
+        const projectData = this.load(projectId)
+        if (projectData?.sessions?.[sessionId]) {
+          delete projectData.sessions[sessionId]
+          this.save(projectId, projectData)
+        }
+      })
+    }
   }
 }

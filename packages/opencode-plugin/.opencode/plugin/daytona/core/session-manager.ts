@@ -177,7 +177,7 @@ export class DaytonaSessionManager {
         if (err instanceof DaytonaNotFoundError) {
           logger.error(`Sandbox ${existing.id} no longer exists; creating a replacement.`)
           this.sessionSandboxes.delete(sessionId)
-          this.dataStorage.removeSession(projectId, worktree, sessionId)
+          this.dataStorage.removeSession(sessionId)
         } else {
           logger.error(`Failed to reconnect to sandbox ${existing.id}: ${err}`)
           throw err
@@ -328,7 +328,7 @@ export class DaytonaSessionManager {
     let sandbox = this.sessionSandboxes.get(sessionId)
 
     // Read-only lookup so deleting never migrates sessions or rewrites project metadata.
-    const stored = this.dataStorage.findSession(sessionId)
+    const stored = this.dataStorage.findSession(sessionId, projectId)
 
     let sandboxGone = false
 
@@ -379,9 +379,7 @@ export class DaytonaSessionManager {
     // stale entry can't cause repeated reconnect failures. Preserve it on transient errors.
     if (sandboxGone) {
       this.sessionSandboxes.delete(sessionId)
-      const cleanupProjectId = stored?.projectId ?? projectId
-      const cleanupWorktree = stored?.worktree ?? this.dataStorage.load(projectId)?.worktree ?? ''
-      this.dataStorage.removeSession(cleanupProjectId, cleanupWorktree, sessionId)
+      this.dataStorage.removeSession(sessionId)
     }
 
     return deleted
@@ -436,7 +434,7 @@ export class DaytonaSessionManager {
     if (this.deletingSessions.has(sessionId)) return false
     this.setProjectContext(projectId)
     if (this.sessionSandboxes.has(sessionId)) return true
-    return this.dataStorage.findSession(sessionId) !== undefined
+    return this.dataStorage.findSession(sessionId, projectId) !== undefined
   }
 
   isSessionDeleting(sessionId: string): boolean {
@@ -444,11 +442,11 @@ export class DaytonaSessionManager {
   }
 
   recordGitReturn(sessionId: string, state: GitReturnState, message?: string): void {
-    this.dataStorage.recordGitReturn(sessionId, state, message)
+    this.dataStorage.recordGitReturn(sessionId, state, message, this.currentProjectId)
   }
 
   getGitReturn(sessionId: string): GitReturnStatus | undefined {
-    return this.dataStorage.findSession(sessionId)?.session.gitReturn
+    return this.dataStorage.findSession(sessionId, this.currentProjectId)?.session.gitReturn
   }
 
   /**
