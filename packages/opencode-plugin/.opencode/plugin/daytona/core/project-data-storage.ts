@@ -98,20 +98,43 @@ export class ProjectDataStorage {
       return currentSession
     }
 
-    // Look in other projects and migrate if found. Each file is re-read and modified
-    // under its own lock (destination first, then source, never nested) so a stale
-    // snapshot can't overwrite another process's concurrent session updates.
+    // Look in other projects and migrate if found.
     for (const otherProjectId of this.listProjectIds()) {
       if (otherProjectId === projectId) continue
       if (!this.load(otherProjectId)?.sessions?.[sessionId]) continue
+      const migrated = this.migrateSession(projectId, worktree, sessionId, otherProjectId)
+      if (migrated) return migrated
+    }
 
-      // Snapshot the record under the SOURCE lock so the copy cannot be older than
-      // what cleanup later compares against.
+    return undefined
+  }
+
+  /**
+   * Move a session record between project files without ever destroying data that was
+   * not copied, and without ever leaving a stale destination copy that would shadow a
+   * newer source record on subsequent reads (getSession/findSession consult the
+   * destination first). Each file is re-read and modified under its own lock,
+   * destination and source in sequence, never nested.
+   *
+   * The snapshot is taken under the source lock; cleanup deletes the source record only
+   * while it still equals that snapshot. If the source changed, the copy is retried
+   * from the newer record; if it keeps changing, our destination copy is withdrawn so
+   * the newest source record stays the single authoritative one, and migration is
+   * retried on the next access. Cleanup ERRORS (as opposed to races) keep the old
+   * best-effort semantics: the duplicate they leave is byte-identical, hence harmless.
+   */
+  private migrateSession(
+    projectId: string,
+    worktree: string,
+    sessionId: string,
+    otherProjectId: string,
+  ): SessionInfo | undefined {
+    for (let attempt = 0; attempt < 3; attempt++) {
       let found: SessionInfo | undefined
       this.withFileLock(otherProjectId, () => {
         found = this.load(otherProjectId)?.sessions?.[sessionId]
       })
-      if (!found) continue
+      if (!found) return undefined
       const snapshot = found
 
       // Write the destination first and confirm it landed on disk, so a write
@@ -133,33 +156,48 @@ export class ProjectDataStorage {
         return snapshot
       }
 
-      // Compare-and-delete: only remove the source record if it is still exactly what
-      // we copied. If another instance updated it mid-migration, their newer record
-      // survives (the stale destination copy is overwritten on the session's next
-      // updateSession) - migration must never destroy data it did not copy.
+      let cleaned = false
       try {
         this.withFileLock(otherProjectId, () => {
           const source = this.load(otherProjectId)
           const currentRecord = source?.sessions?.[sessionId]
-          if (!source || !currentRecord) return
-          if (JSON.stringify(currentRecord) !== JSON.stringify(snapshot)) {
-            logger.warn(
-              `Session ${sessionId} changed in project ${otherProjectId} during migration; leaving the newer record in place`,
-            )
+          if (!source || !currentRecord) {
+            cleaned = true
             return
           }
-          delete source.sessions[sessionId]
-          this.save(otherProjectId, source)
+          if (JSON.stringify(currentRecord) === JSON.stringify(snapshot)) {
+            delete source.sessions[sessionId]
+            this.save(otherProjectId, source)
+            cleaned = true
+          }
         })
       } catch (err) {
         logger.warn(`Failed to remove session ${sessionId} from project ${otherProjectId}: ${err}`)
+        cleaned = true
       }
 
-      logger.info(`Migrated session ${sessionId} from project ${otherProjectId} to project ${projectId}`)
-      return snapshot
+      if (cleaned) {
+        logger.info(`Migrated session ${sessionId} from project ${otherProjectId} to project ${projectId}`)
+        return snapshot
+      }
+      logger.warn(
+        `Session ${sessionId} changed in project ${otherProjectId} during migration; retrying from the newer record`,
+      )
     }
 
-    return undefined
+    // The source kept changing while we copied: withdraw our stale destination copy so
+    // the newest source record cannot be shadowed, and let a later access re-migrate.
+    this.withFileLock(projectId, () => {
+      const destination = this.load(projectId)
+      if (destination?.sessions?.[sessionId]) {
+        delete destination.sessions[sessionId]
+        this.save(projectId, destination)
+      }
+    })
+    logger.warn(
+      `Migration of session ${sessionId} from project ${otherProjectId} withdrawn after repeated concurrent updates; will retry on next access`,
+    )
+    return this.load(otherProjectId)?.sessions?.[sessionId]
   }
 
   /**
