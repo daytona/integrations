@@ -18,6 +18,13 @@ export function setLogFilePath(path: string) {
   logFilePath = path
 }
 
+// Defense in depth for the durable log file: the plugin never builds credential-bearing
+// URLs or logs its GIT_SSH_COMMAND, but git/ssh error output is logged verbatim, so
+// strip anything shaped like SSH URL userinfo or an ssh `User=` option before writing.
+export function redactCredentials(message: string): string {
+  return message.replace(/(ssh:\/\/)[^@\s/]+@/g, '$1***@').replace(/(\bUser=)['"]?[^'"\s]+/g, '$1***')
+}
+
 class Logger {
   private get logFile() {
     if (!logFilePath) throw new Error('Logger file path not set. Call setLogFilePath(path) before use.')
@@ -47,7 +54,7 @@ class Logger {
       // File may not exist yet, ignore
     }
     const timestamp = new Date().toISOString()
-    const logEntry = `[${timestamp}] [${level}] ${message}\n`
+    const logEntry = `[${timestamp}] [${level}] ${redactCredentials(message)}\n`
     try {
       appendFileSync(this.logFile, logEntry)
     } catch (err) {

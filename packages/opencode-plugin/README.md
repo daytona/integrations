@@ -118,7 +118,7 @@ When a new Daytona sandbox is created:
 
 1. The plugin looks for a git repository in the local directory. If none is found, file synchronization will be disabled.
 2. A parallel repository is created in the sandbox with a single `opencode` branch, mirroring the checked out local branch.
-3. A new `sandbox` remote is added to the local repository using an SSH connection to the sandbox.
+3. A new `sandbox-N` remote is added to the local repository, pointing at the sandbox repository over SSH. The remote URL contains no credentials: each transfer creates a short-lived SSH access token, supplies it only to that git invocation as the SSH user (appended to your `GIT_SSH_COMMAND` / `core.sshCommand` if you have one), and revokes it as soon as the transfer finishes. Remotes created by earlier plugin versions are rewritten to the credential-free form automatically. When `DAYTONA_SSH_KNOWN_HOSTS` is set, the plugin controls the full SSH command for sandbox transfers so host-key pinning cannot be overridden by other SSH options.
 4. The `HEAD` of the local repository is pushed to `opencode`, and the sandbox repository is reset to match this initial state.
 5. Each sandbox is assigned a unique incrementing branch number (1, 2, 3, etc.) that persists across sessions.
 

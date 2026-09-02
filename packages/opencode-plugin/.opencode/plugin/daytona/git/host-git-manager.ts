@@ -41,30 +41,42 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
-// When DAYTONA_SSH_KNOWN_HOSTS names a known_hosts file with the ssh.app.daytona.io
-// host keys, pin host verification to it for sandbox git transfers. This lets the
-// first noninteractive sync succeed without trust-on-first-use, and without changing
-// SSH behavior for any other remote. Unset means inherited SSH behavior, as before.
+// Environment for the git invocations that talk to the sandbox gateway. The short-lived
+// access token is the SSH username; it is supplied here, to this one child process, and
+// never becomes part of the remote URL - so it is not written to .git/config, to
+// FETCH_HEAD, or to logs that print the URL.
 //
-// The value crosses two parsers. sh splits GIT_SSH_COMMAND into ssh's argv (outer
-// single quotes), then OpenSSH splits the UserKnownHostsFile VALUE on whitespace as
-// a file list (inner double quotes keep a spaced path as one file). OpenSSH's config
-// grammar has no escape for a literal double quote inside a quoted value, so such
-// paths are rejected instead of being silently mis-pinned.
-function networkEnv(): NodeJS.ProcessEnv | undefined {
+// Without DAYTONA_SSH_KNOWN_HOSTS the user's own SSH command is preserved exactly as git
+// would resolve it (GIT_SSH_COMMAND, then core.sshCommand, then ssh) with only the
+// username appended, so CI setups, alternate ssh binaries and agent wrappers keep
+// working. With it, the plugin controls the whole command: OpenSSH takes the FIRST
+// value given for an option, so pinning options appended to a user command that already
+// sets StrictHostKeyChecking would silently lose - the user's command is not used.
+//
+// Values cross two parsers. sh splits GIT_SSH_COMMAND into ssh's argv (outer single
+// quotes), then OpenSSH splits the UserKnownHostsFile VALUE on whitespace as a file
+// list (inner double quotes keep a spaced path as one file). OpenSSH's config grammar
+// has no escape for a literal double quote inside a quoted value, so such paths are
+// rejected instead of being silently mis-pinned.
+function transferEnv(token: string, cwd: string): NodeJS.ProcessEnv {
+  const user = `-o ${shellQuote(`User=${token}`)}`
   const knownHosts = process.env.DAYTONA_SSH_KNOWN_HOSTS?.trim()
-  if (!knownHosts) return undefined
+  if (!knownHosts) {
+    const base =
+      process.env.GIT_SSH_COMMAND?.trim() || execGit(['config', '--get', 'core.sshCommand'], { cwd }).stdout.trim() || 'ssh'
+    return { ...process.env, GIT_SSH_COMMAND: `${base} ${user}` }
+  }
   if (knownHosts.includes('"')) {
     throw new Error('DAYTONA_SSH_KNOWN_HOSTS must not contain a double quote (") character')
   }
-  return {
-    ...process.env,
-    // GlobalKnownHostsFile=/dev/null: otherwise a matching entry in the system-wide
-    // /etc/ssh/ssh_known_hosts would also be accepted and verification would not be
-    // pinned to the configured file alone.
-    GIT_SSH_COMMAND: `ssh -o ${shellQuote(`UserKnownHostsFile="${knownHosts}"`)} -o GlobalKnownHostsFile=/dev/null -o StrictHostKeyChecking=yes`,
-  }
+  // GlobalKnownHostsFile=/dev/null: otherwise a matching entry in the system-wide
+  // /etc/ssh/ssh_known_hosts would also be accepted and verification would not be
+  // pinned to the configured file alone.
+  const pinning = `-o ${shellQuote(`UserKnownHostsFile="${knownHosts}"`)} -o GlobalKnownHostsFile=/dev/null -o StrictHostKeyChecking=yes`
+  return { ...process.env, GIT_SSH_COMMAND: `ssh ${user} ${pinning}` }
 }
+
+const LEGACY_REMOTE_URL_PATTERN = /^remote\.(sandbox-\d+)\.url (ssh:\/\/)[^@/\s]+@(\S+)$/
 
 export class HostGitManager {
   // Per-repo serialization: one queue per git-common-dir. Linked worktrees (git worktree
@@ -254,17 +266,24 @@ export class HostGitManager {
   /**
    * Pushes local changes to the sandbox remote.
    * @param remoteName Numbered remote (e.g. sandbox-2) matching opencode/N.
-   * @param sshUrl The SSH URL of the sandbox remote.
+   * @param remoteUrl Credential-free SSH URL of the sandbox repository.
+   * @param token Short-lived access token, supplied to the git invocation only.
    * @param branch The branch to push to.
    * @param cwd Worktree path to run git in.
    * @returns true if push succeeded, false if no repo exists. Throws if the push fails.
    */
-  async pushLocalToSandboxRemote(remoteName: string, sshUrl: string, branch: string, cwd: string): Promise<boolean> {
+  async pushLocalToSandboxRemote(
+    remoteName: string,
+    remoteUrl: string,
+    token: string,
+    branch: string,
+    cwd: string,
+  ): Promise<boolean> {
     if (!this.hasRepo(cwd)) {
       logger.warn('No local git repository found. Skipping push to sandbox.')
       return false
     }
-    logger.info(`Pushing to ${remoteName} (${sshUrl}) on branch ${branch}`)
+    logger.info(`Pushing to ${remoteName} (${remoteUrl}) on branch ${branch}`)
     await HostGitManager.enqueue(cwd, async () => {
       const statusRes = execGit(['status', '--porcelain'], { cwd })
       if (!statusRes.ok) {
@@ -274,10 +293,10 @@ export class HostGitManager {
         logger.warn('Local repository has uncommitted changes; pushing HEAD only (no auto-commit).')
       }
 
-      this.setRemote(remoteName, sshUrl, cwd)
+      this.setRemote(remoteName, remoteUrl, cwd)
       let attempts = 0
       while (attempts < 3) {
-        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: networkEnv() })
+        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: transferEnv(token, cwd) })
         if (pushRes.ok) {
           logger.info(`✓ Pushed local changes to ${remoteName}`)
           return
@@ -293,18 +312,52 @@ export class HostGitManager {
     return true
   }
 
-  private setRemote(remoteName: string, sshUrl: string, cwd: string): void {
+  private setRemote(remoteName: string, remoteUrl: string, cwd: string): void {
+    this.scrubLegacyRemotes(cwd)
     // Remote may not exist yet — ignore this result. `remote add` below is the check that matters.
     execGit(['remote', 'remove', remoteName], { cwd })
-    const addRes = execGit(['remote', 'add', remoteName, sshUrl], { cwd })
+    const addRes = execGit(['remote', 'add', remoteName, remoteUrl], { cwd })
     if (!addRes.ok) {
       throw new Error(`Failed to configure sandbox remote '${remoteName}': ${addRes.stderr}`)
     }
   }
 
-  async pull(remoteName: string, sshUrl: string, branch: string, cwd: string, localBranch?: string): Promise<void> {
+  private static scrubbedRepos = new Set<string>()
+
+  /**
+   * Earlier plugin versions stored the access token as the username of every sandbox-N
+   * remote URL. Rewrite any such remote in this repo to the credential-free form, once
+   * per repo per process.
+   */
+  private scrubLegacyRemotes(cwd: string): void {
+    const key = HostGitManager.queueKeyFor(cwd)
+    if (HostGitManager.scrubbedRepos.has(key)) return
+    HostGitManager.scrubbedRepos.add(key)
+    const res = execGit(['config', '--get-regexp', '^remote\\.sandbox-[0-9]+\\.url$'], { cwd })
+    if (!res.ok) return
+    for (const line of res.stdout.split('\n')) {
+      const match = LEGACY_REMOTE_URL_PATTERN.exec(line.trim())
+      if (!match) continue
+      const [, name, scheme, rest] = match
+      const setRes = execGit(['remote', 'set-url', name, `${scheme}${rest}`], { cwd })
+      if (setRes.ok) {
+        logger.info(`Rewrote remote '${name}' to a credential-free URL`)
+      } else {
+        logger.warn(`Failed to rewrite remote '${name}': ${setRes.stderr}`)
+      }
+    }
+  }
+
+  async pull(
+    remoteName: string,
+    remoteUrl: string,
+    token: string,
+    branch: string,
+    cwd: string,
+    localBranch?: string,
+  ): Promise<void> {
     await HostGitManager.enqueue(cwd, async () => {
-      this.setRemote(remoteName, sshUrl, cwd)
+      this.setRemote(remoteName, remoteUrl, cwd)
       let attempts = 0
       let lastError: unknown = undefined
       // The first pull attempt sometimes fails. I'm not sure what the cause is.
@@ -313,7 +366,7 @@ export class HostGitManager {
           if (localBranch) {
             // Fetch into FETCH_HEAD only (never into refs/heads) so we don't hit
             // "refusing to fetch into branch checked out" when this branch is checked out.
-            const fetchRes = execGit(['fetch', remoteName, branch], { cwd, env: networkEnv() })
+            const fetchRes = execGit(['fetch', remoteName, branch], { cwd, env: transferEnv(token, cwd) })
             if (!fetchRes.ok) throw new Error(fetchRes.stderr)
 
             const updateRefRes = execGit(['update-ref', `refs/heads/${localBranch}`, 'FETCH_HEAD'], { cwd })
@@ -329,7 +382,7 @@ export class HostGitManager {
 
             logger.info(`✓ Force pulled latest changes from sandbox into ${localBranch}`)
           } else {
-            const pullRes = execGit(['pull', remoteName, branch], { cwd, env: networkEnv() })
+            const pullRes = execGit(['pull', remoteName, branch], { cwd, env: transferEnv(token, cwd) })
             if (!pullRes.ok) throw new Error(pullRes.stderr)
             logger.info('✓ Pulled latest changes from sandbox')
           }
@@ -347,26 +400,6 @@ export class HostGitManager {
 
       // If we got here, all attempts failed.
       throw lastError ?? new Error('Pull failed after 3 attempts')
-    })
-  }
-
-  async push(remoteName: string, sshUrl: string, branch: string, cwd: string): Promise<void> {
-    await HostGitManager.enqueue(cwd, async () => {
-      this.setRemote(remoteName, sshUrl, cwd)
-      let attempts = 0
-      while (attempts < 3) {
-        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: networkEnv() })
-        if (pushRes.ok) {
-          logger.info('✓ Pushed changes to sandbox')
-          return
-        }
-        attempts++
-        if (attempts >= 3) {
-          logger.error(`Error pushing to sandbox after 3 attempts: ${pushRes.stderr}`)
-          throw new Error(pushRes.stderr)
-        }
-        logger.warn(`Push attempt ${attempts} failed, retrying...`)
-      }
     })
   }
 }
