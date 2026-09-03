@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.192.1](https://github.com/daytona/integrations/compare/opencode-plugin-v0.192.0...opencode-plugin-v0.192.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **opencode-plugin:** keep SSH access tokens out of git config and logs ([#56](https://github.com/daytona/integrations/issues/56)) ([017da24](https://github.com/daytona/integrations/commit/017da247bced37d062bd9a6f728fcb26c7d1fdaf))
+* **opencode-plugin:** persist per-session git-return state and worktree ([#54](https://github.com/daytona/integrations/issues/54)) ([0cad0ca](https://github.com/daytona/integrations/commit/0cad0cac24aedfd6428d3bf2f31235c88d81c763))
+
 ## [0.192.0](https://github.com/daytona/integrations/compare/opencode-plugin-v0.191.0...opencode-plugin-v0.192.0) (2026-08-14)
 
 
