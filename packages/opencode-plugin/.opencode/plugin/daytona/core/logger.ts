@@ -7,7 +7,7 @@
  * Logger class for handling plugin logging
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { dirname } from 'path'
 import type { LogLevel } from './types'
 import { LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN } from './types'
@@ -23,17 +23,26 @@ export function setLogFilePath(path: string) {
 // rotation only trims by size, so those lines would otherwise persist indefinitely.
 // Rewrite the file once in place with the same redaction applied to new entries.
 function sanitizeExistingLog(path: string): void {
+  let tmpPath: string | undefined
   try {
     if (!existsSync(path)) return
     const current = readFileSync(path, 'utf8')
     const cleaned = redactCredentials(current)
-    if (cleaned !== current) {
-      const tmpPath = `${path}.${process.pid}.tmp`
-      writeFileSync(tmpPath, cleaned)
+    if (cleaned === current) return
+    tmpPath = `${path}.${process.pid}.tmp`
+    writeFileSync(tmpPath, cleaned)
+    // rename replaces an existing target on every platform Node supports; the one case
+    // it cannot handle (Windows, target held open by another process) falls through to
+    // the in-place overwrite below rather than leaving the credentials in the file.
+    try {
       renameSync(tmpPath, path)
+    } catch {
+      writeFileSync(path, cleaned)
+      rmSync(tmpPath, { force: true })
     }
   } catch {
     // Best effort: a sanitize failure must never prevent the plugin from loading.
+    if (tmpPath) rmSync(tmpPath, { force: true })
   }
 }
 

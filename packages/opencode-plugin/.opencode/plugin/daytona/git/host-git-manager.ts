@@ -83,7 +83,10 @@ function transferEnv(token: string): NodeJS.ProcessEnv {
       'StrictHostKeyChecking=yes',
     )
   }
-  return { ...process.env, GIT_SSH_COMMAND: parts.join(' ') }
+  // GIT_SSH_VARIANT=ssh: git otherwise applies the user's ssh.variant to OUR command -
+  // `tortoiseplink` appends -batch and `simple` drops every -o option, so the token would
+  // never reach ssh. The env var outranks the config setting for this invocation only.
+  return { ...process.env, GIT_SSH_COMMAND: parts.join(' '), GIT_SSH_VARIANT: 'ssh' }
 }
 
 const LEGACY_REMOTE_URL_PATTERN = /^remote\.(sandbox-\d+)\.url (ssh:\/\/)[^@/\s]+@(\S+)$/
