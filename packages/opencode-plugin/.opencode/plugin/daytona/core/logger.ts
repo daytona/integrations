@@ -23,13 +23,12 @@ export function setLogFilePath(path: string) {
 // rotation only trims by size, so those lines would otherwise persist indefinitely.
 // Rewrite the file once in place with the same redaction applied to new entries.
 function sanitizeExistingLog(path: string): void {
-  let tmpPath: string | undefined
+  const tmpPath = `${path}.${process.pid}.tmp`
   try {
     if (!existsSync(path)) return
     const current = readFileSync(path, 'utf8')
     const cleaned = redactCredentials(current)
     if (cleaned === current) return
-    tmpPath = `${path}.${process.pid}.tmp`
     writeFileSync(tmpPath, cleaned)
     // rename replaces an existing target on every platform Node supports; the one case
     // it cannot handle (Windows, target held open by another process) falls through to
@@ -38,11 +37,14 @@ function sanitizeExistingLog(path: string): void {
       renameSync(tmpPath, path)
     } catch {
       writeFileSync(path, cleaned)
-      rmSync(tmpPath, { force: true })
     }
   } catch {
     // Best effort: a sanitize failure must never prevent the plugin from loading.
-    if (tmpPath) rmSync(tmpPath, { force: true })
+  } finally {
+    // { force: true } only ignores a missing file; any other failure must stay contained.
+    try {
+      rmSync(tmpPath, { force: true })
+    } catch {}
   }
 }
 
