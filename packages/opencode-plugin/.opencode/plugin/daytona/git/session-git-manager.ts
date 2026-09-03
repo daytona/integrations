@@ -121,12 +121,27 @@ export class SessionGitManager {
     try {
       return await fn({ url: `ssh://${SSH_GATEWAY_HOST}${this.repoPath}`, token: sshAccess.token })
     } finally {
+      await this.revokeWithRetry(sshAccess.token)
+    }
+  }
+
+  // Revocation shortens the exposure window; the token still expires on its own, so a
+  // revocation that keeps failing is logged loudly rather than failing a sync whose
+  // git work already completed.
+  private async revokeWithRetry(token: string): Promise<void> {
+    let lastError: unknown
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        await this.sandbox.revokeSshAccess(sshAccess.token)
+        await this.sandbox.revokeSshAccess(token)
+        return
       } catch (err) {
-        logger.warn(`Failed to revoke SSH access token for sandbox ${this.sandbox.id}: ${err}`)
+        lastError = err
+        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
       }
     }
+    logger.error(
+      `Failed to revoke SSH access token for sandbox ${this.sandbox.id} after 3 attempts; it remains valid until its 10-minute expiry: ${lastError}`,
+    )
   }
 
   hasLocalRepo(): boolean {

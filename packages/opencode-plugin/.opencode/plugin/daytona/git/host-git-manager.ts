@@ -46,34 +46,44 @@ function shellQuote(value: string): string {
 // never becomes part of the remote URL - so it is not written to .git/config, to
 // FETCH_HEAD, or to logs that print the URL.
 //
-// Without DAYTONA_SSH_KNOWN_HOSTS the user's own SSH command is preserved exactly as git
-// would resolve it (GIT_SSH_COMMAND, then core.sshCommand, then ssh) with only the
-// username appended, so CI setups, alternate ssh binaries and agent wrappers keep
-// working. With it, the plugin controls the whole command: OpenSSH takes the FIRST
-// value given for an option, so pinning options appended to a user command that already
-// sets StrictHostKeyChecking would silently lose - the user's command is not used.
+// The plugin owns this command completely. OpenSSH honors the FIRST value it sees for an
+// option, so appending `User`/pinning options to a user-supplied GIT_SSH_COMMAND would
+// silently lose to whatever that command already sets (a `-l git` there would make the
+// transfer authenticate as `git`, not as the token). GIT_SSH, core.sshCommand and
+// ssh.variant are likewise not consulted: they exist for the user's other remotes and
+// stay in effect for them. The one legitimate need - a non-default OpenSSH binary - is
+// DAYTONA_SSH_BINARY, an absolute path with no arguments, which keeps the option set
+// under plugin control.
 //
 // Values cross two parsers. sh splits GIT_SSH_COMMAND into ssh's argv (outer single
 // quotes), then OpenSSH splits the UserKnownHostsFile VALUE on whitespace as a file
 // list (inner double quotes keep a spaced path as one file). OpenSSH's config grammar
 // has no escape for a literal double quote inside a quoted value, so such paths are
 // rejected instead of being silently mis-pinned.
-function transferEnv(token: string, cwd: string): NodeJS.ProcessEnv {
-  const user = `-o ${shellQuote(`User=${token}`)}`
+function transferEnv(token: string): NodeJS.ProcessEnv {
+  const binary = process.env.DAYTONA_SSH_BINARY?.trim() || 'ssh'
+  if (binary !== 'ssh' && !isAbsolute(binary)) {
+    throw new Error('DAYTONA_SSH_BINARY must be an absolute path to an OpenSSH client binary')
+  }
+  const parts = [binary === 'ssh' ? 'ssh' : shellQuote(binary), '-o', shellQuote(`User=${token}`)]
   const knownHosts = process.env.DAYTONA_SSH_KNOWN_HOSTS?.trim()
-  if (!knownHosts) {
-    const base =
-      process.env.GIT_SSH_COMMAND?.trim() || execGit(['config', '--get', 'core.sshCommand'], { cwd }).stdout.trim() || 'ssh'
-    return { ...process.env, GIT_SSH_COMMAND: `${base} ${user}` }
+  if (knownHosts) {
+    if (knownHosts.includes('"')) {
+      throw new Error('DAYTONA_SSH_KNOWN_HOSTS must not contain a double quote (") character')
+    }
+    // GlobalKnownHostsFile=/dev/null: otherwise a matching entry in the system-wide
+    // /etc/ssh/ssh_known_hosts would also be accepted and verification would not be
+    // pinned to the configured file alone.
+    parts.push(
+      '-o',
+      shellQuote(`UserKnownHostsFile="${knownHosts}"`),
+      '-o',
+      'GlobalKnownHostsFile=/dev/null',
+      '-o',
+      'StrictHostKeyChecking=yes',
+    )
   }
-  if (knownHosts.includes('"')) {
-    throw new Error('DAYTONA_SSH_KNOWN_HOSTS must not contain a double quote (") character')
-  }
-  // GlobalKnownHostsFile=/dev/null: otherwise a matching entry in the system-wide
-  // /etc/ssh/ssh_known_hosts would also be accepted and verification would not be
-  // pinned to the configured file alone.
-  const pinning = `-o ${shellQuote(`UserKnownHostsFile="${knownHosts}"`)} -o GlobalKnownHostsFile=/dev/null -o StrictHostKeyChecking=yes`
-  return { ...process.env, GIT_SSH_COMMAND: `ssh ${user} ${pinning}` }
+  return { ...process.env, GIT_SSH_COMMAND: parts.join(' ') }
 }
 
 const LEGACY_REMOTE_URL_PATTERN = /^remote\.(sandbox-\d+)\.url (ssh:\/\/)[^@/\s]+@(\S+)$/
@@ -296,7 +306,7 @@ export class HostGitManager {
       this.setRemote(remoteName, remoteUrl, cwd)
       let attempts = 0
       while (attempts < 3) {
-        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: transferEnv(token, cwd) })
+        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: transferEnv(token) })
         if (pushRes.ok) {
           logger.info(`✓ Pushed local changes to ${remoteName}`)
           return
@@ -326,15 +336,18 @@ export class HostGitManager {
 
   /**
    * Earlier plugin versions stored the access token as the username of every sandbox-N
-   * remote URL. Rewrite any such remote in this repo to the credential-free form, once
-   * per repo per process.
+   * remote URL. Rewrite any such remote in this repo to the credential-free form. A repo
+   * is marked done only after a successful scan and every rewrite succeeded, so a
+   * transient failure is retried on the next transfer instead of being suppressed.
    */
   private scrubLegacyRemotes(cwd: string): void {
     const key = HostGitManager.queueKeyFor(cwd)
     if (HostGitManager.scrubbedRepos.has(key)) return
-    HostGitManager.scrubbedRepos.add(key)
     const res = execGit(['config', '--get-regexp', '^remote\\.sandbox-[0-9]+\\.url$'], { cwd })
-    if (!res.ok) return
+    // `git config --get-regexp` exits 1 when nothing matches: a successful, empty scan.
+    // Any other failure leaves the repo unmarked so the scan is retried next transfer.
+    if (!res.ok && res.status !== 1) return
+    let allRewritten = true
     for (const line of res.stdout.split('\n')) {
       const match = LEGACY_REMOTE_URL_PATTERN.exec(line.trim())
       if (!match) continue
@@ -343,9 +356,11 @@ export class HostGitManager {
       if (setRes.ok) {
         logger.info(`Rewrote remote '${name}' to a credential-free URL`)
       } else {
+        allRewritten = false
         logger.warn(`Failed to rewrite remote '${name}': ${setRes.stderr}`)
       }
     }
+    if (allRewritten) HostGitManager.scrubbedRepos.add(key)
   }
 
   async pull(
@@ -366,7 +381,7 @@ export class HostGitManager {
           if (localBranch) {
             // Fetch into FETCH_HEAD only (never into refs/heads) so we don't hit
             // "refusing to fetch into branch checked out" when this branch is checked out.
-            const fetchRes = execGit(['fetch', remoteName, branch], { cwd, env: transferEnv(token, cwd) })
+            const fetchRes = execGit(['fetch', remoteName, branch], { cwd, env: transferEnv(token) })
             if (!fetchRes.ok) throw new Error(fetchRes.stderr)
 
             const updateRefRes = execGit(['update-ref', `refs/heads/${localBranch}`, 'FETCH_HEAD'], { cwd })
@@ -382,7 +397,7 @@ export class HostGitManager {
 
             logger.info(`✓ Force pulled latest changes from sandbox into ${localBranch}`)
           } else {
-            const pullRes = execGit(['pull', remoteName, branch], { cwd, env: transferEnv(token, cwd) })
+            const pullRes = execGit(['pull', remoteName, branch], { cwd, env: transferEnv(token) })
             if (!pullRes.ok) throw new Error(pullRes.stderr)
             logger.info('✓ Pulled latest changes from sandbox')
           }

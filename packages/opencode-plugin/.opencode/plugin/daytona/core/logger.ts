@@ -7,7 +7,7 @@
  * Logger class for handling plugin logging
  */
 
-import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { dirname } from 'path'
 import type { LogLevel } from './types'
 import { LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN } from './types'
@@ -16,6 +16,25 @@ let logFilePath: string | undefined
 
 export function setLogFilePath(path: string) {
   logFilePath = path
+  sanitizeExistingLog(path)
+}
+
+// Earlier plugin versions wrote credential-bearing sandbox URLs to this file, and log
+// rotation only trims by size, so those lines would otherwise persist indefinitely.
+// Rewrite the file once in place with the same redaction applied to new entries.
+function sanitizeExistingLog(path: string): void {
+  try {
+    if (!existsSync(path)) return
+    const current = readFileSync(path, 'utf8')
+    const cleaned = redactCredentials(current)
+    if (cleaned !== current) {
+      const tmpPath = `${path}.${process.pid}.tmp`
+      writeFileSync(tmpPath, cleaned)
+      renameSync(tmpPath, path)
+    }
+  } catch {
+    // Best effort: a sanitize failure must never prevent the plugin from loading.
+  }
 }
 
 // Defense in depth for the durable log file: the plugin never builds credential-bearing
