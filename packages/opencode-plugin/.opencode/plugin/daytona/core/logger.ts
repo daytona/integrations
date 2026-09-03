@@ -7,7 +7,7 @@
  * Logger class for handling plugin logging
  */
 
-import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { dirname } from 'path'
 import type { LogLevel } from './types'
 import { LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN } from './types'
@@ -16,6 +16,43 @@ let logFilePath: string | undefined
 
 export function setLogFilePath(path: string) {
   logFilePath = path
+  sanitizeExistingLog(path)
+}
+
+// Earlier plugin versions wrote credential-bearing sandbox URLs to this file, and log
+// rotation only trims by size, so those lines would otherwise persist indefinitely.
+// Rewrite the file once in place with the same redaction applied to new entries.
+function sanitizeExistingLog(path: string): void {
+  const tmpPath = `${path}.${process.pid}.tmp`
+  try {
+    if (!existsSync(path)) return
+    const current = readFileSync(path, 'utf8')
+    const cleaned = redactCredentials(current)
+    if (cleaned === current) return
+    writeFileSync(tmpPath, cleaned)
+    // rename replaces an existing target on every platform Node supports; the one case
+    // it cannot handle (Windows, target held open by another process) falls through to
+    // the in-place overwrite below rather than leaving the credentials in the file.
+    try {
+      renameSync(tmpPath, path)
+    } catch {
+      writeFileSync(path, cleaned)
+    }
+  } catch {
+    // Best effort: a sanitize failure must never prevent the plugin from loading.
+  } finally {
+    // { force: true } only ignores a missing file; any other failure must stay contained.
+    try {
+      rmSync(tmpPath, { force: true })
+    } catch {}
+  }
+}
+
+// Defense in depth for the durable log file: the plugin never builds credential-bearing
+// URLs or logs its GIT_SSH_COMMAND, but git/ssh error output is logged verbatim, so
+// strip anything shaped like SSH URL userinfo or an ssh `User=` option before writing.
+export function redactCredentials(message: string): string {
+  return message.replace(/(ssh:\/\/)[^@\s/]+@/g, '$1***@').replace(/(\bUser=)['"]?[^'"\s]+/g, '$1***')
 }
 
 class Logger {
@@ -47,7 +84,7 @@ class Logger {
       // File may not exist yet, ignore
     }
     const timestamp = new Date().toISOString()
-    const logEntry = `[${timestamp}] [${level}] ${message}\n`
+    const logEntry = `[${timestamp}] [${level}] ${redactCredentials(message)}\n`
     try {
       appendFileSync(this.logFile, logEntry)
     } catch (err) {

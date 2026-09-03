@@ -10,6 +10,8 @@ import { DaytonaSandboxGitManager } from './sandbox-git-manager'
 import { HostGitManager } from './host-git-manager'
 import type { PluginInput } from '@opencode-ai/plugin'
 
+export const SSH_GATEWAY_HOST = 'ssh.app.daytona.io'
+
 /**
  * SessionGitManager: Combines DaytonaSandboxGitManager and HostGitManager for session lifecycle git operations.
  */
@@ -108,9 +110,38 @@ export class SessionGitManager {
     return true
   }
 
-  private async getSshUrl(): Promise<string> {
+  /**
+   * Run one git transfer with a short-lived SSH access token that exists only for the
+   * duration of `fn`: created immediately before, revoked in `finally` (success or
+   * failure) instead of living out its expiry. The token is handed to `fn` separately
+   * from the URL so it is never embedded in anything git persists.
+   */
+  private async withSshAccess<T>(fn: (access: { url: string; token: string }) => Promise<T>): Promise<T> {
     const sshAccess = await this.sandbox.createSshAccess(10)
-    return `ssh://${sshAccess.token}@ssh.app.daytona.io${this.repoPath}`
+    try {
+      return await fn({ url: `ssh://${SSH_GATEWAY_HOST}${this.repoPath}`, token: sshAccess.token })
+    } finally {
+      await this.revokeWithRetry(sshAccess.token)
+    }
+  }
+
+  // Revocation shortens the exposure window; the token still expires on its own, so a
+  // revocation that keeps failing is logged loudly rather than failing a sync whose
+  // git work already completed.
+  private async revokeWithRetry(token: string): Promise<void> {
+    let lastError: unknown
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await this.sandbox.revokeSshAccess(token)
+        return
+      } catch (err) {
+        lastError = err
+        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
+      }
+    }
+    logger.error(
+      `Failed to revoke SSH access token for sandbox ${this.sandbox.id} after 3 attempts; it remains valid until its 10-minute expiry: ${lastError}`,
+    )
   }
 
   hasLocalRepo(): boolean {
@@ -144,8 +175,9 @@ export class SessionGitManager {
       }
 
       await this.sandboxGit.ensureRepo()
-      const sshUrl = await this.getSshUrl()
-      const pushed = await this.hostGit.pushLocalToSandboxRemote(this.remoteName, sshUrl, this.branch, this.worktree)
+      const pushed = await this.withSshAccess(({ url, token }) =>
+        this.hostGit.pushLocalToSandboxRemote(this.remoteName, url, token, this.branch, this.worktree),
+      )
       if (pushed) {
         await this.sandboxGit.resetToRemote(this.branch)
       }
@@ -191,12 +223,12 @@ export class SessionGitManager {
         return false
       }
 
-      const sshUrl = await this.getSshUrl()
-
       // Pull the branch the sandbox actually committed to, which may differ from the
       // initial 'opencode' branch, so commits are never left unsynced.
       const sandboxBranch = await this.sandboxGit.getCurrentBranch()
-      await this.hostGit.pull(this.remoteName, sshUrl, sandboxBranch, this.worktree, this.localBranch)
+      await this.withSshAccess(({ url, token }) =>
+        this.hostGit.pull(this.remoteName, url, token, sandboxBranch, this.worktree, this.localBranch),
+      )
       toast.show({
         title: 'Changes synced',
         message: `Changes have been synced to ${this.localBranch} in your local repository`,
