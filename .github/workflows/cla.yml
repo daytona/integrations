@@ -45,7 +45,9 @@ jobs:
            (github.event.comment.body == 'recheck' ||
             github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')) ||
           (github.event_name == 'pull_request_target' &&
-           (github.event.action != 'closed' || github.event.pull_request.merged == true)) ||
+           (github.event.action != 'closed' ||
+            (github.event.pull_request.merged == true &&
+             github.event.pull_request.user.login != 'github-actions[bot]'))) ||
           (github.event_name == 'pull_request' &&
            github.event.pull_request.head.repo.full_name == github.repository &&
            github.event.pull_request.user.login == 'github-actions[bot]')
@@ -67,7 +69,11 @@ jobs:
           # (e.g. "bottle") and bypass the CLA gate.
           allowlist: 'dependabot[bot],renovate[bot],github-actions[bot]'
           # Lock the PR conversation after merge so a signature comment can't be
-          # deleted/revoked after the fact.
+          # deleted/revoked after the fact. Not applied to release-please's PRs
+          # (authored by github-actions[bot]; the merge-close path above skips
+          # them): they carry no signature, and the lock lands seconds before
+          # release-please posts its own post-merge comment and relabel, which
+          # then fails with "issue is locked" after the tag and release exist.
           lock-pullrequest-aftermerge: true
           custom-notsigned-prcomment: >-
             Thank you for your contribution! Before we can merge it, we need you
