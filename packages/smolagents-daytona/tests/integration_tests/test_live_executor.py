@@ -132,22 +132,18 @@ class TestLiveExecution:
 
 class TestLiveEntryPointDiscovery:
     def test_code_agent_runs_code_in_daytona_through_entry_point(self):
-        """End-to-end: entry-point discovery, real sandbox, final answer, cleanup."""
+        """End-to-end: entry-point discovery, real sandbox, final answer, cleanup.
+
+        Uses the agent as a context manager, the exact usage documented in the
+        README: `CodeAgent.__exit__` calls `cleanup()`, which releases the sandbox.
+        """
         from unittest.mock import MagicMock
 
         from smolagents import CodeAgent
 
-        agent = CodeAgent(
-            tools=[],
-            model=MagicMock(),
-            executor_type="daytona",
-            executor_kwargs={},
-        )
-        try:
+        with CodeAgent(tools=[], model=MagicMock(), executor_type="daytona") as agent:
             assert isinstance(agent.python_executor, DaytonaExecutor)
             agent.python_executor.send_tools({"final_answer": FinalAnswerTool()})
             code_output = agent.python_executor('final_answer(f"result: {6 * 7}")')
             assert code_output.is_final_answer is True
             assert code_output.output == "result: 42"
-        finally:
-            agent.cleanup()
