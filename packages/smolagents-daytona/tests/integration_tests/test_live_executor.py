@@ -46,6 +46,29 @@ class TestLiveExecution:
         code_output = executor("import emoji; print(emoji.emojize(':thumbs_up:'))")
         assert code_output.logs.strip()
 
+    def test_user_site_precedes_system_site_packages(self, executor):
+        """Agent-requested package versions must shadow preinstalled copies.
+
+        Mirrors interpreter-startup ordering: `site.py` places user site before
+        system site-packages, so a version installed at executor startup wins over
+        one baked into the sandbox image.
+        """
+        code_output = executor(
+            dedent("""
+                import site
+                import sys
+
+                user_site = site.getusersitepackages()
+                assert user_site in sys.path, sys.path
+                system_sites = [p for p in site.getsitepackages() if p in sys.path]
+                if system_sites:
+                    first_system = min(sys.path.index(p) for p in system_sites)
+                    assert sys.path.index(user_site) < first_system, sys.path
+                print("ordering ok")
+            """)
+        )
+        assert "ordering ok" in code_output.logs
+
     def test_final_answer(self, executor):
         executor.send_tools({"final_answer": FinalAnswerTool()})
         code_output = executor('final_answer("This is the final answer")')

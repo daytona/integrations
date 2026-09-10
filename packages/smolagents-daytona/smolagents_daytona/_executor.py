@@ -77,7 +77,9 @@ class DaytonaExecutor(RemotePythonExecutor):
         pip itself already does the right thing in every environment (virtualenv,
         writable, and non-writable system Python alike); the only gap is user-site
         visibility in the running process, which this override repairs after the
-        install.
+        install. The user-site directory is inserted before system site-packages,
+        mirroring interpreter-startup ordering (``site.py`` does the same), so
+        versions installed for the agent shadow copies preinstalled in the image.
 
         Proposed upstream as the base-class default behavior
         (huggingface/smolagents#2724); this override disappears once that lands.
@@ -107,7 +109,11 @@ class DaytonaExecutor(RemotePythonExecutor):
 
                 user_site = site.getusersitepackages()
                 if os.path.isdir(user_site) and user_site not in sys.path:
-                    sys.path.append(user_site)
+                    # Insert before system site-packages, mirroring site.py startup
+                    # ordering, so agent-requested versions shadow preinstalled ones.
+                    system_sites = set(getattr(site, "getsitepackages", lambda: [])())
+                    indices = [index for index, path in enumerate(sys.path) if path in system_sites]
+                    sys.path.insert(min(indices) if indices else len(sys.path), user_site)
                 importlib.invalidate_caches()
                 """
             )

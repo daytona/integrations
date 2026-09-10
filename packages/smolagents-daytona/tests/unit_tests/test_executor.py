@@ -187,6 +187,11 @@ class TestSmolagentsContract:
         sent_code = executor.run_code_raise_errors.call_args.args[0]
         assert "sys.executable" in sent_code
         assert "site.getusersitepackages()" in sent_code
+        # User site must be inserted before system site-packages (mirroring site.py
+        # startup ordering), not appended, so requested versions shadow preinstalled.
+        assert "sys.path.insert" in sent_code
+        assert "getsitepackages" in sent_code
+        assert "sys.path.append" not in sent_code
         assert "importlib.invalidate_caches()" in sent_code
         assert "!pip" not in sent_code
 
