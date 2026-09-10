@@ -8,5 +8,6 @@
   "packages/agentenv-daytona": "0.1.0",
   "packages/convex": "2.2.0",
   "packages/claude-toolsets/typescript": "1.0.0",
-  "packages/claude-toolsets/python": "0.1.1"
+  "packages/claude-toolsets/python": "0.1.1",
+  "packages/smolagents-daytona": "0.1.0"
 }

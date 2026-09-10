@@ -52,6 +52,11 @@
       "release-type": "python",
       "package-name": "daytona-claude-toolsets",
       "component": "daytona-claude-toolsets"
+    },
+    "packages/smolagents-daytona": {
+      "release-type": "python",
+      "package-name": "smolagents-daytona",
+      "component": "smolagents-daytona"
     }
   }
 }
