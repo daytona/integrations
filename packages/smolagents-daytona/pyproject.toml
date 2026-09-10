@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smolagents-daytona"
+version = "0.1.0"
+description = "Daytona sandbox code executor for smolagents CodeAgents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Daytona Platforms Inc.", email = "support@daytona.io"}
+]
+keywords = ["smolagents", "daytona", "sandbox", "executor", "agent", "code-execution"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Floor: the public executor contract (entry-point discovery, top-level
+    # `CodeOutput`/`RemotePythonExecutor`, `FINAL_ANSWER_EXCEPTION_BASE`,
+    # `deserialize_final_answer`, plain-Python `install_packages` default)
+    # ships in this release. See huggingface/smolagents#2722 and #2724.
+    "smolagents>=1.27.0",
+    # Floor: `Sandbox.code_interpreter` (stateful contexts via `create_context`
+    # and `run_code`) verified against this release line.
+    "daytona>=0.211.0,<0.212.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.15,<0.17",
+    "mypy>=1.0.0",
+]
+
+# Registers the executor with smolagents: installing this package makes
+# `CodeAgent(executor_type="daytona")` work with no further configuration.
+[project.entry-points."smolagents.executors"]
+daytona = "smolagents_daytona:DaytonaExecutor"
+
+[project.urls]
+Homepage = "https://github.com/daytona/integrations/tree/main/packages/smolagents-daytona#readme"
+Repository = "https://github.com/daytona/integrations"
+Documentation = "https://github.com/daytona/integrations/tree/main/packages/smolagents-daytona#readme"
+Issues = "https://github.com/daytona/integrations/issues"
+
+[tool.setuptools]
+packages = ["smolagents_daytona"]
+
+[tool.setuptools.package-data]
+smolagents_daytona = ["py.typed"]
+
+[tool.pytest.ini_options]
+# Unit tests only by default; live tests live in tests/integration_tests and are
+# invoked explicitly (see .github/workflows/integration.yml).
+testpaths = ["tests/unit_tests"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+# Select rules explicitly: ruff's *default* set is not a stable contract (0.16.0
+# widened it from E4/E7/E9/F to also include I, UP, B, BLE, S, ... ), so relying
+# on it lets a ruff release turn a green package red without a code change.
+# This is the set this package was written and verified against.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+# smolagents ships no `py.typed` marker, so mypy cannot follow its imports.
+# Remove once upstream marks the package as typed.
+[[tool.mypy.overrides]]
+module = "smolagents.*"
+ignore_missing_imports = true

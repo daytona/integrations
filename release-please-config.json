@@ -32,6 +32,11 @@
       "release-type": "python",
       "package-name": "pydantic-ai-daytona",
       "component": "pydantic-ai-daytona"
+    },
+    "packages/smolagents-daytona": {
+      "release-type": "python",
+      "package-name": "smolagents-daytona",
+      "component": "smolagents-daytona"
     }
   }
 }

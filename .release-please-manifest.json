@@ -4,5 +4,6 @@
   "packages/n8n-nodes-daytona": "0.1.3",
   "packages/pi-extension": "0.191.0",
   "packages/opencode-plugin": "0.192.1",
-  "packages/pydantic-ai-daytona": "0.1.0"
+  "packages/pydantic-ai-daytona": "0.1.0",
+  "packages/smolagents-daytona": "0.1.0"
 }
