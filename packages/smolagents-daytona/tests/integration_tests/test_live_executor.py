@@ -22,9 +22,11 @@ def make_logger() -> AgentLogger:
 
 # One sandbox is shared across this module's tests to keep the suite fast and cheap;
 # `additional_imports` exercises the plain-Python `install_packages` default live.
+# `emoji` is pure-Python with no dependencies and is not preinstalled in sandbox
+# base images (unlike numpy, which may be), so its import proves the install ran.
 @pytest.fixture(scope="module")
 def executor():
-    executor = DaytonaExecutor(additional_imports=["numpy"], logger=make_logger())
+    executor = DaytonaExecutor(additional_imports=["numpy", "emoji"], logger=make_logger())
     yield executor
     executor.cleanup()
 
@@ -39,8 +41,9 @@ class TestLiveExecution:
         code_output = executor("print(np.sqrt(a))")
         assert "1.41421" in code_output.logs
 
-    def test_installed_package_is_importable(self, executor):
-        code_output = executor("import numpy; print(numpy.__version__)")
+    def test_additional_imports_are_installed(self, executor):
+        assert executor.installed_packages == ["numpy", "emoji"]
+        code_output = executor("import emoji; print(emoji.emojize(':thumbs_up:'))")
         assert code_output.logs.strip()
 
     def test_final_answer(self, executor):

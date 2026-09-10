@@ -168,19 +168,36 @@ class TestSmolagentsContract:
         sent_code = executor.run_code_raise_errors.call_args.args[0]
         assert "class FinalAnswerException(Exception):" in sent_code
 
-    def test_base_install_packages_sends_plain_python(self):
-        """The inherited default must not rely on IPython `!pip` shell syntax."""
+    def test_install_packages_repairs_user_site_visibility(self):
+        """Packages must be importable by the live interpreter, not just pip-installed.
+
+        Daytona sandboxes have a non-writable system site-packages: pip silently
+        falls back to a user-site install (exit code 0), and the long-running
+        interpreter does not have that directory on its `sys.path`. The override
+        runs a plain pip install and then exposes user-site to the live context.
+        """
         executor, _, _, _ = make_executor()
         executor.run_code_raise_errors = MagicMock(
             return_value=CodeOutput(output=None, logs="installed", is_final_answer=False)
         )
 
-        installed = executor.install_packages(["numpy"])
+        installed = executor.install_packages(["numpy", "emoji"])
 
-        assert installed == ["numpy"]
+        assert installed == ["numpy", "emoji"]
         sent_code = executor.run_code_raise_errors.call_args.args[0]
         assert "sys.executable" in sent_code
+        assert "site.getusersitepackages()" in sent_code
+        assert "importlib.invalidate_caches()" in sent_code
         assert "!pip" not in sent_code
+
+    def test_install_packages_propagates_agent_error(self):
+        executor, _, _, _ = make_executor()
+        executor.run_code_raise_errors = MagicMock(
+            side_effect=AgentError("installation failed", executor.logger)
+        )
+
+        with pytest.raises(AgentError, match="installation failed"):
+            executor.install_packages(["numpy"])
 
     def test_entry_point_resolves_to_executor(self):
         """The installed distribution must register the `daytona` executor type."""
