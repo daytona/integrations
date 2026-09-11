@@ -168,13 +168,15 @@ class TestSmolagentsContract:
         sent_code = executor.run_code_raise_errors.call_args.args[0]
         assert "class FinalAnswerException(Exception):" in sent_code
 
-    def test_install_packages_repairs_user_site_visibility(self):
-        """Packages must be importable by the live interpreter, not just pip-installed.
+    def test_inherited_install_packages_repairs_user_site_visibility(self):
+        """The inherited smolagents default must keep user-site packages importable.
 
         Daytona sandboxes have a non-writable system site-packages: pip silently
         falls back to a user-site install (exit code 0), and the long-running
-        interpreter does not have that directory on its `sys.path`. The override
-        runs a plain pip install and then exposes user-site to the live context.
+        interpreter does not have that directory on its `sys.path`. The base-class
+        default (contributed from this package, huggingface/smolagents#2724) runs a
+        plain pip install and then repairs user-site visibility with startup-like
+        ordering. This guards against regressions in the inherited behavior.
         """
         executor, _, _, _ = make_executor()
         executor.run_code_raise_errors = MagicMock(

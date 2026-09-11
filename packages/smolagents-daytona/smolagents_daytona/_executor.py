@@ -7,7 +7,6 @@ preserves variables and imports across execution steps.
 
 from __future__ import annotations
 
-from textwrap import dedent
 from typing import TYPE_CHECKING, Any
 
 from daytona import Daytona
@@ -64,62 +63,6 @@ class DaytonaExecutor(RemotePythonExecutor):
             self.cleanup()
             raise
         self.logger.log("Daytona sandbox is running", level=LogLevel.INFO)
-
-    def install_packages(self, additional_imports: list[str]) -> list[str]:
-        """Install packages and make sure the live interpreter can import them.
-
-        Daytona sandboxes run Python with a non-writable system site-packages, so
-        ``pip install`` silently falls back to a user-site install while still
-        exiting 0. The interpreter context is a long-running process started before
-        that user-site directory existed, so the directory is missing from its
-        ``sys.path`` and the installed packages are not importable.
-
-        pip itself already does the right thing in every environment (virtualenv,
-        writable, and non-writable system Python alike); the only gap is user-site
-        visibility in the running process, which this override repairs after the
-        install. The user-site directory is inserted before system site-packages,
-        mirroring interpreter-startup ordering (``site.py`` does the same), so
-        versions installed for the agent shadow copies preinstalled in the image.
-
-        Proposed upstream as the base-class default behavior
-        (huggingface/smolagents#2724); this override disappears once that lands.
-
-        Args:
-            additional_imports: Package names to install.
-
-        Returns:
-            The list of installed packages.
-
-        Raises:
-            AgentError: If the installation command fails in the sandbox.
-        """
-        if additional_imports:
-            code = dedent(
-                f"""
-                import importlib
-                import os
-                import site
-                import subprocess
-                import sys
-
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", *{additional_imports!r}],
-                    check=True,
-                )
-
-                user_site = site.getusersitepackages()
-                if os.path.isdir(user_site) and user_site not in sys.path:
-                    # Insert before system site-packages, mirroring site.py startup
-                    # ordering, so agent-requested versions shadow preinstalled ones.
-                    system_sites = set(getattr(site, "getsitepackages", lambda: [])())
-                    indices = [index for index, path in enumerate(sys.path) if path in system_sites]
-                    sys.path.insert(min(indices) if indices else len(sys.path), user_site)
-                importlib.invalidate_caches()
-                """
-            )
-            code_output = self.run_code_raise_errors(code)
-            self.logger.log(code_output.logs)
-        return additional_imports
 
     def run_code_raise_errors(self, code: str) -> CodeOutput:
         """Execute Python code in the sandbox and return the result.

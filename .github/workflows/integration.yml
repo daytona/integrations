@@ -274,7 +274,7 @@ jobs:
         # TEMPORARY (until smolagents>=1.27.0 is on PyPI): see the ci.yml
         # smolagents job for details; collapse to `pip install -e ".[dev]"` then.
         run: |
-          python -m pip install "smolagents @ git+https://github.com/huggingface/smolagents.git@f2e0c346aaa87000990a6397f8c081f344b0f5e9"
+          python -m pip install "smolagents @ git+https://github.com/huggingface/smolagents.git@5d49484a8c0959fd511c8904f632b60e3dc36b32"
           python -m pip install "daytona>=0.211.0,<0.212.0" "pytest>=7.0.0"
           python -m pip install --no-deps -e .
       - name: Integration tests (live Daytona)
