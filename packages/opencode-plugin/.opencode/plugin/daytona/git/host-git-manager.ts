@@ -5,6 +5,7 @@
 
 import { logger } from '../core/logger'
 import type { HostKeyVerification } from './gateway-host-key'
+import { knownHostsHost } from './gateway-host-key'
 import { spawnSync } from 'child_process'
 import { realpathSync } from 'fs'
 import { isAbsolute, resolve as pathResolve } from 'path'
@@ -76,6 +77,12 @@ function transferEnv(token: string, verification: HostKeyVerification): NodeJS.P
     if (verification.knownHostsFile.includes('"')) {
       throw new Error('The known_hosts path for sandbox transfers must not contain a double quote (") character')
     }
+    // The pin file must be the ONLY trust root, so every ssh_config directive that can
+    // add or redirect host-key trust is neutralized here (first value wins, and we own
+    // the command): KnownHostsCommand can supply extra accepted keys from a program;
+    // UpdateHostKeys lets a connected server append further keys to the pin file;
+    // VerifyHostKeyDNS admits SSHFP records as a trust source; HostKeyAlias changes
+    // which name is looked up, so it is fixed to the pinned host.
     parts.push(
       '-o',
       shellQuote(`UserKnownHostsFile="${verification.knownHostsFile}"`),
@@ -83,6 +90,14 @@ function transferEnv(token: string, verification: HostKeyVerification): NodeJS.P
       'GlobalKnownHostsFile=/dev/null',
       '-o',
       'StrictHostKeyChecking=yes',
+      '-o',
+      'KnownHostsCommand=none',
+      '-o',
+      'UpdateHostKeys=no',
+      '-o',
+      'VerifyHostKeyDNS=no',
+      '-o',
+      shellQuote(`HostKeyAlias=${knownHostsHost(verification.endpoint)}`),
     )
   }
   // GIT_SSH_VARIANT=ssh: git otherwise applies the user's ssh.variant to OUR command -

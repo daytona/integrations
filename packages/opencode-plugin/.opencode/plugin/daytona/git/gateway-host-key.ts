@@ -4,7 +4,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
-import { execFileSync } from 'child_process'
+import { createHash } from 'crypto'
 import { join } from 'path'
 import { logger } from '../core/logger'
 
@@ -81,6 +81,13 @@ export class GatewayHostKeyPin {
     }
 
     const existing = this.readPin()
+    if (!published && existing) {
+      // The API is unavailable: the pin file's own host field carries the endpoint it was
+      // pinned for, so a non-default host or port keeps working instead of the URL
+      // silently reverting to the default gateway while the pin names another.
+      const recovered = endpointOfEntry(existing.entries[0])
+      if (recovered) Object.assign(endpoint, recovered)
+    }
     if (published) {
       const publishedEntries = published.hostKeys.map((key) => knownHostsEntry(endpoint, key))
       if (existing && !existing.entries.some((entry) => publishedEntries.includes(entry))) {
@@ -126,7 +133,10 @@ export class GatewayHostKeyPin {
       const hostKeys = Array.isArray(body.sshGatewayHostKeys) ? body.sshGatewayHostKeys.filter(isValidKeyLine) : []
       if (hostKeys.length === 0) return undefined
       const host = typeof body.sshGatewayHost === 'string' && /^[A-Za-z0-9.\-[\]:]+$/.test(body.sshGatewayHost) ? body.sshGatewayHost : DEFAULT_GATEWAY_HOST
-      const port = typeof body.sshGatewayPort === 'number' && body.sshGatewayPort >= 1 && body.sshGatewayPort <= 65535 ? body.sshGatewayPort : 22
+      const port =
+        Number.isInteger(body.sshGatewayPort) && (body.sshGatewayPort as number) >= 1 && (body.sshGatewayPort as number) <= 65535
+          ? (body.sshGatewayPort as number)
+          : 22
       return { host, port, hostKeys }
     } catch (err) {
       logger.warn(`[host-key] could not fetch ${this.apiUrl}/config: ${err}`)
@@ -188,34 +198,43 @@ function knownHostsEntry(endpoint: GatewayEndpoint, keyLine: string): string {
   return `${knownHostsHost(endpoint)} ${type} ${blob}`
 }
 
+/** Inverse of knownHostsHost(): `[host]:port` -> {host, port}; bare host -> port 22. */
+function endpointOfEntry(entry: string): GatewayEndpoint | undefined {
+  const hostField = entry.trim().split(/\s+/)[0]
+  if (!hostField) return undefined
+  const bracketed = /^\[(.+)\]:(\d{1,5})$/.exec(hostField)
+  if (bracketed) {
+    const port = Number(bracketed[2])
+    return port >= 1 && port <= 65535 ? { host: bracketed[1], port } : undefined
+  }
+  return { host: hostField, port: 22 }
+}
+
 function keyOfEntry(entry: string): string {
   const parts = entry.trim().split(/\s+/)
   return `${parts[1]} ${parts[2]}`
 }
 
-// Accept only what OpenSSH will load as a host key line; the API validates on its side
-// too, but this is the trust boundary on ours.
+// Accept only well-formed OpenSSH public key lines of host-key types. Validation is done
+// in-process: it must not depend on an optional executable, because a missing or failing
+// `ssh-keygen` would otherwise silently downgrade every API response to inherited
+// verification. The API validates the full wire encoding on its side; the blob will be
+// rejected by ssh at connect time if it is not a usable key, which fails closed.
 function isValidKeyLine(value: unknown): value is string {
   if (typeof value !== 'string') return false
   const parts = value.trim().split(/\s+/)
   if (parts.length < 2 || !/^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521))$/.test(parts[0])) return false
   if (!/^[A-Za-z0-9+/]+=*$/.test(parts[1])) return false
-  try {
-    execFileSync('ssh-keygen', ['-lf', '-'], { input: `${parts[0]} ${parts[1]}\n`, stdio: ['pipe', 'pipe', 'pipe'] })
-    return true
-  } catch {
-    return false
-  }
+  const blob = Buffer.from(parts[1], 'base64')
+  if (blob.length < 4 || blob.toString('base64') !== parts[1]) return false
+  const typeLength = blob.readUInt32BE(0)
+  if (typeLength === 0 || typeLength > 64 || blob.length < 4 + typeLength) return false
+  return blob.subarray(4, 4 + typeLength).toString('ascii') === parts[0]
 }
 
 function fingerprintsOf(keyLines: string[]): string[] {
   return keyLines.map((line) => {
-    try {
-      return execFileSync('ssh-keygen', ['-lf', '-'], { input: `${line}\n`, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
-        .trim()
-        .split(/\s+/)[1]
-    } catch {
-      return 'unknown'
-    }
+    const blob = Buffer.from(line.trim().split(/\s+/)[1], 'base64')
+    return `SHA256:${createHash('sha256').update(blob).digest('base64').replace(/=+$/, '')}`
   })
 }
