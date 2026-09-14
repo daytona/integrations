@@ -39,6 +39,10 @@ Versioning is **per package**, automated with [release-please](https://github.co
 - Keep each PR scoped to **no more than one package or app** — for packages, release routing is by changed file path, not the scope text.
 - Each package/app is self-contained (its own dependency manifest); develop within its folder.
 
+## Security
+
+Security policy, vulnerability reporting, and the SSH gateway host key fingerprints are maintained in the organization-wide [Daytona security policy](https://github.com/daytona/.github/blob/main/SECURITY.md). Please report vulnerabilities through the channels described there — not through public issues.
+
 ## License
 
 [Apache-2.0](LICENSE), unless a package declares otherwise — each package includes its own `LICENSE`.
