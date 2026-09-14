@@ -31,6 +31,7 @@ import type { PluginInput } from '@opencode-ai/plugin'
 import { logger, setLogFilePath } from './core/logger'
 import { DaytonaSessionManager } from './core/session-manager'
 import { SessionGitManager } from './git/session-git-manager'
+import { GatewayHostKeyPin } from './git/gateway-host-key'
 import { toast } from './core/toast'
 import { customTools } from './plugins/custom-tools'
 import { eventHandlers } from './plugins/session-events'
@@ -53,6 +54,11 @@ const sessionManager = new DaytonaSessionManager(
 
 async function daytonaPlugin(ctx: PluginInput) {
   toast.initialize(ctx.client?.tui)
+  SessionGitManager.useHostKeyPin(new GatewayHostKeyPin(STORAGE_DIR))
+  // Resolve eagerly so the outcome (pinned / manual / inherited / key mismatch) is logged
+  // at startup rather than surfacing only on the first sync; failures here are logged,
+  // and the first transfer re-raises them where they can be reported to the user.
+  SessionGitManager.hostKeyVerification().catch((err) => logger.error(`[host-key] ${err}`))
   return {
     tool: await customTools(ctx, sessionManager),
     event: await eventHandlers(ctx, sessionManager, REPO_PATH),

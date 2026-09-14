@@ -58,19 +58,40 @@ The snapshot must already exist and be active in your organization; create one v
 
 Leave `DAYTONA_SNAPSHOT` unset to keep the default behavior. The plugin still creates `/home/daytona/project` and syncs your git branch into it.
 
-#### Pinning the sandbox SSH host key
+#### Verifying the sandbox SSH gateway host key
 
-Git syncing transfers commits between your machine and the sandbox over SSH (`ssh.app.daytona.io`). By default, host verification follows your normal SSH configuration — on a machine that has never connected before, this means an interactive trust-on-first-use prompt, which blocks noninteractive environments such as CI or supervised agent runs.
+Git syncing transfers commits between your machine and the sandbox over SSH through the Daytona SSH gateway (`ssh.app.daytona.io`). Like any SSH server, the gateway identifies itself with a host key, and the plugin verifies it before any transfer. Verification works in one of three modes, checked in this order:
 
-To make syncing noninteractive and independently verifiable, point `DAYTONA_SSH_KNOWN_HOSTS` at a `known_hosts` file containing the `ssh.app.daytona.io` host keys:
+| Mode | When | What is trusted |
+| --- | --- | --- |
+| **Manual pin** | `DAYTONA_SSH_KNOWN_HOSTS` is set | Only the keys in that file |
+| **Auto-pin** (default) | Otherwise, unless `DAYTONA_SSH_AUTO_PIN=false` | Only the gateway host key published by the Daytona API (`/api/config`), pinned on first use into a plugin-managed file (`storage/daytona/gateway_known_hosts`) |
+| **Inherited** | Auto-pin is disabled, or no key is published and none is pinned | Your SSH client's normal host verification (`~/.ssh/known_hosts`, trust-on-first-use prompts) |
+
+In the two pinned modes the pin file is the *only* trust root for sandbox transfers: system-wide known hosts are ignored and `StrictHostKeyChecking=yes` is set. SSH behavior for every other remote is unaffected.
+
+**Auto-pin is fail-closed against change.** The API is consulted once per plugin start; the pin file is what connections use, so once a key has been pinned an API outage never weakens verification. (On a machine that has never pinned anything, an unreachable API means there is nothing to pin yet and the plugin falls back to inherited verification — set `DAYTONA_SSH_KNOWN_HOSTS` if a first run must already be strict.) If the API later publishes a host key that does not include the pinned one, transfers are refused with a message pointing here. That means either the gateway rotated its key — the [security policy](https://github.com/daytona/.github/blob/main/SECURITY.md#ssh-host-key-verification) publishes old and new keys together during a rotation, so a healthy client should not hit this — or something between you and the API is not Daytona. Verify the published key against the security policy; if it is legitimate, delete the pin file to pin the new key.
+
+**Manual pin** is for environments that want a human-verified trust root independent of the API — supervised agent runs, CI, compliance-driven setups. The gateway host key is published as a ready-to-use `known_hosts` line in Daytona's [security policy](https://github.com/daytona/.github/blob/main/SECURITY.md#ssh-host-key-verification); copy it into a file and point the plugin at it:
 
 ```bash
 mkdir -p ~/.config/daytona
-ssh-keyscan ssh.app.daytona.io > ~/.config/daytona/known_hosts
+# paste the `ssh.app.daytona.io ssh-ed25519 ...` line from the security policy into:
+$EDITOR ~/.config/daytona/known_hosts
 export DAYTONA_SSH_KNOWN_HOSTS=~/.config/daytona/known_hosts
 ```
 
-Verify the collected fingerprints out of band (`ssh-keygen -lf ~/.config/daytona/known_hosts`) before trusting the file. When `DAYTONA_SSH_KNOWN_HOSTS` is set, sandbox git transfers use that file as the only host-key database (`StrictHostKeyChecking=yes`, system-wide known hosts ignored); SSH behavior for every other remote is unaffected. When unset, behavior is unchanged. Paths containing spaces are supported; a literal `"` in the path is rejected.
+To cross-check that the live gateway presents the published key, compare fingerprints: `ssh-keyscan ssh.app.daytona.io 2>/dev/null | ssh-keygen -lf -` must print the fingerprint listed in the security policy. Do not build the file from `ssh-keyscan` alone — that trusts whatever answered on first connection, which is exactly what pinning is meant to avoid. If the manual file disagrees with the key the API publishes, the plugin logs a warning but keeps using your file.
+
+The example above is for the shared gateway on the default SSH port. For a gateway on another host or port (self-hosted or dedicated regions — check `sshGatewayHost` and `sshGatewayPort` in `GET /api/config`), the `known_hosts` host field must use OpenSSH's `[host]:port` form, or the entry will never match:
+
+```
+[gateway.example.com]:2222 ssh-ed25519 AAAA...
+```
+
+and the cross-check becomes `ssh-keyscan -p 2222 gateway.example.com | ssh-keygen -lf -`. Auto-pin produces the correct form automatically.
+
+Paths containing spaces are supported; a literal `"` in the path is rejected.
 
 ### Running OpenCode
 
