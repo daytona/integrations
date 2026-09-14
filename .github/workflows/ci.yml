@@ -27,6 +27,7 @@ jobs:
       pi: ${{ steps.filter.outputs.pi }}
       opencode: ${{ steps.filter.outputs.opencode }}
       pydantic_ai: ${{ steps.filter.outputs.pydantic_ai }}
+      smolagents: ${{ steps.filter.outputs.smolagents }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -45,6 +46,8 @@ jobs:
               - 'packages/opencode-plugin/**'
             pydantic_ai:
               - 'packages/pydantic-ai-daytona/**'
+            smolagents:
+              - 'packages/smolagents-daytona/**'
 
   adk:
     needs: changes
@@ -208,6 +211,45 @@ jobs:
       # NOTE: live tests (tests/integration_tests, real Daytona sandboxes) run via
       # the separate integration workflow, not per-PR CI.
 
+  smolagents:
+    needs: changes
+    if: needs.changes.outputs.smolagents == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned: obstore (pulled via the daytona SDK) ships no wheels for the
+          # newest Python; 3.12 has wheels so `pip install` succeeds.
+          python-version: "3.12"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/smolagents-daytona/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/smolagents-daytona
+        # TEMPORARY (until smolagents>=1.27.0 is on PyPI): the pluggable executor
+        # contract this package builds on (huggingface/smolagents#2724) is not
+        # released yet, so smolagents is installed from the PR head SHA and the
+        # package itself with --no-deps to skip resolving the unreleased floor.
+        # Once smolagents 1.27.0 releases, replace all of this with:
+        #   python -m pip install -e ".[dev]"
+        run: |
+          python -m pip install "smolagents @ git+https://github.com/huggingface/smolagents.git@5d49484a8c0959fd511c8904f632b60e3dc36b32"
+          python -m pip install "daytona>=0.211.0,<0.212.0" "pytest>=7.0.0" "black>=23.0.0" "ruff>=0.15,<0.17" "mypy>=1.0.0"
+          python -m pip install --no-deps -e .
+      - name: Lint (ruff)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/smolagents-daytona
+        run: ruff check .
+      - name: Unit tests (offline)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/smolagents-daytona
+        run: pytest
+      # NOTE: live tests (tests/integration_tests, real Daytona sandboxes) run via
+      # the separate integration workflow, not per-PR CI.
+
   # Single, stable status check to require in branch protection.
   # It ALWAYS runs (if: always()) and fails only if a relevant job failed or
   # was cancelled. A "skipped" job (a package this PR didn't touch) is fine —
@@ -215,7 +257,7 @@ jobs:
   # merges when a touched package's lint/test/build fails.
   ci-success:
     name: ci-success
-    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai]
+    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai, smolagents]
     if: always()
     runs-on: ubuntu-latest
     steps:
