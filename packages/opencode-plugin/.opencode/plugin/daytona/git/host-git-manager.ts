@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../core/logger'
-import type { HostKeyTrust } from './gateway-host-key'
+import type { HostKeyVerification } from './gateway-host-key'
 import { spawnSync } from 'child_process'
 import { realpathSync } from 'fs'
 import { isAbsolute, resolve as pathResolve } from 'path'
@@ -56,8 +56,8 @@ function shellQuote(value: string): string {
 // DAYTONA_SSH_BINARY, an absolute path with no arguments, which keeps the option set
 // under plugin control.
 //
-// Host verification follows the resolved HostKeyTrust: a manual or auto-pinned
-// known_hosts file becomes the ONLY trust root (GlobalKnownHostsFile=/dev/null, so a
+// Host verification follows the resolved HostKeyVerification: a manual or auto-pinned
+// known_hosts file becomes the ONLY verification root (GlobalKnownHostsFile=/dev/null, so a
 // matching entry in /etc/ssh/ssh_known_hosts cannot satisfy verification either);
 // "inherited" leaves the SSH client's normal verification in place.
 //
@@ -66,19 +66,19 @@ function shellQuote(value: string): string {
 // list (inner double quotes keep a spaced path as one file). OpenSSH's config grammar
 // has no escape for a literal double quote inside a quoted value, so such paths are
 // rejected instead of being silently mis-pinned.
-function transferEnv(token: string, trust: HostKeyTrust): NodeJS.ProcessEnv {
+function transferEnv(token: string, verification: HostKeyVerification): NodeJS.ProcessEnv {
   const binary = process.env.DAYTONA_SSH_BINARY?.trim() || 'ssh'
   if (binary !== 'ssh' && !isAbsolute(binary)) {
     throw new Error('DAYTONA_SSH_BINARY must be an absolute path to an OpenSSH client binary')
   }
   const parts = [binary === 'ssh' ? 'ssh' : shellQuote(binary), '-o', shellQuote(`User=${token}`)]
-  if (trust.mode !== 'inherited') {
-    if (trust.knownHostsFile.includes('"')) {
+  if (verification.mode !== 'inherited') {
+    if (verification.knownHostsFile.includes('"')) {
       throw new Error('The known_hosts path for sandbox transfers must not contain a double quote (") character')
     }
     parts.push(
       '-o',
-      shellQuote(`UserKnownHostsFile="${trust.knownHostsFile}"`),
+      shellQuote(`UserKnownHostsFile="${verification.knownHostsFile}"`),
       '-o',
       'GlobalKnownHostsFile=/dev/null',
       '-o',
@@ -283,7 +283,7 @@ export class HostGitManager {
    * @param remoteName Numbered remote (e.g. sandbox-2) matching opencode/N.
    * @param remoteUrl Credential-free SSH URL of the sandbox repository.
    * @param token Short-lived access token, supplied to the git invocation only.
-   * @param trust How the gateway host key is verified for this transfer.
+   * @param verification How the gateway host key is verified for this transfer.
    * @param branch The branch to push to.
    * @param cwd Worktree path to run git in.
    * @returns true if push succeeded, false if no repo exists. Throws if the push fails.
@@ -292,7 +292,7 @@ export class HostGitManager {
     remoteName: string,
     remoteUrl: string,
     token: string,
-    trust: HostKeyTrust,
+    verification: HostKeyVerification,
     branch: string,
     cwd: string,
   ): Promise<boolean> {
@@ -313,7 +313,7 @@ export class HostGitManager {
       this.setRemote(remoteName, remoteUrl, cwd)
       let attempts = 0
       while (attempts < 3) {
-        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: transferEnv(token, trust) })
+        const pushRes = execGit(['push', remoteName, `HEAD:${branch}`], { cwd, env: transferEnv(token, verification) })
         if (pushRes.ok) {
           logger.info(`✓ Pushed local changes to ${remoteName}`)
           return
@@ -374,7 +374,7 @@ export class HostGitManager {
     remoteName: string,
     remoteUrl: string,
     token: string,
-    trust: HostKeyTrust,
+    verification: HostKeyVerification,
     branch: string,
     cwd: string,
     localBranch?: string,
@@ -389,7 +389,7 @@ export class HostGitManager {
           if (localBranch) {
             // Fetch into FETCH_HEAD only (never into refs/heads) so we don't hit
             // "refusing to fetch into branch checked out" when this branch is checked out.
-            const fetchRes = execGit(['fetch', remoteName, branch], { cwd, env: transferEnv(token, trust) })
+            const fetchRes = execGit(['fetch', remoteName, branch], { cwd, env: transferEnv(token, verification) })
             if (!fetchRes.ok) throw new Error(fetchRes.stderr)
 
             const updateRefRes = execGit(['update-ref', `refs/heads/${localBranch}`, 'FETCH_HEAD'], { cwd })
@@ -405,7 +405,7 @@ export class HostGitManager {
 
             logger.info(`✓ Force pulled latest changes from sandbox into ${localBranch}`)
           } else {
-            const pullRes = execGit(['pull', remoteName, branch], { cwd, env: transferEnv(token, trust) })
+            const pullRes = execGit(['pull', remoteName, branch], { cwd, env: transferEnv(token, verification) })
             if (!pullRes.ok) throw new Error(pullRes.stderr)
             logger.info('✓ Pulled latest changes from sandbox')
           }

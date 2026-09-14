@@ -9,7 +9,7 @@ import { toast } from '../core/toast'
 import { DaytonaSandboxGitManager } from './sandbox-git-manager'
 import { HostGitManager } from './host-git-manager'
 import type { PluginInput } from '@opencode-ai/plugin'
-import type { GatewayHostKeyPin, HostKeyTrust } from './gateway-host-key'
+import type { GatewayHostKeyPin, HostKeyVerification } from './gateway-host-key'
 import { knownHostsHost } from './gateway-host-key'
 
 
@@ -118,16 +118,16 @@ export class SessionGitManager {
    * from the URL so it is never embedded in anything git persists.
    */
   private async withSshAccess<T>(
-    fn: (access: { url: string; token: string; trust: HostKeyTrust }) => Promise<T>,
+    fn: (access: { url: string; token: string; verification: HostKeyVerification }) => Promise<T>,
   ): Promise<T> {
     // Resolved BEFORE the token is minted: a fail-closed pin mismatch must not leave a
     // live token behind, and the endpoint decides the URL.
-    const trust = await SessionGitManager.hostKeyTrust()
-    const { host, port } = trust.endpoint
+    const verification = await SessionGitManager.hostKeyVerification()
+    const { host, port } = verification.endpoint
     const url = `ssh://${host}${port === 22 ? '' : `:${port}`}${this.repoPath}`
     const sshAccess = await this.sandbox.createSshAccess(10)
     try {
-      return await fn({ url, token: sshAccess.token, trust })
+      return await fn({ url, token: sshAccess.token, verification })
     } finally {
       await this.revokeWithRetry(sshAccess.token)
     }
@@ -135,12 +135,12 @@ export class SessionGitManager {
 
   private static pin?: GatewayHostKeyPin
 
-  /** Installed once at plugin load; every transfer resolves host-key trust through it. */
+  /** Installed once at plugin load; every transfer resolves host-key verification through it. */
   static useHostKeyPin(pin: GatewayHostKeyPin): void {
     SessionGitManager.pin = pin
   }
 
-  static hostKeyTrust(): Promise<HostKeyTrust> {
+  static hostKeyVerification(): Promise<HostKeyVerification> {
     if (!SessionGitManager.pin) {
       throw new Error('Gateway host key pin is not configured; SessionGitManager.useHostKeyPin was not called at plugin load')
     }
@@ -149,7 +149,7 @@ export class SessionGitManager {
 
   /** The known_hosts host field for the resolved gateway endpoint, e.g. for documentation or diagnostics. */
   static async gatewayKnownHostsHost(): Promise<string> {
-    return knownHostsHost((await SessionGitManager.hostKeyTrust()).endpoint)
+    return knownHostsHost((await SessionGitManager.hostKeyVerification()).endpoint)
   }
 
   // Revocation shortens the exposure window; the token still expires on its own, so a
@@ -202,8 +202,8 @@ export class SessionGitManager {
       }
 
       await this.sandboxGit.ensureRepo()
-      const pushed = await this.withSshAccess(({ url, token, trust }) =>
-        this.hostGit.pushLocalToSandboxRemote(this.remoteName, url, token, trust, this.branch, this.worktree),
+      const pushed = await this.withSshAccess(({ url, token, verification }) =>
+        this.hostGit.pushLocalToSandboxRemote(this.remoteName, url, token, verification, this.branch, this.worktree),
       )
       if (pushed) {
         await this.sandboxGit.resetToRemote(this.branch)
@@ -253,8 +253,8 @@ export class SessionGitManager {
       // Pull the branch the sandbox actually committed to, which may differ from the
       // initial 'opencode' branch, so commits are never left unsynced.
       const sandboxBranch = await this.sandboxGit.getCurrentBranch()
-      await this.withSshAccess(({ url, token, trust }) =>
-        this.hostGit.pull(this.remoteName, url, token, trust, sandboxBranch, this.worktree, this.localBranch),
+      await this.withSshAccess(({ url, token, verification }) =>
+        this.hostGit.pull(this.remoteName, url, token, verification, sandboxBranch, this.worktree, this.localBranch),
       )
       toast.show({
         title: 'Changes synced',

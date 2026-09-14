@@ -58,7 +58,7 @@ async function daytonaPlugin(ctx: PluginInput) {
   // Resolve eagerly so the outcome (pinned / manual / inherited / key mismatch) is logged
   // at startup rather than surfacing only on the first sync; failures here are logged,
   // and the first transfer re-raises them where they can be reported to the user.
-  SessionGitManager.hostKeyTrust().catch((err) => logger.error(`[host-key] ${err}`))
+  SessionGitManager.hostKeyVerification().catch((err) => logger.error(`[host-key] ${err}`))
   return {
     tool: await customTools(ctx, sessionManager),
     event: await eventHandlers(ctx, sessionManager, REPO_PATH),

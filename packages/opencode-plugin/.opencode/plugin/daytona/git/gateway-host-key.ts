@@ -15,8 +15,13 @@ const CONFIG_FETCH_TIMEOUT_MS = 5_000
 
 export type GatewayEndpoint = { host: string; port: number }
 
-/** How sandbox git transfers verify the gateway's host key for this process. */
-export type HostKeyTrust =
+/**
+ * Which known_hosts file (if any) is the trust root for sandbox git transfers in this
+ * process, and where it came from. Always the OUTPUT of resolution, never a user
+ * input: there is no mode that disables host verification. The weakest outcome,
+ * 'inherited', is the SSH client's own verification - the behavior before this existed.
+ */
+export type HostKeyVerification =
   | { mode: 'manual'; knownHostsFile: string; endpoint: GatewayEndpoint }
   | { mode: 'pinned'; knownHostsFile: string; endpoint: GatewayEndpoint; fingerprints: string[] }
   | { mode: 'inherited'; endpoint: GatewayEndpoint; reason: string }
@@ -44,7 +49,7 @@ type PublishedGateway = { host: string; port: number; hostKeys: string[] }
  * verified against the policy and removed.
  */
 export class GatewayHostKeyPin {
-  private resolved?: Promise<HostKeyTrust>
+  private resolved?: Promise<HostKeyVerification>
 
   constructor(
     private readonly storageDir: string,
@@ -55,12 +60,12 @@ export class GatewayHostKeyPin {
     return join(this.storageDir, 'gateway_known_hosts')
   }
 
-  resolve(): Promise<HostKeyTrust> {
+  resolve(): Promise<HostKeyVerification> {
     this.resolved ??= this.resolveOnce()
     return this.resolved
   }
 
-  private async resolveOnce(): Promise<HostKeyTrust> {
+  private async resolveOnce(): Promise<HostKeyVerification> {
     const manual = process.env.DAYTONA_SSH_KNOWN_HOSTS?.trim()
     const published = await this.fetchPublishedGateway()
     const endpoint: GatewayEndpoint = published
@@ -81,8 +86,9 @@ export class GatewayHostKeyPin {
       if (existing && !existing.entries.some((entry) => publishedEntries.includes(entry))) {
         const message =
           `The SSH gateway host key published by ${this.apiUrl}/config no longer matches the key pinned in ${this.pinFile}. ` +
-          `This is either a key rotation or an attempt to substitute the gateway. Verify the published key against ${SECURITY_POLICY_URL}; ` +
-          `if it is legitimate, delete ${this.pinFile} to pin the new key.`
+          `Either the gateway rotated its key and this machine has not synced since before the rotation's overlap window ` +
+          `(the security policy publishes old and new keys together for at least 30 days), or something between this machine and the API is not Daytona. ` +
+          `Verify the published fingerprint against ${SECURITY_POLICY_URL}; if it matches, run \`rm ${this.pinFile}\` and sync again to pin the new key.`
         logger.error(`[host-key] ${message}`)
         throw new Error(message)
       }
