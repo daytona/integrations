@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.193.0](https://github.com/daytona/integrations/compare/opencode-plugin-v0.192.1...opencode-plugin-v0.193.0) (2026-09-14)
+
+
+### Features
+
+* **opencode-plugin:** pin the SSH gateway host key from the Daytona API by default ([#59](https://github.com/daytona/integrations/issues/59)) ([7b286ce](https://github.com/daytona/integrations/commit/7b286ce283a0c728d40098ad8abf38fa20c33e4c))
+
 ## [0.192.1](https://github.com/daytona/integrations/compare/opencode-plugin-v0.192.0...opencode-plugin-v0.192.1) (2026-09-03)
 
 
