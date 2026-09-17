@@ -44,8 +44,14 @@ permissions:
 # sandboxes). Serialize per PR instead (ref as the dispatch fallback): under
 # `pull_request_target`, `github.ref` is the BASE branch, which would collapse
 # every fork-lane run repo-wide into a single queue.
+# The event name is part of the key because BOTH `pull_request` and
+# `pull_request_target` fire for every fork PR: in a shared queue the newer
+# run cancels the older waiting one ("higher priority waiting request"), which
+# kills the fork lane — the only lane that reports integration-success for
+# forks. Exactly one lane ever executes suites for a given PR (see decide()),
+# so per-lane serialization loses nothing.
 concurrency:
-  group: integration-${{ github.event.pull_request.number || github.ref }}
+  group: integration-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -134,6 +140,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Deliberate opt-in to fork-code checkout in the pull_request_target
+          # lane (checkout@v4 refuses it by default). Safe HERE only because the
+          # `integration-tests` environment approval is a required manual review
+          # gate in front of this job, the SHA is pinned at event time, and the
+          # workflow file always comes from main. Do not copy this flag into
+          # jobs that lack those controls.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
+          # code could read it — the suites never push/pull after checkout.
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
@@ -157,6 +173,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Deliberate opt-in to fork-code checkout in the pull_request_target
+          # lane (checkout@v4 refuses it by default). Safe HERE only because the
+          # `integration-tests` environment approval is a required manual review
+          # gate in front of this job, the SHA is pinned at event time, and the
+          # workflow file always comes from main. Do not copy this flag into
+          # jobs that lack those controls.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
+          # code could read it — the suites never push/pull after checkout.
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
@@ -183,6 +209,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Deliberate opt-in to fork-code checkout in the pull_request_target
+          # lane (checkout@v4 refuses it by default). Safe HERE only because the
+          # `integration-tests` environment approval is a required manual review
+          # gate in front of this job, the SHA is pinned at event time, and the
+          # workflow file always comes from main. Do not copy this flag into
+          # jobs that lack those controls.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
+          # code could read it — the suites never push/pull after checkout.
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
@@ -212,6 +248,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Deliberate opt-in to fork-code checkout in the pull_request_target
+          # lane (checkout@v4 refuses it by default). Safe HERE only because the
+          # `integration-tests` environment approval is a required manual review
+          # gate in front of this job, the SHA is pinned at event time, and the
+          # workflow file always comes from main. Do not copy this flag into
+          # jobs that lack those controls.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
+          # code could read it — the suites never push/pull after checkout.
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
@@ -235,6 +281,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Deliberate opt-in to fork-code checkout in the pull_request_target
+          # lane (checkout@v4 refuses it by default). Safe HERE only because the
+          # `integration-tests` environment approval is a required manual review
+          # gate in front of this job, the SHA is pinned at event time, and the
+          # workflow file always comes from main. Do not copy this flag into
+          # jobs that lack those controls.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
+          # code could read it — the suites never push/pull after checkout.
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
