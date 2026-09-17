@@ -377,7 +377,7 @@ export default function (pi: ExtensionAPI) {
   // commit-not-push guideline. Project context (AGENTS.md/CLAUDE.md) is left to
   // Pi's default loading from the local files.
   pi.on('before_agent_start', (event) => {
-    if (!active) return
+    if (!active || !event.systemPrompt) return
     const cwdLine = `Current working directory: ${active.cwd} (Daytona sandbox ${shortId(active.sandbox.id)})`
     let systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, cwdLine)
     systemPrompt +=
