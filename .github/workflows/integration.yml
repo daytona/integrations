@@ -179,6 +179,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Fork-lane opt-in + credential hygiene — see the adk job for rationale.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
