@@ -102,9 +102,16 @@ export const create = action({
         });
         state = started.state;
       } catch (error) {
+        // Best-effort: capture the observed failure state (e.g. "build_failed")
+        // so the reactive record doesn't stay "creating" forever.
+        const observed = await client
+          .getSandbox(created.id)
+          .then((s) => s.state as string)
+          .catch(() => undefined);
         await ctx.runMutation(internal.lib.setSandboxError, {
           sandboxId: created.id,
           error: error instanceof Error ? error.message : String(error),
+          state: observed,
         });
         throw error;
       }
@@ -126,14 +133,22 @@ export const start = action({
   returns: sandboxSummary,
   handler: async (ctx, args) => {
     const client = new DaytonaClient(args.config);
-    const sandbox = await client.ensureStarted(args.sandboxId, {
-      timeoutMs: args.waitTimeoutMs,
-    });
-    await ctx.runMutation(internal.lib.upsertSandbox, {
-      sandboxId: args.sandboxId,
-      state: sandbox.state,
-    });
-    return { sandboxId: args.sandboxId, state: sandbox.state };
+    try {
+      const sandbox = await client.ensureStarted(args.sandboxId, {
+        timeoutMs: args.waitTimeoutMs,
+      });
+      await ctx.runMutation(internal.lib.upsertSandbox, {
+        sandboxId: args.sandboxId,
+        state: sandbox.state,
+      });
+      return { sandboxId: args.sandboxId, state: sandbox.state };
+    } catch (error) {
+      await ctx.runMutation(internal.lib.setSandboxError, {
+        sandboxId: args.sandboxId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 });
 
@@ -146,15 +161,34 @@ export const stop = action({
   returns: sandboxSummary,
   handler: async (ctx, args) => {
     const client = new DaytonaClient(args.config);
-    await client.stopSandbox(args.sandboxId);
-    const sandbox = await client.waitForState(args.sandboxId, ["stopped"], {
-      timeoutMs: args.waitTimeoutMs,
-    });
-    await ctx.runMutation(internal.lib.upsertSandbox, {
-      sandboxId: args.sandboxId,
-      state: sandbox.state,
-    });
-    return { sandboxId: args.sandboxId, state: sandbox.state };
+    try {
+      await client.stopSandbox(args.sandboxId);
+      // `destroyed` is a valid terminal outcome: autoDeleteInterval 0 deletes
+      // a sandbox as soon as it stops.
+      const sandbox = await client.waitForState(
+        args.sandboxId,
+        ["stopped", "destroyed"],
+        { timeoutMs: args.waitTimeoutMs },
+      );
+      await ctx.runMutation(internal.lib.upsertSandbox, {
+        sandboxId: args.sandboxId,
+        state: sandbox.state,
+      });
+      return { sandboxId: args.sandboxId, state: sandbox.state };
+    } catch (error) {
+      if (error instanceof DaytonaApiError && error.status === 404) {
+        await ctx.runMutation(internal.lib.upsertSandbox, {
+          sandboxId: args.sandboxId,
+          state: "destroyed",
+        });
+        return { sandboxId: args.sandboxId, state: "destroyed" };
+      }
+      await ctx.runMutation(internal.lib.setSandboxError, {
+        sandboxId: args.sandboxId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 });
 

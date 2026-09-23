@@ -37,11 +37,18 @@ export const get = query({
   },
 });
 
+/** Clamp caller-provided limits to a sane integer range for `.take()`. */
+function clampLimit(limit: number | undefined, fallback: number): number {
+  const floored = Math.floor(limit ?? fallback);
+  if (!Number.isFinite(floored)) return fallback;
+  return Math.min(Math.max(floored, 1), 500);
+}
+
 export const list = query({
   args: { userKey: v.optional(v.string()), limit: v.optional(v.number()) },
   returns: v.array(sandboxDoc),
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
+    const limit = clampLimit(args.limit, 100);
     if (args.userKey !== undefined) {
       const userKey = args.userKey;
       return await ctx.db
@@ -62,7 +69,7 @@ export const listExecutions = query({
       .query("executions")
       .withIndex("sandboxId", (q) => q.eq("sandboxId", args.sandboxId))
       .order("desc")
-      .take(args.limit ?? 50);
+      .take(clampLimit(args.limit, 50));
   },
 });
 
@@ -112,7 +119,12 @@ export const upsertSandbox = internalMutation({
 });
 
 export const setSandboxError = internalMutation({
-  args: { sandboxId: v.string(), error: v.string() },
+  args: {
+    sandboxId: v.string(),
+    error: v.string(),
+    /** Last observed remote state, when known (e.g. "build_failed"). */
+    state: v.optional(v.string()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -122,6 +134,7 @@ export const setSandboxError = internalMutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         lastError: args.error,
+        ...(args.state !== undefined ? { state: args.state } : {}),
         updatedAt: Date.now(),
       });
     }
