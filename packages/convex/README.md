@@ -8,6 +8,11 @@ Run [Daytona](https://www.daytona.io) sandboxes from your Convex backend: create
 
 ```ts
 // convex/agent.ts
+import { Daytona } from "@daytona/convex";
+import { v } from "convex/values";
+import { components } from "./_generated/api";
+import { action } from "./_generated/server";
+
 const daytona = new Daytona(components.daytona);
 
 export const codeInterpreter = action({
@@ -169,8 +174,8 @@ export const mySandboxes = query({
 
 ### Limits & long-running work
 
-- Convex actions time out after 10 minutes; `timeoutSeconds` bounds the command itself. For longer jobs, start a background process in the sandbox (`nohup … &`) and poll with follow-up `run` calls.
-- Stored execution output is truncated (64 KB) — the action's return value carries the full output.
+- Convex actions time out after 10 minutes, so commands are always bounded below that ceiling: `timeoutSeconds` defaults to 540 and is capped at 570. For longer jobs, start a background process in the sandbox (`nohup … &`) and poll with follow-up `run` calls.
+- Stored execution output is truncated (64 KB); the action's return value carries up to 4 MB.
 - Sandboxes cost money while running: set `autoStopInterval`, and delete sandboxes you're done with. `refreshSandbox` reconciles records whose remote sandbox was removed out-of-band.
 
 See [example/convex/example.ts](./example/convex/example.ts) for a complete example app.
