@@ -105,7 +105,13 @@ export interface PreviewUrlResponse {
 export const MAX_STORED_OUTPUT = 64_000;
 /** Cap stored command/code input. */
 export const MAX_STORED_INPUT = 4_000;
+/** Cap output returned across the Convex function boundary (limit is 16 MiB total). */
+export const MAX_RETURNED_OUTPUT = 4_000_000;
 
+const TRUNCATION_MARKER = "\n…[truncated]";
+
+/** Truncate to a HARD bound of `max` characters, marker included. */
 export function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max)}\n…[truncated]` : text;
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(0, max - TRUNCATION_MARKER.length))}${TRUNCATION_MARKER}`;
 }

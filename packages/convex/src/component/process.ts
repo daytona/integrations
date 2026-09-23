@@ -20,12 +20,29 @@ import type { Id } from "./_generated/dataModel.js";
 import { action, type ActionCtx } from "./_generated/server.js";
 import { DaytonaClient } from "./daytona.js";
 import {
+  MAX_RETURNED_OUTPUT,
   MAX_STORED_INPUT,
   MAX_STORED_OUTPUT,
   configValidator,
   truncate,
   type ProcessExecutionResponse,
 } from "./types.js";
+
+/**
+ * Convex actions hard-timeout at 10 minutes — a command outliving the action
+ * would leave its execution row stuck "running" (the catch below never runs).
+ * So the remote command is always bounded BELOW the action ceiling: default
+ * 9 minutes, capped at 9.5.
+ */
+const DEFAULT_EXEC_TIMEOUT_SECONDS = 540;
+const MAX_EXEC_TIMEOUT_SECONDS = 570;
+
+function boundedTimeout(requested: number | undefined): number {
+  return Math.min(
+    requested ?? DEFAULT_EXEC_TIMEOUT_SECONDS,
+    MAX_EXEC_TIMEOUT_SECONDS,
+  );
+}
 
 const executionResult = v.object({
   executionId: v.id("executions"),
@@ -70,7 +87,13 @@ async function recordAndRun(
       exitCode: response.exitCode,
       result: truncate(output, MAX_STORED_OUTPUT),
     });
-    return { executionId, exitCode: response.exitCode ?? 0, result: output };
+    return {
+      executionId,
+      exitCode: response.exitCode ?? 0,
+      // Bounded so huge outputs can't blow Convex's function return limits
+      // after the execution was already marked completed.
+      result: truncate(output, MAX_RETURNED_OUTPUT),
+    };
   } catch (error) {
     await ctx.runMutation(internal.lib.finishExecution, {
       executionId,
@@ -88,7 +111,7 @@ export const run = action({
     command: v.string(),
     cwd: v.optional(v.string()),
     envs: v.optional(v.record(v.string(), v.string())),
-    /** Max seconds for the command itself (enforced by the Daytona toolbox). */
+    /** Max seconds for the command (default 540, capped at 570 — below Convex's 10-min action ceiling). */
     timeoutSeconds: v.optional(v.number()),
     /** Transparently restart a stopped/archived sandbox first (default true). */
     autoStart: v.optional(v.boolean()),
@@ -111,7 +134,7 @@ export const run = action({
           command: args.command,
           cwd: args.cwd,
           envs: args.envs,
-          timeoutSeconds: args.timeoutSeconds,
+          timeoutSeconds: boundedTimeout(args.timeoutSeconds),
         }),
     );
   },
@@ -147,7 +170,7 @@ export const runCode = action({
           language: args.language,
           argv: args.argv,
           envs: args.envs,
-          timeoutSeconds: args.timeoutSeconds,
+          timeoutSeconds: boundedTimeout(args.timeoutSeconds),
         }),
     );
   },

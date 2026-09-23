@@ -54,7 +54,9 @@ export class DaytonaClient {
   private readonly toolboxBaseCache = new Map<string, string>();
 
   constructor(private readonly config: DaytonaConfig) {
-    this.baseUrl = (config.apiUrl ?? DEFAULT_API_URL).replace(/\/+$/, "");
+    // A blank env var must fall back to Daytona Cloud, not produce relative URLs.
+    const apiUrl = config.apiUrl?.trim();
+    this.baseUrl = (apiUrl || DEFAULT_API_URL).replace(/\/+$/, "");
   }
 
   private headers(json: boolean): Record<string, string> {
