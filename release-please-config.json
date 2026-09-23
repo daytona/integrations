@@ -32,6 +32,11 @@
       "release-type": "python",
       "package-name": "pydantic-ai-daytona",
       "component": "pydantic-ai-daytona"
+    },
+    "packages/convex": {
+      "release-type": "node",
+      "package-name": "@daytona/convex",
+      "component": "convex"
     }
   }
 }

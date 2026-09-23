@@ -32,6 +32,7 @@ on:
         options:
           - all
           - adk
+          - convex
           - langchain
           - n8n
           - pi
@@ -64,6 +65,7 @@ jobs:
       pull-requests: read
     outputs:
       adk: ${{ steps.decide.outputs.adk }}
+      convex: ${{ steps.decide.outputs.convex }}
       langchain: ${{ steps.decide.outputs.langchain }}
       n8n: ${{ steps.decide.outputs.n8n }}
       pi: ${{ steps.decide.outputs.pi }}
@@ -77,6 +79,8 @@ jobs:
           filters: |
             adk:
               - 'packages/adk-plugin/**'
+            convex:
+              - 'packages/convex/**'
             langchain:
               - 'packages/langchain-data-analysis/**'
             n8n:
@@ -93,6 +97,7 @@ jobs:
           # Fork = the PR's source branch lives in a different repo than ours.
           IS_FORK: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.repo.full_name != github.repository }}
           CH_ADK: ${{ steps.filter.outputs.adk }}
+          CH_CONVEX: ${{ steps.filter.outputs.convex }}
           CH_LANGCHAIN: ${{ steps.filter.outputs.langchain }}
           CH_N8N: ${{ steps.filter.outputs.n8n }}
           CH_PI: ${{ steps.filter.outputs.pi }}
@@ -120,6 +125,7 @@ jobs:
           }
           {
             echo "adk=$(decide adk "${CH_ADK:-false}")"
+            echo "convex=$(decide convex "${CH_CONVEX:-false}")"
             echo "langchain=$(decide langchain "${CH_LANGCHAIN:-false}")"
             echo "n8n=$(decide n8n "${CH_N8N:-false}")"
             echo "pi=$(decide pi "${CH_PI:-false}")"
@@ -161,6 +167,35 @@ jobs:
         env:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: pytest
+
+  convex:
+    needs: changes
+    if: needs.changes.outputs.convex == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 30
+    steps:
+      # Fork lane checks out the PR head (see the adk job note).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Install
+        working-directory: packages/convex
+        run: npm ci
+      - name: Build
+        working-directory: packages/convex
+        run: npm run build
+      # Boots an anonymous LOCAL Convex deployment (no Convex account), deploys
+      # the example app with the component installed, and drives it end to end
+      # against real Daytona sandboxes via `convex run`.
+      - name: Live E2E (local Convex deployment + real Daytona)
+        working-directory: packages/convex
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: npm run test:live
 
   langchain:
     needs: changes
@@ -313,7 +348,7 @@ jobs:
   # required checks treat as satisfied, so the owning lane's verdict governs.
   integration-success:
     name: integration-success
-    needs: [changes, adk, langchain, n8n, pi, pydantic-ai]
+    needs: [changes, adk, convex, langchain, n8n, pi, pydantic-ai]
     if: >-
       always() && (
         github.event_name == 'workflow_dispatch' ||
