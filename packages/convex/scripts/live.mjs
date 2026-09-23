@@ -20,11 +20,15 @@ if (!apiKey) {
   process.exit(1);
 }
 
+// On Windows, npx is a .cmd shim that needs a shell to spawn.
+const isWindows = process.platform === "win32";
+
 const convex = (...args) =>
-  execFileSync("npx", ["convex", ...args], {
+  execFileSync(isWindows ? "npx.cmd" : "npx", ["convex", ...args], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
     timeout: 300_000,
+    shell: isWindows,
   });
 
 const run = (fn, args = {}) => {

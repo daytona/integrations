@@ -26,6 +26,7 @@ describe("Daytona client configuration", () => {
   });
 
   test("explicit options win over environment variables", async () => {
+    const previous = process.env.DAYTONA_API_KEY;
     process.env.DAYTONA_API_KEY = "env-key";
     try {
       let sent: Record<string, unknown> | undefined;
@@ -40,7 +41,8 @@ describe("Daytona client configuration", () => {
       await daytona.getPreviewUrl(capturingCtx, { sandboxId: "sbx-1", port: 80 });
       expect(sent?.config).toMatchObject({ apiKey: "opt-key" });
     } finally {
-      delete process.env.DAYTONA_API_KEY;
+      if (previous === undefined) delete process.env.DAYTONA_API_KEY;
+      else process.env.DAYTONA_API_KEY = previous;
     }
   });
 });

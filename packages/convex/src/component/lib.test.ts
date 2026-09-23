@@ -14,7 +14,12 @@ function stubFetch(
     response: () => Response;
   }>,
 ) {
-  const calls: Array<{ method: string; url: string; body?: string }> = [];
+  const calls: Array<{
+    method: string;
+    url: string;
+    body?: string;
+    headers: Record<string, string>;
+  }> = [];
   const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
@@ -22,6 +27,7 @@ function stubFetch(
       method,
       url,
       body: typeof init?.body === "string" ? init.body : undefined,
+      headers: (init?.headers ?? {}) as Record<string, string>,
     });
     const route = routes.find(
       (r) => r.method === method && url.includes(r.match),
@@ -245,6 +251,29 @@ describe("sandbox lifecycle actions", () => {
     expect(sandbox?.state).toBe("destroyed");
   });
 
+  test("stop treats an already-deleted sandbox (404) as destroyed", async () => {
+    const t = initConvexTest();
+    await t.mutation(internal.lib.upsertSandbox, {
+      sandboxId: "sbx-ephemeral",
+      state: "started",
+    });
+    stubFetch([
+      {
+        method: "POST",
+        match: "/api/sandbox/sbx-ephemeral/stop",
+        response: () => new Response("not found", { status: 404 }),
+      },
+    ]);
+
+    const result = await t.action(api.sandboxes.stop, {
+      config,
+      sandboxId: "sbx-ephemeral",
+    });
+    expect(result).toEqual({ sandboxId: "sbx-ephemeral", state: "destroyed" });
+    const sandbox = await t.query(api.lib.get, { sandboxId: "sbx-ephemeral" });
+    expect(sandbox?.state).toBe("destroyed");
+  });
+
   test("previewUrl returns signed URL fields", async () => {
     const t = initConvexTest();
     stubFetch([
@@ -295,8 +324,11 @@ describe("process actions", () => {
     expect(executeCall?.url).toBe(
       "https://proxy.daytona.test/toolbox/sbx-1/process/execute",
     );
+    expect(executeCall?.headers.Authorization).toBe("Bearer test-key");
     expect(JSON.parse(executeCall?.body ?? "{}")).toMatchObject({
       command: "echo hello",
+      // Default timeout is bounded below Convex's 10-minute action ceiling.
+      timeout: 540,
     });
 
     const history = await t.query(api.lib.listExecutions, {
