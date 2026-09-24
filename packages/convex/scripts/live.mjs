@@ -13,6 +13,8 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 
 const apiKey = process.env.DAYTONA_API_KEY;
 if (!apiKey) {
@@ -20,15 +22,19 @@ if (!apiKey) {
   process.exit(1);
 }
 
-// On Windows, npx is a .cmd shim that needs a shell to spawn.
-const isWindows = process.platform === "win32";
+// Invoke the locally installed Convex CLI through the current Node binary —
+// no npx, no shell: works identically on every platform and never re-parses
+// JSON arguments through cmd.exe.
+const convexBin = join(
+  dirname(createRequire(import.meta.url).resolve("convex/package.json")),
+  "bin/main.js",
+);
 
 const convex = (...args) =>
-  execFileSync(isWindows ? "npx.cmd" : "npx", ["convex", ...args], {
+  execFileSync(process.execPath, [convexBin, ...args], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
     timeout: 300_000,
-    shell: isWindows,
   });
 
 const run = (fn, args = {}) => {

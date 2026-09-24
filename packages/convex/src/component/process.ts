@@ -38,10 +38,13 @@ const DEFAULT_EXEC_TIMEOUT_SECONDS = 540;
 const MAX_EXEC_TIMEOUT_SECONDS = 570;
 
 function boundedTimeout(requested: number | undefined): number {
-  return Math.min(
-    requested ?? DEFAULT_EXEC_TIMEOUT_SECONDS,
-    MAX_EXEC_TIMEOUT_SECONDS,
-  );
+  if (requested === undefined) return DEFAULT_EXEC_TIMEOUT_SECONDS;
+  if (!Number.isFinite(requested) || requested <= 0) {
+    throw new Error(
+      `timeoutSeconds must be a positive number, got ${requested}`,
+    );
+  }
+  return Math.min(requested, MAX_EXEC_TIMEOUT_SECONDS);
 }
 
 const executionResult = v.object({
@@ -118,6 +121,8 @@ export const run = action({
   },
   returns: executionResult,
   handler: async (ctx, args) => {
+    // Validate before any remote call or execution row is created.
+    const timeoutSeconds = boundedTimeout(args.timeoutSeconds);
     const client = new DaytonaClient(args.config);
     return await recordAndRun(
       ctx,
@@ -134,7 +139,7 @@ export const run = action({
           command: args.command,
           cwd: args.cwd,
           envs: args.envs,
-          timeoutSeconds: boundedTimeout(args.timeoutSeconds),
+          timeoutSeconds,
         }),
     );
   },
@@ -154,6 +159,7 @@ export const runCode = action({
   },
   returns: executionResult,
   handler: async (ctx, args) => {
+    const timeoutSeconds = boundedTimeout(args.timeoutSeconds);
     const client = new DaytonaClient(args.config);
     return await recordAndRun(
       ctx,
@@ -170,7 +176,7 @@ export const runCode = action({
           language: args.language,
           argv: args.argv,
           envs: args.envs,
-          timeoutSeconds: boundedTimeout(args.timeoutSeconds),
+          timeoutSeconds,
         }),
     );
   },

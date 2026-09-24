@@ -404,6 +404,19 @@ describe("process actions", () => {
     expect(history[0].kind).toBe("code");
   });
 
+  test("run rejects non-positive timeoutSeconds", async () => {
+    const t = initConvexTest();
+    stubFetch([]);
+    await expect(
+      t.action(api.process.run, {
+        config,
+        sandboxId: "sbx-1",
+        command: "true",
+        timeoutSeconds: -5,
+      }),
+    ).rejects.toThrow(/positive number/);
+  });
+
   test("run auto-starts a stopped sandbox before executing", async () => {
     const t = initConvexTest();
     let state = "stopped";
