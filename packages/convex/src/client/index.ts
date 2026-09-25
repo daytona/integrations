@@ -162,7 +162,7 @@ export class Daytona {
 
   /** Last-observed sandbox record, or null. Reactive. */
   async getSandbox(ctx: RunQueryCtx, args: { sandboxId: string }) {
-    return await ctx.runQuery(this.component.lib.get, args);
+    return await ctx.runQuery(this.component.sandboxes.get, args);
   }
 
   /** Sandbox records, optionally scoped to a `userKey`. Reactive. */
@@ -170,7 +170,7 @@ export class Daytona {
     ctx: RunQueryCtx,
     args: { userKey?: string; limit?: number } = {},
   ) {
-    return await ctx.runQuery(this.component.lib.list, args);
+    return await ctx.runQuery(this.component.sandboxes.list, args);
   }
 
   /** Execution history for a sandbox, newest first. Reactive. */
@@ -178,12 +178,12 @@ export class Daytona {
     ctx: RunQueryCtx,
     args: { sandboxId: string; limit?: number },
   ) {
-    return await ctx.runQuery(this.component.lib.listExecutions, args);
+    return await ctx.runQuery(this.component.executions.list, args);
   }
 
   /** A single execution record by ID, or null. Reactive. */
   async getExecution(ctx: RunQueryCtx, args: { executionId: string }) {
-    return await ctx.runQuery(this.component.lib.getExecution, {
+    return await ctx.runQuery(this.component.executions.get, {
       executionId: args.executionId as never,
     });
   }

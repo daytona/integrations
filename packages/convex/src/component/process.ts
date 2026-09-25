@@ -66,7 +66,7 @@ async function recordAndRun(
   execute: () => Promise<ProcessExecutionResponse>,
 ): Promise<{ executionId: Id<"executions">; exitCode: number; result: string }> {
   const executionId: Id<"executions"> = await ctx.runMutation(
-    internal.lib.startExecution,
+    internal.executions.startExecution,
     {
       sandboxId: args.sandboxId,
       kind: args.kind,
@@ -77,14 +77,14 @@ async function recordAndRun(
   try {
     if (args.autoStart !== false) {
       const sandbox = await client.ensureStarted(args.sandboxId);
-      await ctx.runMutation(internal.lib.upsertSandbox, {
+      await ctx.runMutation(internal.sandboxes.upsertSandbox, {
         sandboxId: args.sandboxId,
         state: sandbox.state,
       });
     }
     const response = await execute();
     const output = response.result ?? response.artifacts?.stdout ?? "";
-    await ctx.runMutation(internal.lib.finishExecution, {
+    await ctx.runMutation(internal.executions.finishExecution, {
       executionId,
       status: "completed",
       exitCode: response.exitCode,
@@ -98,7 +98,7 @@ async function recordAndRun(
       result: truncate(output, MAX_RETURNED_OUTPUT),
     };
   } catch (error) {
-    await ctx.runMutation(internal.lib.finishExecution, {
+    await ctx.runMutation(internal.executions.finishExecution, {
       executionId,
       status: "failed",
       error: error instanceof Error ? error.message : String(error),

@@ -23,6 +23,48 @@ import type { FunctionReference } from "convex/server";
  */
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
+    executions: {
+      get: FunctionReference<
+        "query",
+        "internal",
+        { executionId: string },
+        null | {
+          _creationTime: number;
+          _id: string;
+          cwd?: string;
+          error?: string;
+          exitCode?: number;
+          finishedAt?: number;
+          input: string;
+          kind: "command" | "code";
+          result?: string;
+          sandboxId: string;
+          startedAt: number;
+          status: "running" | "completed" | "failed";
+        },
+        Name
+      >;
+      list: FunctionReference<
+        "query",
+        "internal",
+        { limit?: number; sandboxId: string },
+        Array<{
+          _creationTime: number;
+          _id: string;
+          cwd?: string;
+          error?: string;
+          exitCode?: number;
+          finishedAt?: number;
+          input: string;
+          kind: "command" | "code";
+          result?: string;
+          sandboxId: string;
+          startedAt: number;
+          status: "running" | "completed" | "failed";
+        }>,
+        Name
+      >;
+    };
     files: {
       deleteFile: FunctionReference<
         "action",
@@ -73,90 +115,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           sandboxId: string;
         },
         null,
-        Name
-      >;
-    };
-    lib: {
-      get: FunctionReference<
-        "query",
-        "internal",
-        { sandboxId: string },
-        null | {
-          _creationTime: number;
-          _id: string;
-          createdAt: number;
-          labels?: Record<string, string>;
-          lastError?: string;
-          name?: string;
-          public?: boolean;
-          sandboxId: string;
-          snapshot?: string;
-          state: string;
-          target?: string;
-          updatedAt: number;
-          userKey?: string;
-        },
-        Name
-      >;
-      getExecution: FunctionReference<
-        "query",
-        "internal",
-        { executionId: string },
-        null | {
-          _creationTime: number;
-          _id: string;
-          cwd?: string;
-          error?: string;
-          exitCode?: number;
-          finishedAt?: number;
-          input: string;
-          kind: "command" | "code";
-          result?: string;
-          sandboxId: string;
-          startedAt: number;
-          status: "running" | "completed" | "failed";
-        },
-        Name
-      >;
-      list: FunctionReference<
-        "query",
-        "internal",
-        { limit?: number; userKey?: string },
-        Array<{
-          _creationTime: number;
-          _id: string;
-          createdAt: number;
-          labels?: Record<string, string>;
-          lastError?: string;
-          name?: string;
-          public?: boolean;
-          sandboxId: string;
-          snapshot?: string;
-          state: string;
-          target?: string;
-          updatedAt: number;
-          userKey?: string;
-        }>,
-        Name
-      >;
-      listExecutions: FunctionReference<
-        "query",
-        "internal",
-        { limit?: number; sandboxId: string },
-        Array<{
-          _creationTime: number;
-          _id: string;
-          cwd?: string;
-          error?: string;
-          exitCode?: number;
-          finishedAt?: number;
-          input: string;
-          kind: "command" | "code";
-          result?: string;
-          sandboxId: string;
-          startedAt: number;
-          status: "running" | "completed" | "failed";
-        }>,
         Name
       >;
     };
@@ -218,6 +176,48 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           waitTimeoutMs?: number;
         },
         { sandboxId: string; state: string },
+        Name
+      >;
+      get: FunctionReference<
+        "query",
+        "internal",
+        { sandboxId: string },
+        null | {
+          _creationTime: number;
+          _id: string;
+          createdAt: number;
+          labels?: Record<string, string>;
+          lastError?: string;
+          name?: string;
+          public?: boolean;
+          sandboxId: string;
+          snapshot?: string;
+          state: string;
+          target?: string;
+          updatedAt: number;
+          userKey?: string;
+        },
+        Name
+      >;
+      list: FunctionReference<
+        "query",
+        "internal",
+        { limit?: number; userKey?: string },
+        Array<{
+          _creationTime: number;
+          _id: string;
+          createdAt: number;
+          labels?: Record<string, string>;
+          lastError?: string;
+          name?: string;
+          public?: boolean;
+          sandboxId: string;
+          snapshot?: string;
+          state: string;
+          target?: string;
+          updatedAt: number;
+          userKey?: string;
+        }>,
         Name
       >;
       previewUrl: FunctionReference<

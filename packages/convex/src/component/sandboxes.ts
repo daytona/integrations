@@ -4,20 +4,114 @@
  */
 
 /**
- * Sandbox lifecycle actions. Each action calls the Daytona API and records the
- * observed state in the component's `sandboxes` table so the host app can
- * subscribe to it reactively.
+ * Sandbox state and lifecycle: reactive queries over the `sandboxes` table,
+ * the internal bookkeeping mutations, and the lifecycle actions that call the
+ * Daytona API and record the observed state for the host app to subscribe to.
  */
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api.js";
-import { action } from "./_generated/server.js";
+import { action, internalMutation, query } from "./_generated/server.js";
 import { DaytonaApiError, DaytonaClient } from "./daytona.js";
-import { configValidator } from "./types.js";
+import { sandboxFields } from "./schema.js";
+import { clampLimit, configValidator } from "./types.js";
+
+export const sandboxDoc = v.object({
+  ...sandboxFields,
+  _id: v.id("sandboxes"),
+  _creationTime: v.number(),
+});
 
 const sandboxSummary = v.object({
   sandboxId: v.string(),
   state: v.string(),
+});
+
+export const get = query({
+  args: { sandboxId: v.string() },
+  returns: v.union(v.null(), sandboxDoc),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("sandboxes")
+      .withIndex("sandboxId", (q) => q.eq("sandboxId", args.sandboxId))
+      .unique();
+  },
+});
+
+export const list = query({
+  args: { userKey: v.optional(v.string()), limit: v.optional(v.number()) },
+  returns: v.array(sandboxDoc),
+  handler: async (ctx, args) => {
+    const limit = clampLimit(args.limit, 100);
+    if (args.userKey !== undefined) {
+      const userKey = args.userKey;
+      return await ctx.db
+        .query("sandboxes")
+        .withIndex("userKey", (q) => q.eq("userKey", userKey))
+        .order("desc")
+        .take(limit);
+    }
+    return await ctx.db.query("sandboxes").order("desc").take(limit);
+  },
+});
+
+export const upsertSandbox = internalMutation({
+  args: {
+    sandboxId: v.string(),
+    state: v.string(),
+    name: v.optional(v.string()),
+    snapshot: v.optional(v.string()),
+    target: v.optional(v.string()),
+    public: v.optional(v.boolean()),
+    labels: v.optional(v.record(v.string(), v.string())),
+    userKey: v.optional(v.string()),
+    lastError: v.optional(v.string()),
+  },
+  returns: v.id("sandboxes"),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("sandboxes")
+      .withIndex("sandboxId", (q) => q.eq("sandboxId", args.sandboxId))
+      .unique();
+    // Skip undefined fields so a partial update never clears known values.
+    const defined = Object.fromEntries(
+      Object.entries(args).filter(([, value]) => value !== undefined),
+    ) as typeof args;
+    if (existing) {
+      await ctx.db.patch(existing._id, { ...defined, updatedAt: now });
+      return existing._id;
+    }
+    return await ctx.db.insert("sandboxes", {
+      ...defined,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const setSandboxError = internalMutation({
+  args: {
+    sandboxId: v.string(),
+    error: v.string(),
+    /** Last observed remote state, when known (e.g. "build_failed"). */
+    state: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("sandboxes")
+      .withIndex("sandboxId", (q) => q.eq("sandboxId", args.sandboxId))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        lastError: args.error,
+        ...(args.state !== undefined ? { state: args.state } : {}),
+        updatedAt: Date.now(),
+      });
+    }
+    return null;
+  },
 });
 
 export const create = action({
@@ -84,7 +178,7 @@ export const create = action({
       autoArchiveInterval: args.autoArchiveInterval,
       autoDeleteInterval: args.autoDeleteInterval,
     });
-    await ctx.runMutation(internal.lib.upsertSandbox, {
+    await ctx.runMutation(internal.sandboxes.upsertSandbox, {
       sandboxId: created.id,
       state: created.state,
       name: created.name,
@@ -108,14 +202,14 @@ export const create = action({
           .getSandbox(created.id)
           .then((s) => s.state as string)
           .catch(() => undefined);
-        await ctx.runMutation(internal.lib.setSandboxError, {
+        await ctx.runMutation(internal.sandboxes.setSandboxError, {
           sandboxId: created.id,
           error: error instanceof Error ? error.message : String(error),
           state: observed,
         });
         throw error;
       }
-      await ctx.runMutation(internal.lib.upsertSandbox, {
+      await ctx.runMutation(internal.sandboxes.upsertSandbox, {
         sandboxId: created.id,
         state,
       });
@@ -137,13 +231,13 @@ export const start = action({
       const sandbox = await client.ensureStarted(args.sandboxId, {
         timeoutMs: args.waitTimeoutMs,
       });
-      await ctx.runMutation(internal.lib.upsertSandbox, {
+      await ctx.runMutation(internal.sandboxes.upsertSandbox, {
         sandboxId: args.sandboxId,
         state: sandbox.state,
       });
       return { sandboxId: args.sandboxId, state: sandbox.state };
     } catch (error) {
-      await ctx.runMutation(internal.lib.setSandboxError, {
+      await ctx.runMutation(internal.sandboxes.setSandboxError, {
         sandboxId: args.sandboxId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -170,20 +264,20 @@ export const stop = action({
         ["stopped", "destroyed"],
         { timeoutMs: args.waitTimeoutMs },
       );
-      await ctx.runMutation(internal.lib.upsertSandbox, {
+      await ctx.runMutation(internal.sandboxes.upsertSandbox, {
         sandboxId: args.sandboxId,
         state: sandbox.state,
       });
       return { sandboxId: args.sandboxId, state: sandbox.state };
     } catch (error) {
       if (error instanceof DaytonaApiError && error.status === 404) {
-        await ctx.runMutation(internal.lib.upsertSandbox, {
+        await ctx.runMutation(internal.sandboxes.upsertSandbox, {
           sandboxId: args.sandboxId,
           state: "destroyed",
         });
         return { sandboxId: args.sandboxId, state: "destroyed" };
       }
-      await ctx.runMutation(internal.lib.setSandboxError, {
+      await ctx.runMutation(internal.sandboxes.setSandboxError, {
         sandboxId: args.sandboxId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -199,7 +293,7 @@ export const remove = action({
     const client = new DaytonaClient(args.config);
     await client.deleteSandbox(args.sandboxId);
     // Keep the row (with its execution history) as an audit record.
-    await ctx.runMutation(internal.lib.upsertSandbox, {
+    await ctx.runMutation(internal.sandboxes.upsertSandbox, {
       sandboxId: args.sandboxId,
       state: "destroyed",
     });
@@ -215,7 +309,7 @@ export const refresh = action({
     const client = new DaytonaClient(args.config);
     try {
       const sandbox = await client.getSandbox(args.sandboxId);
-      await ctx.runMutation(internal.lib.upsertSandbox, {
+      await ctx.runMutation(internal.sandboxes.upsertSandbox, {
         sandboxId: args.sandboxId,
         state: sandbox.state,
         name: sandbox.name,
@@ -227,7 +321,7 @@ export const refresh = action({
       return { sandboxId: args.sandboxId, state: sandbox.state };
     } catch (error) {
       if (error instanceof DaytonaApiError && error.status === 404) {
-        await ctx.runMutation(internal.lib.upsertSandbox, {
+        await ctx.runMutation(internal.sandboxes.upsertSandbox, {
           sandboxId: args.sandboxId,
           state: "destroyed",
         });

@@ -108,6 +108,13 @@ export const MAX_STORED_INPUT = 4_000;
 /** Cap output returned across the Convex function boundary (limit is 16 MiB total). */
 export const MAX_RETURNED_OUTPUT = 4_000_000;
 
+/** Clamp caller-provided limits to a sane integer range for `.take()`. */
+export function clampLimit(limit: number | undefined, fallback: number): number {
+  const floored = Math.floor(limit ?? fallback);
+  if (!Number.isFinite(floored)) return fallback;
+  return Math.min(Math.max(floored, 1), 500);
+}
+
 const TRUNCATION_MARKER = "\n…[truncated]";
 
 /** Truncate to a HARD bound of `max` characters, marker included. */

@@ -9,8 +9,8 @@
  */
 
 import type * as daytona from "../daytona.js";
+import type * as executions from "../executions.js";
 import type * as files from "../files.js";
-import type * as lib from "../lib.js";
 import type * as process from "../process.js";
 import type * as sandboxes from "../sandboxes.js";
 import type * as types from "../types.js";
@@ -24,8 +24,8 @@ import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
   daytona: typeof daytona;
+  executions: typeof executions;
   files: typeof files;
-  lib: typeof lib;
   process: typeof process;
   sandboxes: typeof sandboxes;
   types: typeof types;

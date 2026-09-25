@@ -61,18 +61,18 @@ afterEach(() => {
 describe("state bookkeeping (queries + internal mutations)", () => {
   test("upsertSandbox inserts then patches without clearing fields", async () => {
     const t = initConvexTest();
-    await t.mutation(internal.lib.upsertSandbox, {
+    await t.mutation(internal.sandboxes.upsertSandbox, {
       sandboxId: "sbx-1",
       state: "creating",
       snapshot: "snap-a",
       userKey: "user-1",
     });
-    await t.mutation(internal.lib.upsertSandbox, {
+    await t.mutation(internal.sandboxes.upsertSandbox, {
       sandboxId: "sbx-1",
       state: "started",
     });
 
-    const sandbox = await t.query(api.lib.get, { sandboxId: "sbx-1" });
+    const sandbox = await t.query(api.sandboxes.get, { sandboxId: "sbx-1" });
     expect(sandbox?.state).toBe("started");
     // Partial update must not clear previously known fields.
     expect(sandbox?.snapshot).toBe("snap-a");
@@ -81,45 +81,45 @@ describe("state bookkeeping (queries + internal mutations)", () => {
 
   test("list scopes by userKey", async () => {
     const t = initConvexTest();
-    await t.mutation(internal.lib.upsertSandbox, {
+    await t.mutation(internal.sandboxes.upsertSandbox, {
       sandboxId: "sbx-1",
       state: "started",
       userKey: "user-1",
     });
-    await t.mutation(internal.lib.upsertSandbox, {
+    await t.mutation(internal.sandboxes.upsertSandbox, {
       sandboxId: "sbx-2",
       state: "started",
       userKey: "user-2",
     });
 
-    expect(await t.query(api.lib.list, {})).toHaveLength(2);
-    const scoped = await t.query(api.lib.list, { userKey: "user-1" });
+    expect(await t.query(api.sandboxes.list, {})).toHaveLength(2);
+    const scoped = await t.query(api.sandboxes.list, { userKey: "user-1" });
     expect(scoped).toHaveLength(1);
     expect(scoped[0].sandboxId).toBe("sbx-1");
   });
 
   test("execution lifecycle: running → completed", async () => {
     const t = initConvexTest();
-    const executionId = await t.mutation(internal.lib.startExecution, {
+    const executionId = await t.mutation(internal.executions.startExecution, {
       sandboxId: "sbx-1",
       kind: "command",
       input: "echo hi",
     });
-    let execution = await t.query(api.lib.getExecution, { executionId });
+    let execution = await t.query(api.executions.get, { executionId });
     expect(execution?.status).toBe("running");
 
-    await t.mutation(internal.lib.finishExecution, {
+    await t.mutation(internal.executions.finishExecution, {
       executionId,
       status: "completed",
       exitCode: 0,
       result: "hi",
     });
-    execution = await t.query(api.lib.getExecution, { executionId });
+    execution = await t.query(api.executions.get, { executionId });
     expect(execution?.status).toBe("completed");
     expect(execution?.exitCode).toBe(0);
     expect(execution?.finishedAt).toBeDefined();
 
-    const history = await t.query(api.lib.listExecutions, {
+    const history = await t.query(api.executions.list, {
       sandboxId: "sbx-1",
     });
     expect(history).toHaveLength(1);
@@ -151,7 +151,7 @@ describe("sandbox lifecycle actions", () => {
     });
     expect(result).toEqual({ sandboxId: "sbx-1", state: "started" });
 
-    const sandbox = await t.query(api.lib.get, { sandboxId: "sbx-1" });
+    const sandbox = await t.query(api.sandboxes.get, { sandboxId: "sbx-1" });
     expect(sandbox?.state).toBe("started");
     expect(sandbox?.userKey).toBe("user-1");
   });
@@ -224,13 +224,13 @@ describe("sandbox lifecycle actions", () => {
     await expect(
       t.action(api.sandboxes.create, { config }),
     ).rejects.toThrow(/build_failed/);
-    const sandbox = await t.query(api.lib.get, { sandboxId: "sbx-1" });
+    const sandbox = await t.query(api.sandboxes.get, { sandboxId: "sbx-1" });
     expect(sandbox?.lastError).toMatch(/build_failed/);
   });
 
   test("refresh returns null and marks destroyed on 404", async () => {
     const t = initConvexTest();
-    await t.mutation(internal.lib.upsertSandbox, {
+    await t.mutation(internal.sandboxes.upsertSandbox, {
       sandboxId: "sbx-gone",
       state: "started",
     });
@@ -247,13 +247,13 @@ describe("sandbox lifecycle actions", () => {
       sandboxId: "sbx-gone",
     });
     expect(result).toBeNull();
-    const sandbox = await t.query(api.lib.get, { sandboxId: "sbx-gone" });
+    const sandbox = await t.query(api.sandboxes.get, { sandboxId: "sbx-gone" });
     expect(sandbox?.state).toBe("destroyed");
   });
 
   test("stop treats an already-deleted sandbox (404) as destroyed", async () => {
     const t = initConvexTest();
-    await t.mutation(internal.lib.upsertSandbox, {
+    await t.mutation(internal.sandboxes.upsertSandbox, {
       sandboxId: "sbx-ephemeral",
       state: "started",
     });
@@ -270,7 +270,7 @@ describe("sandbox lifecycle actions", () => {
       sandboxId: "sbx-ephemeral",
     });
     expect(result).toEqual({ sandboxId: "sbx-ephemeral", state: "destroyed" });
-    const sandbox = await t.query(api.lib.get, { sandboxId: "sbx-ephemeral" });
+    const sandbox = await t.query(api.sandboxes.get, { sandboxId: "sbx-ephemeral" });
     expect(sandbox?.state).toBe("destroyed");
   });
 
@@ -331,7 +331,7 @@ describe("process actions", () => {
       timeout: 540,
     });
 
-    const history = await t.query(api.lib.listExecutions, {
+    const history = await t.query(api.executions.list, {
       sandboxId: "sbx-1",
     });
     expect(history).toHaveLength(1);
@@ -362,7 +362,7 @@ describe("process actions", () => {
       }),
     ).rejects.toThrow(/500/);
 
-    const history = await t.query(api.lib.listExecutions, {
+    const history = await t.query(api.executions.list, {
       sandboxId: "sbx-1",
     });
     expect(history).toHaveLength(1);
@@ -398,7 +398,7 @@ describe("process actions", () => {
       language: "python",
     });
 
-    const history = await t.query(api.lib.listExecutions, {
+    const history = await t.query(api.executions.list, {
       sandboxId: "sbx-1",
     });
     expect(history[0].kind).toBe("code");
