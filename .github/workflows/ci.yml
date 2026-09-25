@@ -27,6 +27,7 @@ jobs:
       pi: ${{ steps.filter.outputs.pi }}
       opencode: ${{ steps.filter.outputs.opencode }}
       pydantic_ai: ${{ steps.filter.outputs.pydantic_ai }}
+      convex: ${{ steps.filter.outputs.convex }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -45,6 +46,8 @@ jobs:
               - 'packages/opencode-plugin/**'
             pydantic_ai:
               - 'packages/pydantic-ai-daytona/**'
+            convex:
+              - 'packages/convex/**'
 
   adk:
     needs: changes
@@ -208,6 +211,36 @@ jobs:
       # NOTE: live tests (tests/integration_tests, real Daytona sandboxes) run via
       # the separate integration workflow, not per-PR CI.
 
+  convex:
+    needs: changes
+    if: needs.changes.outputs.convex == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/convex/package.json && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/convex
+        run: npm ci
+      - name: Typecheck
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/convex
+        run: npm run typecheck
+      - name: Build
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/convex
+        run: npm run build
+      - name: Unit tests (offline, mocked Daytona API)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/convex
+        run: npm test
+
   # Single, stable status check to require in branch protection.
   # It ALWAYS runs (if: always()) and fails only if a relevant job failed or
   # was cancelled. A "skipped" job (a package this PR didn't touch) is fine —
@@ -215,7 +248,7 @@ jobs:
   # merges when a touched package's lint/test/build fails.
   ci-success:
     name: ci-success
-    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai]
+    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai, convex]
     if: always()
     runs-on: ubuntu-latest
     steps:

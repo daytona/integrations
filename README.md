@@ -10,6 +10,7 @@ Packages published to **a package registry** live in [`packages/`](packages/):
 |---|---|
 | [`adk-plugin`](packages/adk-plugin) — Google ADK plugin | PyPI · [`daytona-adk`](https://pypi.org/project/daytona-adk/) |
 | [`langchain-data-analysis`](packages/langchain-data-analysis) — LangChain data-analysis tool | PyPI · [`langchain-daytona-data-analysis`](https://pypi.org/project/langchain-daytona-data-analysis/) |
+| [`convex`](packages/convex) — Convex sandbox component | npm · [`@daytona/convex`](https://www.npmjs.com/package/@daytona/convex) |
 | [`n8n-nodes-daytona`](packages/n8n-nodes-daytona) — n8n community node | npm · [`@daytona/n8n-nodes-daytona`](https://www.npmjs.com/package/@daytona/n8n-nodes-daytona) |
 | [`pi-extension`](packages/pi-extension) — Pi coding-agent extension | npm · [`@daytona/pi`](https://www.npmjs.com/package/@daytona/pi) |
 | [`opencode-plugin`](packages/opencode-plugin) — OpenCode plugin | npm · [`@daytona/opencode`](https://www.npmjs.com/package/@daytona/opencode) |

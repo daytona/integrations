@@ -1,0 +1,77 @@
+{
+  "name": "@daytona/convex",
+  "version": "0.0.0",
+  "description": "Convex component for Daytona — create sandboxes, run commands and code, and manage sandbox files from your Convex backend, with sandbox and execution state tracked in reactive Convex tables",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daytona/integrations.git",
+    "directory": "packages/convex"
+  },
+  "author": "Daytona Platforms Inc.",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/daytona/integrations/issues"
+  },
+  "homepage": "https://github.com/daytona/integrations/tree/main/packages/convex#readme",
+  "keywords": [
+    "convex",
+    "component",
+    "convex-component",
+    "daytona",
+    "sandbox",
+    "code-execution",
+    "ai-agents"
+  ],
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./test": "./src/test.ts",
+    "./_generated/component.js": {
+      "types": "./dist/component/_generated/component.d.ts"
+    },
+    "./_generated/component": {
+      "types": "./dist/component/_generated/component.d.ts"
+    },
+    "./convex.config.js": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    },
+    "./convex.config": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    }
+  },
+  "types": "./dist/client/index.d.ts",
+  "module": "./dist/client/index.js",
+  "scripts": {
+    "codegen": "convex codegen --component-dir ./src/component",
+    "build": "tsc --project tsconfig.build.json",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "typecheck": "tsc --noEmit",
+    "typecheck:example": "tsc -p example/convex",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:live": "node scripts/live.mjs",
+    "dev": "convex dev"
+  },
+  "peerDependencies": {
+    "convex": "^1.43.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "convex": "^1.45.0",
+    "convex-test": "^0.0.58",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.4"
+  }
+}
