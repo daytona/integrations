@@ -548,6 +548,19 @@ describe("background execution", () => {
     expect(execution?.finishedAt).toBeDefined();
   });
 
+  test("runBackground rejects shell-unsafe env var names", async () => {
+    const t = initConvexTest();
+    stubFetch(sessionRoutes(() => false));
+    await expect(
+      t.action(api.process.runBackground, {
+        config,
+        sandboxId: "sbx-1",
+        command: "true",
+        envs: { "X=1; touch /tmp/pwn; #": "oops" },
+      }),
+    ).rejects.toThrow(/Invalid environment variable name/);
+  });
+
   test("pollExecution marks failed on non-zero exit", async () => {
     const t = initConvexTest();
     stubFetch(sessionRoutes(() => true, 2));

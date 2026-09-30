@@ -313,19 +313,29 @@ export class DaytonaClient {
       "GET",
       `/process/session/${encodeURIComponent(sessionId)}/command/${encodeURIComponent(commandId)}/logs`,
     );
-    // The toolbox serves logs as text/plain; tolerate a JSON variant too.
+    // The toolbox serves logs as text/plain; tolerate a JSON variant too —
+    // but only when the response says so, or a command that PRINTS JSON
+    // would be misparsed as a logs envelope.
     const raw = await response.text();
-    try {
-      const logs = JSON.parse(raw) as {
-        output?: string;
-        stdout?: string;
-        stderr?: string;
-      };
-      if (logs && typeof logs === "object") {
-        return logs.output ?? `${logs.stdout ?? ""}${logs.stderr ?? ""}`;
+    if (response.headers.get("content-type")?.includes("application/json")) {
+      try {
+        const logs = JSON.parse(raw) as {
+          output?: string;
+          stdout?: string;
+          stderr?: string;
+        };
+        if (logs && typeof logs === "object") {
+          if (logs.output) return logs.output;
+          const stdout = logs.stdout ?? "";
+          const stderr = logs.stderr ?? "";
+          if (stdout && stderr) {
+            return `${stdout}${stdout.endsWith("\n") ? "" : "\n"}${stderr}`;
+          }
+          return stdout || stderr;
+        }
+      } catch {
+        // Malformed JSON header/body combo — fall through to raw.
       }
-    } catch {
-      // Plain text — the normal case.
     }
     return raw;
   }

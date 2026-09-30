@@ -65,6 +65,9 @@ const devProcess = spawn(process.execPath, [convexBin, "dev"], {
   stdio: "ignore",
   detached: false,
 });
+// Unreferenced so the child can't keep this script's event loop alive after
+// the assertions finish; the exit handler then reaps it.
+devProcess.unref();
 process.on("exit", () => devProcess.kill());
 await new Promise((resolve) => setTimeout(resolve, 5000));
 console.log("✓ example app deployed to local Convex with the daytona component");

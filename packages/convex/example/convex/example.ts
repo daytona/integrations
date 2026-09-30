@@ -13,13 +13,17 @@ const daytona = new Daytona(components.daytona);
 
 /** Create a sandbox and wait until it's running. */
 export const createSandbox = action({
-  args: { snapshot: v.optional(v.string()) },
+  args: {
+    snapshot: v.optional(v.string()),
+    // Sandboxes for long background jobs should pass 0 (never idle-stop) —
+    // a running background command does not reset the idle timer.
+    autoStopInterval: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     return await daytona.createSandbox(ctx, {
       snapshot: args.snapshot,
       labels: { "created-by": "convex-example" },
-      // Pause after 15 idle minutes (filesystem preserved); never auto-delete.
-      autoStopInterval: 15,
+      autoStopInterval: args.autoStopInterval ?? 15,
       autoDeleteInterval: -1,
     });
   },

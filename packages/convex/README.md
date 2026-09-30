@@ -120,7 +120,7 @@ const py = await daytona.runCode(ctx, {
 
 A stopped or archived sandbox is transparently restarted first (disable with `autoStart: false`). Every call records an execution row (`running` → `completed`/`failed`) with truncated output, so history and status are queryable.
 
-For long-running commands, `runBackground` starts the command in a sandbox session and returns immediately — no Convex action is held open (or billed) while it runs, and it isn't bound to the 10-minute action ceiling:
+For long-running commands, `runBackground` starts the command in a sandbox session and returns immediately — the launch action isn't held open for the command's duration (a lightweight scheduler-driven poller checks in periodically instead), and the command isn't bound to the 10-minute action ceiling:
 
 ```ts
 const { executionId } = await daytona.runBackground(ctx, {
@@ -131,7 +131,8 @@ const { executionId } = await daytona.runBackground(ctx, {
 // Watch it reactively: a scheduler-driven poller streams logs into the row
 // while it runs and records the exit code when it finishes.
 export const training = query({
-  args: { executionId: v.id("executions") },
+  // Component table IDs cross the boundary as plain strings.
+  args: { executionId: v.string() },
   handler: async (ctx, args) => daytona.getExecution(ctx, args),
 });
 ```

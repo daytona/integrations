@@ -212,6 +212,11 @@ function composeSessionCommand(
 ): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(envs ?? {})) {
+    // Keys are interpolated as shell syntax — reject anything that isn't a
+    // valid identifier so they can't smuggle in extra commands.
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+      throw new Error(`Invalid environment variable name: ${key}`);
+    }
     parts.push(`export ${key}=${shellQuote(value)}`);
   }
   if (cwd) parts.push(`cd ${shellQuote(cwd)}`);
@@ -232,13 +237,8 @@ export const runBackground = action({
   returns: v.object({ executionId: v.id("executions") }),
   handler: async (ctx, args) => {
     const client = new DaytonaClient(args.config);
-    if (args.autoStart !== false) {
-      const sandbox = await client.ensureStarted(args.sandboxId);
-      await ctx.runMutation(internal.sandboxes.upsertSandbox, {
-        sandboxId: args.sandboxId,
-        state: sandbox.state,
-      });
-    }
+    // Record the row first so every call leaves a history entry, even when
+    // sandbox startup fails.
     const executionId: Id<"executions"> = await ctx.runMutation(
       internal.executions.startExecution,
       {
@@ -248,9 +248,18 @@ export const runBackground = action({
         cwd: args.cwd,
       },
     );
+    const sessionId = `convex-exec-${executionId}`;
+    let sessionCreated = false;
     try {
-      const sessionId = `convex-exec-${executionId}`;
+      if (args.autoStart !== false) {
+        const sandbox = await client.ensureStarted(args.sandboxId);
+        await ctx.runMutation(internal.sandboxes.upsertSandbox, {
+          sandboxId: args.sandboxId,
+          state: sandbox.state,
+        });
+      }
       await client.createSession(args.sandboxId, sessionId);
+      sessionCreated = true;
       const { cmdId } = await client.sessionExec(args.sandboxId, sessionId, {
         command: composeSessionCommand(args.command, args.cwd, args.envs),
         runAsync: true,
@@ -268,6 +277,13 @@ export const runBackground = action({
       });
       return { executionId };
     } catch (error) {
+      // Don't leave an orphaned session (and possibly a started command)
+      // running with no poller attached.
+      if (sessionCreated) {
+        await client
+          .deleteSession(args.sandboxId, sessionId)
+          .catch(() => undefined);
+      }
       await ctx.runMutation(internal.executions.finishExecution, {
         executionId,
         status: "failed",
@@ -341,6 +357,11 @@ export const pollExecution = internalAction({
       // Tolerate transient failures (network, sandbox restarting) before
       // declaring the execution dead.
       if (args.failures + 1 >= MAX_POLL_FAILURES) {
+        // Make the terminal state honest: kill the session so the command
+        // can't keep running after its row says "failed".
+        await client
+          .deleteSession(execution.sandboxId, execution.sessionId)
+          .catch(() => undefined);
         await ctx.runMutation(internal.executions.finishExecution, {
           executionId: args.executionId,
           status: "failed",
