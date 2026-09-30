@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.191.2](https://github.com/daytona/integrations/compare/pi-extension-v0.191.1...pi-extension-v0.191.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **pi-extension:** run sandbox tools in the sandbox cwd on newer Pi ([#72](https://github.com/daytona/integrations/issues/72)) ([e2d6de3](https://github.com/daytona/integrations/commit/e2d6de35ac466f4c5ded3e35c337fc672bd58a70))
+
 ## [0.191.1](https://github.com/daytona/integrations/compare/pi-extension-v0.191.0...pi-extension-v0.191.1) (2026-09-17)
 
 
