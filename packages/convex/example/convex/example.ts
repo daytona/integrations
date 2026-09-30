@@ -37,6 +37,18 @@ export const runCommand = action({
   },
 });
 
+/** Start a long-running command in the background — watch it via `executions`. */
+export const runBackgroundCommand = action({
+  args: {
+    sandboxId: v.string(),
+    command: v.string(),
+    cwd: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await daytona.runBackground(ctx, args);
+  },
+});
+
 /** Run a Python snippet inside a sandbox. */
 export const runPython = action({
   args: { sandboxId: v.string(), code: v.string() },

@@ -41,6 +41,9 @@ export const executionFields = {
   exitCode: v.optional(v.number()),
   /** Combined output (truncated for storage — full output is the action's return value). */
   result: v.optional(v.string()),
+  /** Set for background executions: the toolbox session/command driving them. */
+  sessionId: v.optional(v.string()),
+  commandId: v.optional(v.string()),
   error: v.optional(v.string()),
   startedAt: v.number(),
   finishedAt: v.optional(v.number()),

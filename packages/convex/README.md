@@ -120,6 +120,24 @@ const py = await daytona.runCode(ctx, {
 
 A stopped or archived sandbox is transparently restarted first (disable with `autoStart: false`). Every call records an execution row (`running` → `completed`/`failed`) with truncated output, so history and status are queryable.
 
+For long-running commands, `runBackground` starts the command in a sandbox session and returns immediately — no Convex action is held open (or billed) while it runs, and it isn't bound to the 10-minute action ceiling:
+
+```ts
+const { executionId } = await daytona.runBackground(ctx, {
+  sandboxId,
+  command: "python train.py",
+  cwd: "/home/daytona/project",
+});
+// Watch it reactively: a scheduler-driven poller streams logs into the row
+// while it runs and records the exit code when it finishes.
+export const training = query({
+  args: { executionId: v.id("executions") },
+  handler: async (ctx, args) => daytona.getExecution(ctx, args),
+});
+```
+
+A running background command does not reset the sandbox's [idle auto-stop timer](https://www.daytona.io/docs/sandboxes#what-resets-the-timer) — create sandboxes for long jobs with `autoStopInterval: 0`.
+
 ### Reactive state
 
 These read the component's tables — no Daytona API call, and they update live:
@@ -174,7 +192,7 @@ export const mySandboxes = query({
 
 ### Limits & long-running work
 
-- Convex actions time out after 10 minutes, so commands are always bounded below that ceiling: `timeoutSeconds` defaults to 540 and is capped at 570. For longer jobs, start a background process in the sandbox (`nohup … &`) and poll with follow-up `run` calls.
+- Convex actions time out after 10 minutes, so synchronous `run`/`runCode` commands are always bounded below that ceiling: `timeoutSeconds` defaults to 540 and is capped at 570. For longer jobs, use `runBackground` — it has no duration bound and holds no action open.
 - Stored execution output is truncated (64 KB); the action's return value carries up to 4 MB.
 - Sandboxes cost money while running: set `autoStopInterval`, and delete sandboxes you're done with. `refreshSandbox` reconciles records whose remote sandbox was removed out-of-band.
 

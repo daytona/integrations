@@ -206,6 +206,32 @@ export class Daytona {
     });
   }
 
+  /**
+   * Start a command in the background and return immediately with the
+   * execution ID. No action is held open and the command isn't bound to
+   * Convex's 10-minute ceiling: a scheduler-chained poller updates the
+   * execution row (live logs while running, exit code + status when done) —
+   * watch it reactively with `getExecution`/`listExecutions`.
+   *
+   * A running background command does not reset the sandbox's idle timer;
+   * create sandboxes for long jobs with `autoStopInterval: 0`.
+   */
+  async runBackground(
+    ctx: RunActionCtx,
+    args: {
+      sandboxId: string;
+      command: string;
+      cwd?: string;
+      envs?: Record<string, string>;
+      autoStart?: boolean;
+    },
+  ) {
+    return await ctx.runAction(this.component.process.runBackground, {
+      config: this.config,
+      ...args,
+    });
+  }
+
   // ---- Files ----
 
   /** Read a file from the sandbox as a UTF-8 string. */

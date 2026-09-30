@@ -265,6 +265,79 @@ export class DaytonaClient {
     return (await response.json()) as ProcessExecutionResponse;
   }
 
+  // ---- Sessions (background execution) ----
+
+  async createSession(sandboxId: string, sessionId: string): Promise<void> {
+    await this.toolbox(sandboxId, "POST", "/process/session", { sessionId });
+  }
+
+  async sessionExec(
+    sandboxId: string,
+    sessionId: string,
+    args: { command: string; runAsync?: boolean },
+  ): Promise<{ cmdId: string }> {
+    const response = await this.toolbox(
+      sandboxId,
+      "POST",
+      `/process/session/${encodeURIComponent(sessionId)}/exec`,
+      { command: args.command, runAsync: args.runAsync },
+    );
+    return (await response.json()) as { cmdId: string };
+  }
+
+  /** `exitCode` is only present once the command has finished. */
+  async getSessionCommand(
+    sandboxId: string,
+    sessionId: string,
+    commandId: string,
+  ): Promise<{ id: string; command: string; exitCode?: number | null }> {
+    const response = await this.toolbox(
+      sandboxId,
+      "GET",
+      `/process/session/${encodeURIComponent(sessionId)}/command/${encodeURIComponent(commandId)}`,
+    );
+    return (await response.json()) as {
+      id: string;
+      command: string;
+      exitCode?: number | null;
+    };
+  }
+
+  async getSessionCommandLogs(
+    sandboxId: string,
+    sessionId: string,
+    commandId: string,
+  ): Promise<string> {
+    const response = await this.toolbox(
+      sandboxId,
+      "GET",
+      `/process/session/${encodeURIComponent(sessionId)}/command/${encodeURIComponent(commandId)}/logs`,
+    );
+    // The toolbox serves logs as text/plain; tolerate a JSON variant too.
+    const raw = await response.text();
+    try {
+      const logs = JSON.parse(raw) as {
+        output?: string;
+        stdout?: string;
+        stderr?: string;
+      };
+      if (logs && typeof logs === "object") {
+        return logs.output ?? `${logs.stdout ?? ""}${logs.stderr ?? ""}`;
+      }
+    } catch {
+      // Plain text — the normal case.
+    }
+    return raw;
+  }
+
+  async deleteSession(sandboxId: string, sessionId: string): Promise<void> {
+    await this.toolbox(
+      sandboxId,
+      "DELETE",
+      `/process/session/${encodeURIComponent(sessionId)}`,
+    );
+  }
+
   // ---- Files (toolbox) ----
 
   async downloadFile(sandboxId: string, path: string): Promise<string> {
