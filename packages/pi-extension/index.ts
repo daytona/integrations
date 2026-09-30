@@ -370,16 +370,18 @@ export default function (pi: ExtensionAPI) {
     }
   })
 
-  // Rewrite the agent's "current working directory" to the sandbox path.
-  // Match the whole line (not a literal host path) so this works regardless of
-  // what Pi used as the prompt cwd — avoids a silent no-op if they diverge.
-  // Point the agent's working-directory line at the sandbox and add the
+  // Point the agent's working directory at the sandbox and add the
   // commit-not-push guideline. Project context (AGENTS.md/CLAUDE.md) is left to
   // Pi's default loading from the local files.
   pi.on('before_agent_start', (event) => {
     if (!active || !event.systemPrompt) return
-    const cwdLine = `Current working directory: ${active.cwd} (Daytona sandbox ${shortId(active.sandbox.id)})`
-    let systemPrompt = event.systemPrompt.replace(/Current working directory: .*/g, cwdLine)
+    const cwd = `${active.cwd} (Daytona sandbox ${shortId(active.sandbox.id)})`
+    // Match the whole cwd line/section (not a literal host path) so this can't
+    // silently no-op if Pi's prompt cwd diverges from ours. Older Pi renders a
+    // "Current working directory: …" line; newer Pi a `<cwd>…</cwd>` section.
+    let systemPrompt = event.systemPrompt
+      .replace(/Current working directory: .*/g, `Current working directory: ${cwd}`)
+      .replace(/<cwd>\n.*\n<\/cwd>/g, `<cwd>\n${cwd}\n</cwd>`)
     systemPrompt +=
       '\n\nThis project is a git repository inside a Daytona sandbox. After you finish a unit of work, ' +
       'commit it with git (e.g. `git add -A && git commit -m "..."`). Do not push — pushing is handled automatically.'
