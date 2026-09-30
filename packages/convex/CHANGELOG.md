@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/daytona/integrations/compare/convex-v1.0.0...convex-v1.1.0) (2026-09-30)
+
+
+### Features
+
+* **convex:** runBackground for long-running process support ([#70](https://github.com/daytona/integrations/issues/70)) ([5336e15](https://github.com/daytona/integrations/commit/5336e15abe793017e86785240dceb7466c15d5fc))
+
 ## 1.0.0 (2026-09-25)
 
 
