@@ -16,17 +16,17 @@
  */
 
 import type { Sandbox } from '@daytona/sdk'
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
+import type { ExtensionAPI, ToolDefinition } from '@earendil-works/pi-coding-agent'
 import {
-  createBashTool,
-  createEditTool,
-  createFindTool,
-  createGrepTool,
-  createLsTool,
-  createReadTool,
-  createWriteTool,
+  createBashToolDefinition,
+  createEditToolDefinition,
+  createFindToolDefinition,
+  createGrepToolDefinition,
+  createLsToolDefinition,
+  createReadToolDefinition,
+  createWriteToolDefinition,
 } from '@earendil-works/pi-coding-agent'
-import { Type } from 'typebox'
+import { type TSchema, Type } from 'typebox'
 import { type FindParams, runRemoteFind } from './find-tool.ts'
 import { type GrepParams, runRemoteGrep } from './grep-tool.ts'
 import { createBashOps, createEditOps, createLsOps, createReadOps, createWriteOps } from './ops.ts'
@@ -44,13 +44,13 @@ export interface ToolSandbox {
  */
 export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | null): void {
   const localCwd = process.cwd()
-  const localBash = createBashTool(localCwd)
-  const localRead = createReadTool(localCwd)
-  const localWrite = createWriteTool(localCwd)
-  const localEdit = createEditTool(localCwd)
-  const localLs = createLsTool(localCwd)
-  const localFind = createFindTool(localCwd)
-  const localGrep = createGrepTool(localCwd)
+  const localBash = createBashToolDefinition(localCwd)
+  const localRead = createReadToolDefinition(localCwd)
+  const localWrite = createWriteToolDefinition(localCwd)
+  const localEdit = createEditToolDefinition(localCwd)
+  const localLs = createLsToolDefinition(localCwd)
+  const localFind = createFindToolDefinition(localCwd)
+  const localGrep = createGrepToolDefinition(localCwd)
 
   /**
    * Resolve the sandbox for a tool call. With `--daytona` on but no sandbox, we
@@ -67,32 +67,47 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
   }
 
   /** Wrap a tool so it runs against the sandbox (built per call) when one is active. */
-  function sandboxTool<T extends { execute: (...args: never[]) => unknown }>(
-    local: T,
-    makeRemote: (cwd: string, sandbox: Sandbox) => T,
-  ): T {
+  function sandboxTool<TParams extends TSchema, TDetails, TState>(
+    local: ToolDefinition<TParams, TDetails, TState>,
+    makeRemote: (cwd: string, sandbox: Sandbox) => ToolDefinition<TParams, TDetails, TState>,
+  ): ToolDefinition<TParams, TDetails, TState> {
     return {
       ...local,
-      execute: (...args: Parameters<T['execute']>) => {
+      execute(toolCallId, params, signal, onUpdate, ctx) {
         const active = requireSandbox()
-        const tool = active ? makeRemote(active.cwd, active.sandbox) : local
-        return tool.execute(...args)
+        if (!active) return local.execute(toolCallId, params, signal, onUpdate, ctx)
+        // Pi resolves a tool's cwd as `ctx.cwd || cwd`, and ctx.cwd is the HOST
+        // session cwd. Sent to the sandbox, that path doesn't exist, and Daytona's
+        // exec fails with a misleading "fork/exec <shell>: no such file" (issue
+        // #66). So hand the tool a ctx whose cwd is the sandbox cwd. Object.create
+        // (not a spread) keeps ctx's other lazy getters live and leaves Pi's
+        // object untouched.
+        const sandboxCtx: typeof ctx = Object.create(ctx, { cwd: { value: active.cwd } })
+        return makeRemote(active.cwd, active.sandbox).execute(toolCallId, params, signal, onUpdate, sandboxCtx)
       },
-    } as T
+    }
   }
 
-  pi.registerTool(sandboxTool(localBash, (cwd, sb) => createBashTool(cwd, { operations: createBashOps(sb) })))
-  pi.registerTool(sandboxTool(localRead, (cwd, sb) => createReadTool(cwd, { operations: createReadOps(sb) })))
-  pi.registerTool(sandboxTool(localWrite, (cwd, sb) => createWriteTool(cwd, { operations: createWriteOps(sb) })))
-  pi.registerTool(sandboxTool(localEdit, (cwd, sb) => createEditTool(cwd, { operations: createEditOps(sb) })))
-  pi.registerTool(sandboxTool(localLs, (cwd, sb) => createLsTool(cwd, { operations: createLsOps(sb) })))
+  pi.registerTool(
+    sandboxTool(localBash, (cwd, sb) => createBashToolDefinition(cwd, { operations: createBashOps(sb) })),
+  )
+  pi.registerTool(
+    sandboxTool(localRead, (cwd, sb) => createReadToolDefinition(cwd, { operations: createReadOps(sb) })),
+  )
+  pi.registerTool(
+    sandboxTool(localWrite, (cwd, sb) => createWriteToolDefinition(cwd, { operations: createWriteOps(sb) })),
+  )
+  pi.registerTool(
+    sandboxTool(localEdit, (cwd, sb) => createEditToolDefinition(cwd, { operations: createEditOps(sb) })),
+  )
+  pi.registerTool(sandboxTool(localLs, (cwd, sb) => createLsToolDefinition(cwd, { operations: createLsOps(sb) })))
 
   // find and grep can't be redirected via operations: Pi runs fd/ripgrep
   // locally, and Daytona's searchFiles only does basename matching. So we run
   // the search inside the sandbox via dedicated tools.
   pi.registerTool({
     ...localFind,
-    async execute(id, params, signal, onUpdate) {
+    async execute(id, params, signal, onUpdate, ctx) {
       const active = requireSandbox()
       if (active) {
         // We can only honor a pre-aborted signal here: Daytona's exec is a
@@ -101,13 +116,13 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
         if (signal?.aborted) throw new Error('aborted')
         return runRemoteFind(active.sandbox, active.cwd, params as FindParams)
       }
-      return localFind.execute(id, params, signal, onUpdate)
+      return localFind.execute(id, params, signal, onUpdate, ctx)
     },
   })
 
   pi.registerTool({
     ...localGrep,
-    async execute(id, params, signal, onUpdate) {
+    async execute(id, params, signal, onUpdate, ctx) {
       const active = requireSandbox()
       if (active) {
         // See find above: only a pre-aborted signal is honorable; Daytona's
@@ -115,7 +130,7 @@ export function registerTools(pi: ExtensionAPI, getActive: () => ToolSandbox | n
         if (signal?.aborted) throw new Error('aborted')
         return runRemoteGrep(active.sandbox, active.cwd, params as GrepParams)
       }
-      return localGrep.execute(id, params, signal, onUpdate)
+      return localGrep.execute(id, params, signal, onUpdate, ctx)
     },
   })
 
