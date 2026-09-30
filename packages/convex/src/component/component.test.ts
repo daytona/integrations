@@ -451,6 +451,137 @@ describe("process actions", () => {
   });
 });
 
+describe("background execution", () => {
+  const sessionRoutes = (commandDone: () => boolean, exitCode = 0) => [
+    {
+      method: "GET",
+      match: "/api/sandbox/sbx-1",
+      response: () => json(startedSandbox),
+    },
+    {
+      method: "POST",
+      match: "/process/session/convex-exec-",
+      response: () => json({ cmdId: "cmd-1" }),
+    },
+    {
+      method: "POST",
+      match: "/process/session",
+      response: () => json({}),
+    },
+    {
+      // The toolbox serves logs as text/plain.
+      method: "GET",
+      match: "/command/cmd-1/logs",
+      response: () => new Response("partial output\n"),
+    },
+    {
+      method: "GET",
+      match: "/command/cmd-1",
+      response: () =>
+        json(
+          commandDone()
+            ? { id: "cmd-1", command: "sleep 5", exitCode }
+            : { id: "cmd-1", command: "sleep 5" },
+        ),
+    },
+    {
+      method: "DELETE",
+      match: "/process/session/convex-exec-",
+      response: () => new Response("", { status: 200 }),
+    },
+  ];
+
+  test("runBackground starts a session command and returns immediately", async () => {
+    const t = initConvexTest();
+    const { calls } = stubFetch(sessionRoutes(() => false));
+
+    const { executionId } = await t.action(api.process.runBackground, {
+      config,
+      sandboxId: "sbx-1",
+      command: "sleep 5 && echo done",
+      cwd: "/home/daytona",
+    });
+
+    const execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.status).toBe("running");
+    expect(execution?.sessionId).toContain("convex-exec-");
+    expect(execution?.commandId).toBe("cmd-1");
+
+    const exec = calls.find((c) => c.url.includes("/exec"));
+    const body = JSON.parse(exec?.body ?? "{}");
+    expect(body.runAsync).toBe(true);
+    // cwd is composed into the command — sessions have no cwd param.
+    expect(body.command).toBe("cd '/home/daytona' && sleep 5 && echo done");
+  });
+
+  test("pollExecution patches logs while running, finishes on exit", async () => {
+    const t = initConvexTest();
+    let done = false;
+    stubFetch(sessionRoutes(() => done));
+
+    const { executionId } = await t.action(api.process.runBackground, {
+      config,
+      sandboxId: "sbx-1",
+      command: "sleep 5",
+    });
+
+    await t.action(internal.process.pollExecution, {
+      config,
+      executionId,
+      delayMs: 1000,
+      failures: 0,
+    });
+    let execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.status).toBe("running");
+    expect(execution?.result).toBe("partial output\n");
+
+    done = true;
+    await t.action(internal.process.pollExecution, {
+      config,
+      executionId,
+      delayMs: 1000,
+      failures: 0,
+    });
+    execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.status).toBe("completed");
+    expect(execution?.exitCode).toBe(0);
+    expect(execution?.finishedAt).toBeDefined();
+  });
+
+  test("runBackground rejects shell-unsafe env var names", async () => {
+    const t = initConvexTest();
+    stubFetch(sessionRoutes(() => false));
+    await expect(
+      t.action(api.process.runBackground, {
+        config,
+        sandboxId: "sbx-1",
+        command: "true",
+        envs: { "X=1; touch /tmp/pwn; #": "oops" },
+      }),
+    ).rejects.toThrow(/Invalid environment variable name/);
+  });
+
+  test("pollExecution marks failed on non-zero exit", async () => {
+    const t = initConvexTest();
+    stubFetch(sessionRoutes(() => true, 2));
+
+    const { executionId } = await t.action(api.process.runBackground, {
+      config,
+      sandboxId: "sbx-1",
+      command: "false",
+    });
+    await t.action(internal.process.pollExecution, {
+      config,
+      executionId,
+      delayMs: 1000,
+      failures: 0,
+    });
+    const execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.status).toBe("failed");
+    expect(execution?.exitCode).toBe(2);
+  });
+});
+
 describe("file actions", () => {
   test("readFile and writeFile round-trip through the toolbox", async () => {
     const t = initConvexTest();

@@ -9,7 +9,7 @@
  */
 
 import { v } from "convex/values";
-import { internalMutation, query } from "./_generated/server.js";
+import { internalMutation, internalQuery, query } from "./_generated/server.js";
 import { executionFields } from "./schema.js";
 import { clampLimit } from "./types.js";
 
@@ -36,6 +36,32 @@ export const get = query({
   returns: v.union(v.null(), executionDoc),
   handler: async (ctx, args) => {
     return await ctx.db.get(args.executionId);
+  },
+});
+
+export const getInternal = internalQuery({
+  args: { executionId: v.id("executions") },
+  returns: v.union(v.null(), executionDoc),
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.executionId);
+  },
+});
+
+export const updateExecution = internalMutation({
+  args: {
+    executionId: v.id("executions"),
+    sessionId: v.optional(v.string()),
+    commandId: v.optional(v.string()),
+    result: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { executionId, ...fields } = args;
+    const defined = Object.fromEntries(
+      Object.entries(fields).filter(([, value]) => value !== undefined),
+    );
+    await ctx.db.patch(executionId, defined);
+    return null;
   },
 });
 

@@ -11,7 +11,7 @@
  * that dropped query strings). Needs DAYTONA_API_KEY.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -59,6 +59,17 @@ if (process.env.DAYTONA_API_URL) {
   convex("env", "set", "DAYTONA_API_URL", process.env.DAYTONA_API_URL);
 }
 convex("dev", "--once");
+// Scheduled functions (runBackground's poller) only execute while a dev
+// process is attached to the local backend — keep one alive for the test.
+const devProcess = spawn(process.execPath, [convexBin, "dev"], {
+  stdio: "ignore",
+  detached: false,
+});
+// Unreferenced so the child can't keep this script's event loop alive after
+// the assertions finish; the exit handler then reaps it.
+devProcess.unref();
+process.on("exit", () => devProcess.kill());
+await new Promise((resolve) => setTimeout(resolve, 5000));
 console.log("✓ example app deployed to local Convex with the daytona component");
 
 let sandboxId;
@@ -80,6 +91,23 @@ try {
   });
   assert(content === "convex-live-e2e", "writeFile/readFile round-trip (upload-v2)");
 
+  const bg = run("example:runBackgroundCommand", {
+    sandboxId,
+    command: "sleep 5 && echo background-done",
+  });
+  assert(typeof bg.executionId === "string", "runBackground returned immediately with executionId");
+  let bgRow;
+  for (let i = 0; i < 30; i++) {
+    const executions = run("example:executions", { sandboxId });
+    bgRow = executions.find((e) => e._id === bg.executionId);
+    if (bgRow && bgRow.status !== "running") break;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  assert(
+    bgRow?.status === "completed" && bgRow.result.includes("background-done"),
+    `background execution completed via scheduler polling (exit ${bgRow?.exitCode})`,
+  );
+
   const preview = run("example:previewUrl", { sandboxId, port: 3000 });
   assert(
     typeof preview.url === "string" && preview.url.startsWith("https://"),
@@ -88,8 +116,8 @@ try {
 
   const executions = run("example:executions", { sandboxId });
   assert(
-    executions.length === 2 && executions.every((e) => e.status === "completed"),
-    "executions table recorded 2 completed runs",
+    executions.length === 3 && executions.every((e) => e.status === "completed"),
+    "executions table recorded 3 completed runs (sync command, code, background)",
   );
 
   run("example:deleteSandbox", { sandboxId });

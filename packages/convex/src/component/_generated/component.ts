@@ -31,6 +31,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         null | {
           _creationTime: number;
           _id: string;
+          commandId?: string;
           cwd?: string;
           error?: string;
           exitCode?: number;
@@ -39,6 +40,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           kind: "command" | "code";
           result?: string;
           sandboxId: string;
+          sessionId?: string;
           startedAt: number;
           status: "running" | "completed" | "failed";
         },
@@ -51,6 +53,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         Array<{
           _creationTime: number;
           _id: string;
+          commandId?: string;
           cwd?: string;
           error?: string;
           exitCode?: number;
@@ -59,6 +62,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           kind: "command" | "code";
           result?: string;
           sandboxId: string;
+          sessionId?: string;
           startedAt: number;
           status: "running" | "completed" | "failed";
         }>,
@@ -132,6 +136,20 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           timeoutSeconds?: number;
         },
         { executionId: string; exitCode: number; result: string },
+        Name
+      >;
+      runBackground: FunctionReference<
+        "action",
+        "internal",
+        {
+          autoStart?: boolean;
+          command: string;
+          config: { apiKey: string; apiUrl?: string };
+          cwd?: string;
+          envs?: Record<string, string>;
+          sandboxId: string;
+        },
+        { executionId: string },
         Name
       >;
       runCode: FunctionReference<
