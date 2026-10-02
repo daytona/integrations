@@ -4,9 +4,11 @@
  */
 
 /**
- * Sandbox filesystem actions (Daytona toolbox files API). Content crosses the
- * Convex function boundary as UTF-8 strings — fine for source files and text
- * artifacts. Keep individual files under Convex's function argument/return
+ * Sandbox filesystem actions (Daytona toolbox files API), in two modes:
+ * `readFile`/`writeFile` move content as UTF-8 strings (source files, configs,
+ * logs), while `readFileBytes`/`writeFileBytes` move raw bytes untouched
+ * (images, PDFs, archives). Either way content crosses the Convex function
+ * boundary, so keep individual files under Convex's function argument/return
  * limits (16 MiB); move bigger payloads via URLs inside the sandbox instead.
  */
 
@@ -34,6 +36,40 @@ export const writeFile = action({
     sandboxId: v.string(),
     path: v.string(),
     content: v.string(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, args) => {
+    const client = new DaytonaClient(args.config);
+    await client.uploadFile(args.sandboxId, args.path, args.content);
+    return null;
+  },
+});
+
+/**
+ * Binary-safe read: returns the file's raw bytes (images, archives, PDFs).
+ * Use `readFile` for text. Payloads are bounded by Convex's function
+ * argument/return size limits.
+ */
+export const readFileBytes = action({
+  args: {
+    config: configValidator,
+    sandboxId: v.string(),
+    path: v.string(),
+  },
+  returns: v.bytes(),
+  handler: async (_ctx, args) => {
+    const client = new DaytonaClient(args.config);
+    return await client.downloadFileBytes(args.sandboxId, args.path);
+  },
+});
+
+/** Binary-safe write: uploads raw bytes as-is. Use `writeFile` for text. */
+export const writeFileBytes = action({
+  args: {
+    config: configValidator,
+    sandboxId: v.string(),
+    path: v.string(),
+    content: v.bytes(),
   },
   returns: v.null(),
   handler: async (_ctx, args) => {

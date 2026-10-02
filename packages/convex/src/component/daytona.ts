@@ -355,10 +355,19 @@ export class DaytonaClient {
     return await response.text();
   }
 
+  /** Raw file contents — no text decoding, so binary files survive intact. */
+  async downloadFileBytes(
+    sandboxId: string,
+    path: string,
+  ): Promise<ArrayBuffer> {
+    const response = await this.toolbox(sandboxId, "GET", "/files/download", undefined, { path });
+    return await response.arrayBuffer();
+  }
+
   async uploadFile(
     sandboxId: string,
     path: string,
-    content: string,
+    content: string | ArrayBuffer,
   ): Promise<void> {
     const form = new FormData();
     const filename = path.split("/").pop() || "upload";
