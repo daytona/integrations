@@ -5,7 +5,9 @@ import { v, type Infer } from "convex/values";
  * host app's environment variables, so the host-side client (`src/client`)
  * resolves credentials (from options or `process.env`) and passes them into
  * every component action — the same pattern used by other Convex components
- * that wrap external APIs.
+ * that wrap external APIs. The exception is `runBackground`, whose poller runs
+ * from the scheduler: it reads the env vars the app passes down to the
+ * component in `convex.config.ts` instead (see `process.ts`).
  */
 export const configValidator = v.object({
   /** Daytona API key (create one at https://app.daytona.io/dashboard/keys). */

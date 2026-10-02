@@ -215,6 +215,10 @@ export class Daytona {
    *
    * A running background command does not reset the sandbox's idle timer;
    * create sandboxes for long jobs with `autoStopInterval: 0`.
+   *
+   * The poller runs from the scheduler, so this doesn't use the client's
+   * credentials: it needs `DAYTONA_API_KEY` passed down to the component in
+   * your `convex.config.ts` (see the README).
    */
   async runBackground(
     ctx: RunActionCtx,
@@ -226,10 +230,7 @@ export class Daytona {
       autoStart?: boolean;
     },
   ) {
-    return await ctx.runAction(this.component.process.runBackground, {
-      config: this.config,
-      ...args,
-    });
+    return await ctx.runAction(this.component.process.runBackground, args);
   }
 
   // ---- Files ----

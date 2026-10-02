@@ -43,26 +43,33 @@ Why a component instead of calling the Daytona API directly?
 npm install @daytona/convex
 ```
 
-Create or update `convex/convex.config.ts` in your app:
-
-```ts
-// convex/convex.config.ts
-import { defineApp } from "convex/server";
-import daytona from "@daytona/convex/convex.config.js";
-
-const app = defineApp();
-app.use(daytona);
-
-export default app;
-```
-
 Set your Daytona API key on your deployment (create one at [app.daytona.io/dashboard/keys](https://app.daytona.io/dashboard/keys)):
 
 ```bash
 npx convex env set DAYTONA_API_KEY dtn_...
 ```
 
-Optional: `DAYTONA_API_URL` (self-hosted instances; defaults to `https://app.daytona.io/api`).
+Then create or update `convex/convex.config.ts` in your app. Components can't read your app's env vars, so pass the key down to the component:
+
+```ts
+// convex/convex.config.ts
+import { defineApp } from "convex/server";
+import { v } from "convex/values";
+import daytona from "@daytona/convex/convex.config.js";
+
+const app = defineApp({
+  env: { DAYTONA_API_KEY: v.string() },
+});
+app.use(daytona, {
+  env: { DAYTONA_API_KEY: app.env.DAYTONA_API_KEY },
+});
+
+export default app;
+```
+
+Passing it by reference means the component always sees the current value, so rotating the key doesn't need a redeploy.
+
+Optional: `DAYTONA_API_URL` (self-hosted instances; defaults to `https://app.daytona.io/api`). Set it the same way, declare it as `v.optional(v.string())`, and pass it down alongside the key.
 
 ## Usage
 
@@ -75,6 +82,8 @@ import { components } from "./_generated/api";
 const daytona = new Daytona(components.daytona);
 // or: new Daytona(components.daytona, { apiKey: "dtn_..." })
 ```
+
+`runBackground` is the exception: it always uses the key passed down to the component in `convex.config.ts`.
 
 ### Sandbox lifecycle
 
@@ -138,6 +147,8 @@ export const training = query({
 ```
 
 A running background command does not reset the sandbox's [idle auto-stop timer](https://www.daytona.io/docs/sandboxes#what-resets-the-timer) — create sandboxes for long jobs with `autoStopInterval: 0`.
+
+`runBackground` needs the key passed down as shown in [Installation](#installation). Its poller runs from the scheduler, outside any of your calls, so it reads `DAYTONA_API_KEY` from the component's env on every poll instead of carrying it in scheduled function args.
 
 ### Reactive state
 
