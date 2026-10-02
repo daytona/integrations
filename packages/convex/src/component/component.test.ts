@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api.js";
 import { initConvexTest } from "./setup.test.js";
 
@@ -452,6 +452,17 @@ describe("process actions", () => {
 });
 
 describe("background execution", () => {
+  // runBackground reads the key from the component's env (passed down by the
+  // app in convex.config.ts). convex-test runs everything in this process, so
+  // the component sees process.env directly.
+  beforeEach(() => {
+    vi.stubEnv("DAYTONA_API_KEY", config.apiKey);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   const sessionRoutes = (commandDone: () => boolean, exitCode = 0) => [
     {
       method: "GET",
@@ -491,12 +502,37 @@ describe("background execution", () => {
     },
   ];
 
+  type Test = ReturnType<typeof initConvexTest>;
+
+  /** The args each scheduled poll was given (stored as `[args]`). */
+  const scheduledPolls = (t: Test) =>
+    t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect()).map(
+        (job) => job.args[0],
+      ),
+    );
+
+  /** A running background execution as 1.1.0 left it, mid-poll. */
+  const legacyExecution = (t: Test) =>
+    t.run(
+      async (ctx) =>
+        await ctx.db.insert("executions", {
+          sandboxId: "sbx-1",
+          kind: "command",
+          input: "sleep 5",
+          status: "running",
+          sessionId: "convex-exec-legacy",
+          commandId: "cmd-1",
+          startedAt: Date.now(),
+        }),
+    );
+
   test("runBackground starts a session command and returns immediately", async () => {
     const t = initConvexTest();
     const { calls } = stubFetch(sessionRoutes(() => false));
 
     const { executionId } = await t.action(api.process.runBackground, {
-      config,
+      apiUrl: config.apiUrl,
       sandboxId: "sbx-1",
       command: "sleep 5 && echo done",
       cwd: "/home/daytona",
@@ -506,6 +542,10 @@ describe("background execution", () => {
     expect(execution?.status).toBe("running");
     expect(execution?.sessionId).toContain("convex-exec-");
     expect(execution?.commandId).toBe("cmd-1");
+
+    // The key comes from the component's env, the URL from the caller.
+    expect(calls[0].url).toBe("https://daytona.test/api/sandbox/sbx-1");
+    expect(calls[0].headers.Authorization).toBe(`Bearer ${config.apiKey}`);
 
     const exec = calls.find((c) => c.url.includes("/exec"));
     const body = JSON.parse(exec?.body ?? "{}");
@@ -520,13 +560,12 @@ describe("background execution", () => {
     stubFetch(sessionRoutes(() => done));
 
     const { executionId } = await t.action(api.process.runBackground, {
-      config,
+      apiUrl: config.apiUrl,
       sandboxId: "sbx-1",
       command: "sleep 5",
     });
 
     await t.action(internal.process.pollExecution, {
-      config,
       executionId,
       delayMs: 1000,
       failures: 0,
@@ -537,7 +576,6 @@ describe("background execution", () => {
 
     done = true;
     await t.action(internal.process.pollExecution, {
-      config,
       executionId,
       delayMs: 1000,
       failures: 0,
@@ -553,7 +591,7 @@ describe("background execution", () => {
     stubFetch(sessionRoutes(() => false));
     await expect(
       t.action(api.process.runBackground, {
-        config,
+        apiUrl: config.apiUrl,
         sandboxId: "sbx-1",
         command: "true",
         envs: { "X=1; touch /tmp/pwn; #": "oops" },
@@ -566,12 +604,11 @@ describe("background execution", () => {
     stubFetch(sessionRoutes(() => true, 2));
 
     const { executionId } = await t.action(api.process.runBackground, {
-      config,
+      apiUrl: config.apiUrl,
       sandboxId: "sbx-1",
       command: "false",
     });
     await t.action(internal.process.pollExecution, {
-      config,
       executionId,
       delayMs: 1000,
       failures: 0,
@@ -579,6 +616,176 @@ describe("background execution", () => {
     const execution = await t.query(api.executions.get, { executionId });
     expect(execution?.status).toBe("failed");
     expect(execution?.exitCode).toBe(2);
+  });
+
+  test("scheduled polls never carry the API key", async () => {
+    const t = initConvexTest();
+    stubFetch(sessionRoutes(() => false));
+
+    const { executionId } = await t.action(api.process.runBackground, {
+      apiUrl: config.apiUrl,
+      sandboxId: "sbx-1",
+      command: "sleep 5",
+    });
+    // Still running: reschedules with backoff.
+    await t.action(internal.process.pollExecution, {
+      executionId,
+      delayMs: 1000,
+      failures: 0,
+    });
+    // Daytona unreachable: reschedules on the failure path.
+    stubFetch([]);
+    await t.action(internal.process.pollExecution, {
+      executionId,
+      delayMs: 1000,
+      failures: 0,
+    });
+
+    const polls = await scheduledPolls(t);
+    expect(polls).toHaveLength(3);
+    expect(JSON.stringify(polls)).not.toContain(config.apiKey);
+    // Only the URL, which isn't a secret, rides along.
+    expect(polls[0]).toEqual({
+      executionId,
+      apiUrl: config.apiUrl,
+      delayMs: 1000,
+      failures: 0,
+    });
+  });
+
+  test("runBackground needs the key passed down to the component", async () => {
+    const t = initConvexTest();
+    const { calls } = stubFetch(sessionRoutes(() => false));
+    vi.stubEnv("DAYTONA_API_KEY", undefined);
+
+    await expect(
+      t.action(api.process.runBackground, {
+        apiUrl: config.apiUrl,
+        sandboxId: "sbx-1",
+        command: "sleep 5",
+      }),
+    ).rejects.toThrow(/DAYTONA_API_KEY: app\.env\.DAYTONA_API_KEY/);
+    // Checked before anything is recorded or started.
+    expect(await t.query(api.executions.list, { sandboxId: "sbx-1" })).toEqual(
+      [],
+    );
+    expect(calls).toEqual([]);
+  });
+
+  test("polls pick up a rotated key", async () => {
+    const t = initConvexTest();
+    let done = false;
+    const { calls } = stubFetch(sessionRoutes(() => done));
+    const { executionId } = await t.action(api.process.runBackground, {
+      apiUrl: config.apiUrl,
+      sandboxId: "sbx-1",
+      command: "sleep 5",
+    });
+
+    // `npx convex env set DAYTONA_API_KEY ...` while the command runs, then
+    // the poll runBackground scheduled fires with its stored args.
+    vi.stubEnv("DAYTONA_API_KEY", "rotated-key");
+    const [pollArgs] = await scheduledPolls(t);
+    const before = calls.length;
+    done = true;
+    await t.action(internal.process.pollExecution, pollArgs);
+
+    expect((await t.query(api.executions.get, { executionId }))?.status).toBe(
+      "completed",
+    );
+    // Status, logs and the session cleanup all used the new key.
+    const pollCalls = calls.slice(before);
+    expect(pollCalls.map((c) => c.method)).toContain("DELETE");
+    expect(new Set(pollCalls.map((c) => c.headers.Authorization))).toEqual(
+      new Set(["Bearer rotated-key"]),
+    );
+  });
+
+  test("polls scheduled by 1.1.0 keep going without passing the key on", async () => {
+    const t = initConvexTest();
+    const { calls } = stubFetch(sessionRoutes(() => false));
+    const executionId = await legacyExecution(t);
+
+    // 1.1.0 scheduled its polls with the config in their args.
+    await t.action(internal.process.pollExecution, {
+      config: { ...config, apiKey: "old-key" },
+      executionId,
+      delayMs: 1000,
+      failures: 0,
+    });
+
+    expect((await t.query(api.executions.get, { executionId }))?.result).toBe(
+      "partial output\n",
+    );
+    // It polls with the key passed down to the component, not the old one...
+    expect(new Set(calls.map((c) => c.headers.Authorization))).toEqual(
+      new Set([`Bearer ${config.apiKey}`]),
+    );
+    // ...and the next poll doesn't carry either.
+    const polls = await scheduledPolls(t);
+    expect(polls).toHaveLength(1);
+    expect(JSON.stringify(polls)).not.toMatch(/old-key|test-key/);
+  });
+
+  test("with no key to use, polls wait instead of failing the execution", async () => {
+    const t = initConvexTest();
+    const { calls } = stubFetch(sessionRoutes(() => false));
+    // Restored in finally — a failed assertion must not leave the spy
+    // swallowing error logs for the rest of the file.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { executionId } = await t.action(api.process.runBackground, {
+        apiUrl: config.apiUrl,
+        sandboxId: "sbx-1",
+        command: "sleep 5",
+      });
+
+      // The key stops being passed down while the command runs.
+      vi.stubEnv("DAYTONA_API_KEY", undefined);
+      const [pollArgs] = await scheduledPolls(t);
+      const before = calls.length;
+      await t.action(internal.process.pollExecution, pollArgs);
+
+      // The command may still be running, so the row says so, and the poller
+      // logs why and checks again later rather than giving up.
+      expect((await t.query(api.executions.get, { executionId }))?.status).toBe(
+        "running",
+      );
+      expect(calls.length).toBe(before);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringMatching(/passed down to the component/),
+      );
+      const polls = await scheduledPolls(t);
+      expect(polls).toHaveLength(2);
+      expect(polls[1]).toEqual(pollArgs);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  test("a 1.1.0 poll with no key passed down uses its own key once, without passing it on", async () => {
+    const t = initConvexTest();
+    const { calls } = stubFetch(sessionRoutes(() => false));
+    const executionId = await legacyExecution(t);
+    vi.stubEnv("DAYTONA_API_KEY", undefined);
+
+    await t.action(internal.process.pollExecution, {
+      config: { ...config, apiKey: "old-key" },
+      executionId,
+      delayMs: 1000,
+      failures: 0,
+    });
+
+    expect((await t.query(api.executions.get, { executionId }))?.result).toBe(
+      "partial output\n",
+    );
+    expect(new Set(calls.map((c) => c.headers.Authorization))).toEqual(
+      new Set(["Bearer old-key"]),
+    );
+    const polls = await scheduledPolls(t);
+    expect(polls).toEqual([
+      { executionId, apiUrl: config.apiUrl, delayMs: 2000, failures: 0 },
+    ]);
   });
 });
 

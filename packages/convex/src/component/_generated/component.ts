@@ -142,9 +142,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "action",
         "internal",
         {
+          apiUrl?: string;
           autoStart?: boolean;
           command: string;
-          config: { apiKey: string; apiUrl?: string };
           cwd?: string;
           envs?: Record<string, string>;
           sandboxId: string;

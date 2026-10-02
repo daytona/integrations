@@ -45,4 +45,29 @@ describe("Daytona client configuration", () => {
       else process.env.DAYTONA_API_KEY = previous;
     }
   });
+
+  test("runBackground forwards the API URL but never the key", async () => {
+    let sent: Record<string, unknown> | undefined;
+    const capturingCtx: RunActionCtx = {
+      ...nullCtx,
+      runAction: async (_ref, args) => {
+        sent = args as Record<string, unknown>;
+        return null;
+      },
+    };
+    const daytona = new Daytona(components.daytona, {
+      apiKey: "opt-key",
+      apiUrl: "https://daytona.example/api",
+    });
+    await daytona.runBackground(capturingCtx, {
+      sandboxId: "sbx-1",
+      command: "sleep 5",
+    });
+    // The component reads the key passed down to it in convex.config.ts.
+    expect(sent).toEqual({
+      sandboxId: "sbx-1",
+      command: "sleep 5",
+      apiUrl: "https://daytona.example/api",
+    });
+  });
 });

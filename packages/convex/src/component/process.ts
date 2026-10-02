@@ -19,6 +19,7 @@ import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
 import {
   action,
+  env,
   internalAction,
   type ActionCtx,
 } from "./_generated/server.js";
@@ -29,6 +30,7 @@ import {
   MAX_STORED_OUTPUT,
   configValidator,
   truncate,
+  type DaytonaConfig,
   type ProcessExecutionResponse,
 } from "./types.js";
 
@@ -195,10 +197,32 @@ export const runCode = action({
 // status/logs (~1s each) and finishes the execution row when the command
 // exits. NOTE: a running background command does not reset the sandbox's idle
 // timer — create long-job sandboxes with autoStopInterval: 0.
+//
+// The poller runs from the scheduler, outside any call from the app, so it
+// can't be handed the API key like the other actions are. Passing it in the
+// scheduled args would store it in `_scheduled_functions` (kept for 7 days
+// after each poll runs), so background executions read it from the env var
+// the app passes down to the component instead. That also means a rotated key
+// is picked up on the next poll. The API URL isn't a secret, so it's still
+// forwarded by the client and carried in the scheduled args.
 
 const POLL_MIN_MS = 1_000;
 const POLL_MAX_MS = 10_000;
 const MAX_POLL_FAILURES = 3;
+/** How long a poll with no key to use waits before checking again. */
+const MISSING_KEY_RETRY_MS = 60_000;
+
+const MISSING_API_KEY =
+  "runBackground needs your Daytona API key passed down to the component. " +
+  "In convex/convex.config.ts, declare it with defineApp({ env: { DAYTONA_API_KEY: v.string() } }) " +
+  "and pass it with app.use(daytona, { env: { DAYTONA_API_KEY: app.env.DAYTONA_API_KEY } }). " +
+  "See https://github.com/daytona/integrations/tree/main/packages/convex#installation";
+
+/** The key the app passed down to the component, or null if it didn't. */
+function backgroundConfig(apiUrl: string | undefined): DaytonaConfig | null {
+  const apiKey = env.DAYTONA_API_KEY;
+  return apiKey ? { apiKey, apiUrl } : null;
+}
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -226,17 +250,21 @@ function composeSessionCommand(
 
 export const runBackground = action({
   args: {
-    config: configValidator,
     sandboxId: v.string(),
     command: v.string(),
     cwd: v.optional(v.string()),
     envs: v.optional(v.record(v.string(), v.string())),
     /** Transparently restart a stopped/archived sandbox first (default true). */
     autoStart: v.optional(v.boolean()),
+    /** API base URL, forwarded by the client. The key comes from the component's env. */
+    apiUrl: v.optional(v.string()),
   },
   returns: v.object({ executionId: v.id("executions") }),
   handler: async (ctx, args) => {
-    const client = new DaytonaClient(args.config);
+    // Launch with the same key the poller will use.
+    const config = backgroundConfig(args.apiUrl);
+    if (!config) throw new Error(MISSING_API_KEY);
+    const client = new DaytonaClient(config);
     // Record the row first so every call leaves a history entry, even when
     // sandbox startup fails.
     const executionId: Id<"executions"> = await ctx.runMutation(
@@ -270,8 +298,8 @@ export const runBackground = action({
         commandId: cmdId,
       });
       await ctx.scheduler.runAfter(POLL_MIN_MS, internal.process.pollExecution, {
-        config: args.config,
         executionId,
+        apiUrl: args.apiUrl,
         delayMs: POLL_MIN_MS,
         failures: 0,
       });
@@ -296,10 +324,15 @@ export const runBackground = action({
 
 export const pollExecution = internalAction({
   args: {
-    config: configValidator,
     executionId: v.id("executions"),
+    apiUrl: v.optional(v.string()),
     delayMs: v.number(),
     failures: v.number(),
+    /**
+     * Only set on polls scheduled by 1.1.0, which passed the key here. Still
+     * accepted so those keep going after an upgrade, but never passed on.
+     */
+    config: v.optional(configValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -314,7 +347,27 @@ export const pollExecution = internalAction({
     ) {
       return null;
     }
-    const client = new DaytonaClient(args.config);
+    const apiUrl = args.apiUrl ?? args.config?.apiUrl;
+    // A 1.1.0 poll can fall back to the key in its own args for this poll.
+    const config = backgroundConfig(apiUrl) ?? args.config;
+    if (!config) {
+      // The command may well still be running, so failing the row would be
+      // dishonest and we can't stop the command without a key. Keep it
+      // running and check again once the key may be back (e.g. mid-redeploy).
+      console.error(MISSING_API_KEY);
+      await ctx.scheduler.runAfter(
+        MISSING_KEY_RETRY_MS,
+        internal.process.pollExecution,
+        {
+          executionId: args.executionId,
+          apiUrl,
+          delayMs: args.delayMs,
+          failures: args.failures,
+        },
+      );
+      return null;
+    }
+    const client = new DaytonaClient(config);
     try {
       const command = await client.getSessionCommand(
         execution.sandboxId,
@@ -348,8 +401,8 @@ export const pollExecution = internalAction({
       });
       const nextDelay = Math.min(args.delayMs * 2, POLL_MAX_MS);
       await ctx.scheduler.runAfter(nextDelay, internal.process.pollExecution, {
-        config: args.config,
         executionId: args.executionId,
+        apiUrl,
         delayMs: nextDelay,
         failures: 0,
       });
@@ -370,8 +423,8 @@ export const pollExecution = internalAction({
         return null;
       }
       await ctx.scheduler.runAfter(POLL_MAX_MS, internal.process.pollExecution, {
-        config: args.config,
         executionId: args.executionId,
+        apiUrl,
         delayMs: POLL_MAX_MS,
         failures: args.failures + 1,
       });

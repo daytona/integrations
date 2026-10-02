@@ -104,10 +104,11 @@ export class Daytona {
           "(npx convex env set DAYTONA_API_KEY ...).",
       );
     }
-    return {
-      apiKey,
-      apiUrl: this.options?.apiUrl ?? process.env.DAYTONA_API_URL,
-    };
+    return { apiKey, apiUrl: this.apiUrl };
+  }
+
+  private get apiUrl() {
+    return this.options?.apiUrl ?? process.env.DAYTONA_API_URL;
   }
 
   // ---- Lifecycle ----
@@ -215,6 +216,10 @@ export class Daytona {
    *
    * A running background command does not reset the sandbox's idle timer;
    * create sandboxes for long jobs with `autoStopInterval: 0`.
+   *
+   * The poller runs from the scheduler, so this doesn't use the client's API
+   * key: it needs `DAYTONA_API_KEY` passed down to the component in your
+   * `convex.config.ts` (see the README). The API URL is forwarded as usual.
    */
   async runBackground(
     ctx: RunActionCtx,
@@ -227,8 +232,8 @@ export class Daytona {
     },
   ) {
     return await ctx.runAction(this.component.process.runBackground, {
-      config: this.config,
       ...args,
+      apiUrl: this.apiUrl,
     });
   }
 
