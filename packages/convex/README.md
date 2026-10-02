@@ -69,7 +69,7 @@ export default app;
 
 Passing it by reference means the component always sees the current value, so rotating the key doesn't need a redeploy.
 
-Optional: `DAYTONA_API_URL` (self-hosted instances; defaults to `https://app.daytona.io/api`). Set it the same way, declare it as `v.optional(v.string())`, and pass it down alongside the key.
+Optional: `DAYTONA_API_URL` (self-hosted instances; defaults to `https://app.daytona.io/api`). Set it the same way. It isn't a secret, so it doesn't need passing down: the client forwards it with each call.
 
 ## Usage
 

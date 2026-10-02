@@ -142,6 +142,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "action",
         "internal",
         {
+          apiUrl?: string;
           autoStart?: boolean;
           command: string;
           cwd?: string;
