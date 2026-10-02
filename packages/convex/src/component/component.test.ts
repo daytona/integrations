@@ -1071,6 +1071,7 @@ describe("binary file actions", () => {
   test("writeFileBytes uploads the exact bytes", async () => {
     const t = initConvexTest();
     let uploaded: Uint8Array | undefined;
+    let uploadUrl: string | undefined;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1079,6 +1080,7 @@ describe("binary file actions", () => {
           return new Response(JSON.stringify(startedSandbox));
         }
         if (url.includes("/files/upload-v2")) {
+          uploadUrl = url;
           const file = (init?.body as FormData).get("file") as Blob;
           uploaded = new Uint8Array(await file.arrayBuffer());
           return new Response("{}");
@@ -1094,11 +1096,15 @@ describe("binary file actions", () => {
       content: allBytes().buffer,
     });
     expect(uploaded).toEqual(allBytes());
+    // Targets the requested sandbox and path, not just any upload.
+    expect(uploadUrl).toBe(
+      "https://proxy.daytona.test/toolbox/sbx-1/files/upload-v2?path=%2Fhome%2Fdaytona%2Fblob.bin",
+    );
   });
 
   test("readFileBytes returns the exact bytes", async () => {
     const t = initConvexTest();
-    stubFetch([
+    const { calls } = stubFetch([
       {
         method: "GET",
         match: "/api/sandbox/sbx-1",
@@ -1117,6 +1123,10 @@ describe("binary file actions", () => {
       path: "/home/daytona/blob.bin",
     });
     expect(new Uint8Array(bytes)).toEqual(allBytes());
+    const download = calls.find((c) => c.url.includes("/files/download"));
+    expect(download?.url).toBe(
+      "https://proxy.daytona.test/toolbox/sbx-1/files/download?path=%2Fhome%2Fdaytona%2Fblob.bin",
+    );
   });
 });
 

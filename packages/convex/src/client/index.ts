@@ -334,14 +334,30 @@ export class Daytona {
     });
   }
 
-  /** Write raw bytes to a file in the sandbox (binary-safe). */
+  /**
+   * Write raw bytes to a file in the sandbox (binary-safe). Accepts an
+   * `ArrayBuffer` or any `Uint8Array` — including Node `Buffer`s.
+   */
   async writeFileBytes(
     ctx: RunActionCtx,
-    args: { sandboxId: string; path: string; content: ArrayBuffer },
+    args: {
+      sandboxId: string;
+      path: string;
+      content: ArrayBuffer | Uint8Array;
+    },
   ) {
+    // Copy views into an exact-length ArrayBuffer. A view's `.buffer` can be
+    // larger than the view itself (subarrays, Node's pooled Buffers), so
+    // passing it through would upload unrelated bytes.
+    const content =
+      args.content instanceof Uint8Array
+        ? new Uint8Array(args.content).buffer
+        : args.content;
     return await ctx.runAction(this.component.files.writeFileBytes, {
       config: this.config,
-      ...args,
+      sandboxId: args.sandboxId,
+      path: args.path,
+      content,
     });
   }
 

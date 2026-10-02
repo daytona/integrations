@@ -71,3 +71,44 @@ describe("Daytona client configuration", () => {
     });
   });
 });
+
+describe("writeFileBytes content normalization", () => {
+  const capture = () => {
+    let sent: { content?: ArrayBuffer } | undefined;
+    const ctx: RunActionCtx = {
+      ...nullCtx,
+      runAction: async (_ref, args) => {
+        sent = args as { content?: ArrayBuffer };
+        return null;
+      },
+    };
+    return { ctx, sent: () => sent };
+  };
+  const daytona = new Daytona(components.daytona, { apiKey: "k" });
+
+  test("a view into a larger buffer sends only the view's bytes", async () => {
+    // Like Node's pooled Buffers: the view's .buffer is much bigger than it.
+    const backing = Uint8Array.from({ length: 64 }, (_, i) => i);
+    const view = backing.subarray(10, 14);
+    const { ctx, sent } = capture();
+    await daytona.writeFileBytes(ctx, {
+      sandboxId: "sbx-1",
+      path: "/tmp/x.bin",
+      content: view,
+    });
+    const content = sent()!.content!;
+    expect(content).toBeInstanceOf(ArrayBuffer);
+    expect(Array.from(new Uint8Array(content))).toEqual([10, 11, 12, 13]);
+  });
+
+  test("a plain ArrayBuffer passes through unchanged", async () => {
+    const buffer = Uint8Array.from([1, 2, 3]).buffer;
+    const { ctx, sent } = capture();
+    await daytona.writeFileBytes(ctx, {
+      sandboxId: "sbx-1",
+      path: "/tmp/x.bin",
+      content: buffer,
+    });
+    expect(sent()!.content).toBe(buffer);
+  });
+});

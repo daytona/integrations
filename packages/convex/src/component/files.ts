@@ -4,9 +4,11 @@
  */
 
 /**
- * Sandbox filesystem actions (Daytona toolbox files API). Content crosses the
- * Convex function boundary as UTF-8 strings — fine for source files and text
- * artifacts. Keep individual files under Convex's function argument/return
+ * Sandbox filesystem actions (Daytona toolbox files API), in two modes:
+ * `readFile`/`writeFile` move content as UTF-8 strings (source files, configs,
+ * logs), while `readFileBytes`/`writeFileBytes` move raw bytes untouched
+ * (images, PDFs, archives). Either way content crosses the Convex function
+ * boundary, so keep individual files under Convex's function argument/return
  * limits (16 MiB); move bigger payloads via URLs inside the sandbox instead.
  */
 

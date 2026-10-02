@@ -135,7 +135,7 @@ export const binaryRoundTrip = action({
     await daytona.writeFileBytes(ctx, {
       sandboxId: args.sandboxId,
       path: "/home/daytona/all-bytes.bin",
-      content: original.buffer,
+      content: original,
     });
     const readBack = new Uint8Array(
       await daytona.readFileBytes(ctx, {
