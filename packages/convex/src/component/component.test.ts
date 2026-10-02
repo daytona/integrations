@@ -730,32 +730,37 @@ describe("background execution", () => {
   test("with no key to use, polls wait instead of failing the execution", async () => {
     const t = initConvexTest();
     const { calls } = stubFetch(sessionRoutes(() => false));
+    // Restored in finally — a failed assertion must not leave the spy
+    // swallowing error logs for the rest of the file.
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { executionId } = await t.action(api.process.runBackground, {
-      apiUrl: config.apiUrl,
-      sandboxId: "sbx-1",
-      command: "sleep 5",
-    });
+    try {
+      const { executionId } = await t.action(api.process.runBackground, {
+        apiUrl: config.apiUrl,
+        sandboxId: "sbx-1",
+        command: "sleep 5",
+      });
 
-    // The key stops being passed down while the command runs.
-    vi.stubEnv("DAYTONA_API_KEY", undefined);
-    const [pollArgs] = await scheduledPolls(t);
-    const before = calls.length;
-    await t.action(internal.process.pollExecution, pollArgs);
+      // The key stops being passed down while the command runs.
+      vi.stubEnv("DAYTONA_API_KEY", undefined);
+      const [pollArgs] = await scheduledPolls(t);
+      const before = calls.length;
+      await t.action(internal.process.pollExecution, pollArgs);
 
-    // The command may still be running, so the row says so, and the poller
-    // logs why and checks again later rather than giving up.
-    expect((await t.query(api.executions.get, { executionId }))?.status).toBe(
-      "running",
-    );
-    expect(calls.length).toBe(before);
-    expect(error).toHaveBeenCalledWith(
-      expect.stringMatching(/passed down to the component/),
-    );
-    const polls = await scheduledPolls(t);
-    expect(polls).toHaveLength(2);
-    expect(polls[1]).toEqual(pollArgs);
-    error.mockRestore();
+      // The command may still be running, so the row says so, and the poller
+      // logs why and checks again later rather than giving up.
+      expect((await t.query(api.executions.get, { executionId }))?.status).toBe(
+        "running",
+      );
+      expect(calls.length).toBe(before);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringMatching(/passed down to the component/),
+      );
+      const polls = await scheduledPolls(t);
+      expect(polls).toHaveLength(2);
+      expect(polls[1]).toEqual(pollArgs);
+    } finally {
+      error.mockRestore();
+    }
   });
 
   test("a 1.1.0 poll with no key passed down uses its own key once, without passing it on", async () => {
