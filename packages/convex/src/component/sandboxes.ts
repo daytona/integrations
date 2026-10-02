@@ -9,9 +9,16 @@
  * Daytona API and record the observed state for the host app to subscribe to.
  */
 
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api.js";
-import { action, internalMutation, query } from "./_generated/server.js";
+import {
+  action,
+  internalMutation,
+  mutation,
+  query,
+  type QueryCtx,
+} from "./_generated/server.js";
 import { DaytonaApiError, DaytonaClient } from "./daytona.js";
 import { sandboxFields } from "./schema.js";
 import { clampLimit, configValidator } from "./types.js";
@@ -38,20 +45,92 @@ export const get = query({
   },
 });
 
+/** Pick the narrowest index for the given filters — never a filtered full scan. */
+function sandboxesQuery(
+  ctx: QueryCtx,
+  userKey: string | undefined,
+  state: string | undefined,
+) {
+  if (userKey !== undefined && state !== undefined) {
+    return ctx.db
+      .query("sandboxes")
+      .withIndex("userKey_state", (q) =>
+        q.eq("userKey", userKey).eq("state", state),
+      );
+  }
+  if (userKey !== undefined) {
+    return ctx.db
+      .query("sandboxes")
+      .withIndex("userKey", (q) => q.eq("userKey", userKey));
+  }
+  if (state !== undefined) {
+    return ctx.db
+      .query("sandboxes")
+      .withIndex("state", (q) => q.eq("state", state));
+  }
+  return ctx.db.query("sandboxes");
+}
+
 export const list = query({
-  args: { userKey: v.optional(v.string()), limit: v.optional(v.number()) },
+  args: {
+    userKey: v.optional(v.string()),
+    /** Filter by last-observed state, e.g. "started" for a live count. */
+    state: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
   returns: v.array(sandboxDoc),
   handler: async (ctx, args) => {
     const limit = clampLimit(args.limit, 100);
-    if (args.userKey !== undefined) {
-      const userKey = args.userKey;
-      return await ctx.db
-        .query("sandboxes")
-        .withIndex("userKey", (q) => q.eq("userKey", userKey))
-        .order("desc")
-        .take(limit);
+    return await sandboxesQuery(ctx, args.userKey, args.state)
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const listPaginated = query({
+  args: {
+    userKey: v.optional(v.string()),
+    state: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    return await sandboxesQuery(ctx, args.userKey, args.state)
+      .order("desc")
+      .paginate(args.paginationOpts);
+  },
+});
+
+/**
+ * Delete sandbox rows in terminal states older than a cutoff, in bounded
+ * batches — call again until `hasMore` is false. Remote sandboxes are not
+ * touched; this only clears component bookkeeping.
+ */
+export const purge = mutation({
+  args: { olderThanMs: v.number() },
+  returns: v.object({ deleted: v.number(), hasMore: v.boolean() }),
+  handler: async (ctx, args) => {
+    if (!Number.isFinite(args.olderThanMs) || args.olderThanMs < 0) {
+      throw new Error("olderThanMs must be a non-negative finite number");
     }
-    return await ctx.db.query("sandboxes").order("desc").take(limit);
+    const cutoff = Date.now() - args.olderThanMs;
+    // Filter BEFORE taking the batch so repeated calls always make progress.
+    const victims = await ctx.db
+      .query("sandboxes")
+      .filter((q) =>
+        q.and(
+          q.or(
+            q.eq(q.field("state"), "destroyed"),
+            q.eq(q.field("state"), "error"),
+            q.eq(q.field("state"), "build_failed"),
+          ),
+          q.lte(q.field("updatedAt"), cutoff),
+        ),
+      )
+      .take(200);
+    for (const victim of victims) {
+      await ctx.db.delete(victim._id);
+    }
+    return { deleted: victims.length, hasMore: victims.length === 200 };
   },
 });
 
@@ -291,7 +370,14 @@ export const remove = action({
   returns: v.null(),
   handler: async (ctx, args) => {
     const client = new DaytonaClient(args.config);
-    await client.deleteSandbox(args.sandboxId);
+    try {
+      await client.deleteSandbox(args.sandboxId);
+    } catch (error) {
+      // Already gone (e.g. auto-deleted) is a success for delete.
+      if (!(error instanceof DaytonaApiError && error.status === 404)) {
+        throw error;
+      }
+    }
     // Keep the row (with its execution history) as an audit record.
     await ctx.runMutation(internal.sandboxes.upsertSandbox, {
       sandboxId: args.sandboxId,

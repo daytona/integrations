@@ -13,6 +13,7 @@
  * themselves, so the client forwards them on each call.
  */
 
+import { createFunctionHandle } from "convex/server";
 import type { FunctionReference, FunctionReturnType } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
 
@@ -166,12 +167,24 @@ export class Daytona {
     return await ctx.runQuery(this.component.sandboxes.get, args);
   }
 
-  /** Sandbox records, optionally scoped to a `userKey`. Reactive. */
+  /** Sandbox records, optionally scoped by `userKey` and/or `state`. Reactive. */
   async listSandboxes(
     ctx: RunQueryCtx,
-    args: { userKey?: string; limit?: number } = {},
+    args: { userKey?: string; state?: string; limit?: number } = {},
   ) {
     return await ctx.runQuery(this.component.sandboxes.list, args);
+  }
+
+  /** Cursor-paginated sandbox records, with the same filters as `listSandboxes`. */
+  async listSandboxesPaginated(
+    ctx: RunQueryCtx,
+    args: {
+      userKey?: string;
+      state?: string;
+      paginationOpts: { numItems: number; cursor: string | null };
+    },
+  ) {
+    return await ctx.runQuery(this.component.sandboxes.listPaginated, args);
   }
 
   /** Execution history for a sandbox, newest first. Reactive. */
@@ -229,12 +242,60 @@ export class Daytona {
       cwd?: string;
       envs?: Record<string, string>;
       autoStart?: boolean;
+      /**
+       * Mutation invoked when the execution reaches a terminal state
+       * (completed, failed, or cancelled), with
+       * `{ executionId, status, exitCode, result, error, context }`.
+       */
+      onComplete?: FunctionReference<"mutation", "public" | "internal">;
+      /** Passed through to the onComplete handler as `context`. */
+      onCompleteContext?: unknown;
+      /** First poll delay and backoff floor in ms (default 1000, min 250). */
+      minPollMs?: number;
+      /** Backoff ceiling between polls in ms (default 10000, max 120000). */
+      maxPollMs?: number;
     },
   ) {
+    const { onComplete, ...rest } = args;
     return await ctx.runAction(this.component.process.runBackground, {
-      ...args,
+      ...rest,
+      onComplete: onComplete
+        ? await createFunctionHandle(onComplete)
+        : undefined,
       apiUrl: this.apiUrl,
     });
+  }
+
+  /**
+   * Cancel a running background execution: stops the command (kills its
+   * session), marks the row "cancelled", and fires its onComplete handler.
+   * Throws if the execution already reached a terminal state.
+   */
+  async cancelExecution(ctx: RunActionCtx, args: { executionId: string }) {
+    return await ctx.runAction(this.component.process.cancelExecution, {
+      executionId: args.executionId as never,
+      apiUrl: this.apiUrl,
+    });
+  }
+
+  /**
+   * Delete terminal execution rows older than `olderThanMs`, in bounded
+   * batches — call again while `hasMore` is true.
+   */
+  async purgeExecutions(
+    ctx: RunMutationCtx,
+    args: { olderThanMs: number; sandboxId?: string },
+  ) {
+    return await ctx.runMutation(this.component.executions.purge, args);
+  }
+
+  /**
+   * Delete destroyed/errored sandbox rows older than `olderThanMs`, in
+   * bounded batches — call again while `hasMore` is true. Remote sandboxes
+   * are not touched.
+   */
+  async purgeSandboxes(ctx: RunMutationCtx, args: { olderThanMs: number }) {
+    return await ctx.runMutation(this.component.sandboxes.purge, args);
   }
 
   // ---- Files ----

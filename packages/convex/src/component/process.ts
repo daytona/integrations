@@ -14,6 +14,7 @@
  * `nohup … &`) and poll it with follow-up executions.
  */
 
+import type { FunctionHandle } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
@@ -23,7 +24,7 @@ import {
   internalAction,
   type ActionCtx,
 } from "./_generated/server.js";
-import { DaytonaClient } from "./daytona.js";
+import { DaytonaApiError, DaytonaClient } from "./daytona.js";
 import {
   MAX_RETURNED_OUTPUT,
   MAX_STORED_INPUT,
@@ -208,9 +209,58 @@ export const runCode = action({
 
 const POLL_MIN_MS = 1_000;
 const POLL_MAX_MS = 10_000;
+/** Clamps for caller-configured polling (see runBackground's poll options). */
+const POLL_FLOOR_MS = 250;
+const POLL_CEILING_MS = 120_000;
 const MAX_POLL_FAILURES = 3;
 /** How long a poll with no key to use waits before checking again. */
 const MISSING_KEY_RETRY_MS = 60_000;
+
+function clampPoll(
+  requested: number | undefined,
+  fallback: number,
+  floor: number,
+): number {
+  if (requested === undefined) return fallback;
+  if (!Number.isFinite(requested) || requested <= 0) {
+    throw new Error(`Poll intervals must be positive numbers, got ${requested}`);
+  }
+  return Math.min(Math.max(requested, floor), POLL_CEILING_MS);
+}
+
+/**
+ * Invoke the execution's onComplete handle (if any) after a terminal
+ * transition. Callback failures are logged, never propagated — the execution
+ * row is already terminal and must stay truthful.
+ */
+async function notifyComplete(
+  ctx: ActionCtx,
+  executionId: Id<"executions">,
+  onComplete: string | undefined,
+  onCompleteContext: unknown,
+): Promise<void> {
+  if (!onComplete) return;
+  const execution = await ctx.runQuery(internal.executions.getInternal, {
+    executionId,
+  });
+  if (!execution) return;
+  try {
+    await ctx.runMutation(onComplete as FunctionHandle<"mutation">, {
+      executionId,
+      status: execution.status,
+      exitCode: execution.exitCode,
+      result: execution.result,
+      error: execution.error,
+      context: onCompleteContext,
+    });
+  } catch (error) {
+    console.error(
+      `onComplete handler failed for execution ${executionId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
 
 const MISSING_API_KEY =
   "runBackground needs your Daytona API key passed down to the component. " +
@@ -258,9 +308,22 @@ export const runBackground = action({
     autoStart: v.optional(v.boolean()),
     /** API base URL, forwarded by the client. The key comes from the component's env. */
     apiUrl: v.optional(v.string()),
+    /** Mutation function handle invoked when the execution reaches a terminal state. */
+    onComplete: v.optional(v.string()),
+    /** Caller-supplied value passed through to the onComplete handler. */
+    onCompleteContext: v.optional(v.any()),
+    /** First poll delay and backoff floor (default 1000ms, min 250ms). */
+    minPollMs: v.optional(v.number()),
+    /** Backoff ceiling between polls (default 10000ms, max 120000ms). */
+    maxPollMs: v.optional(v.number()),
   },
   returns: v.object({ executionId: v.id("executions") }),
   handler: async (ctx, args) => {
+    const minPollMs = clampPoll(args.minPollMs, POLL_MIN_MS, POLL_FLOOR_MS);
+    const maxPollMs = Math.max(
+      clampPoll(args.maxPollMs, POLL_MAX_MS, POLL_FLOOR_MS),
+      minPollMs,
+    );
     // Launch with the same key the poller will use.
     const config = backgroundConfig(args.apiUrl);
     if (!config) throw new Error(MISSING_API_KEY);
@@ -274,6 +337,8 @@ export const runBackground = action({
         kind: "command",
         input: truncate(args.command, MAX_STORED_INPUT),
         cwd: args.cwd,
+        onComplete: args.onComplete,
+        onCompleteContext: args.onCompleteContext,
       },
     );
     const sessionId = `convex-exec-${executionId}`;
@@ -297,10 +362,11 @@ export const runBackground = action({
         sessionId,
         commandId: cmdId,
       });
-      await ctx.scheduler.runAfter(POLL_MIN_MS, internal.process.pollExecution, {
+      await ctx.scheduler.runAfter(minPollMs, internal.process.pollExecution, {
         executionId,
         apiUrl: args.apiUrl,
-        delayMs: POLL_MIN_MS,
+        delayMs: minPollMs,
+        maxDelayMs: maxPollMs,
         failures: 0,
       });
       return { executionId };
@@ -312,11 +378,17 @@ export const runBackground = action({
           .deleteSession(args.sandboxId, sessionId)
           .catch(() => undefined);
       }
-      await ctx.runMutation(internal.executions.finishExecution, {
-        executionId,
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const transitioned = await ctx.runMutation(
+        internal.executions.finishExecution,
+        {
+          executionId,
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      if (transitioned) {
+        await notifyComplete(ctx, executionId, args.onComplete, args.onCompleteContext);
+      }
       throw error;
     }
   },
@@ -327,6 +399,8 @@ export const pollExecution = internalAction({
     executionId: v.id("executions"),
     apiUrl: v.optional(v.string()),
     delayMs: v.number(),
+    /** Backoff ceiling; absent on polls scheduled before it existed. */
+    maxDelayMs: v.optional(v.number()),
     failures: v.number(),
     /**
      * Only set on polls scheduled by 1.1.0, which passed the key here. Still
@@ -362,6 +436,7 @@ export const pollExecution = internalAction({
           executionId: args.executionId,
           apiUrl,
           delayMs: args.delayMs,
+          maxDelayMs: args.maxDelayMs,
           failures: args.failures,
         },
       );
@@ -382,15 +457,27 @@ export const pollExecution = internalAction({
         )
         .catch(() => "");
       if (command.exitCode !== undefined && command.exitCode !== null) {
-        await ctx.runMutation(internal.executions.finishExecution, {
-          executionId: args.executionId,
-          status: command.exitCode === 0 ? "completed" : "failed",
-          exitCode: command.exitCode,
-          result: truncate(logs, MAX_STORED_OUTPUT),
-        });
+        const transitioned = await ctx.runMutation(
+          internal.executions.finishExecution,
+          {
+            executionId: args.executionId,
+            status: command.exitCode === 0 ? "completed" : "failed",
+            exitCode: command.exitCode,
+            result: truncate(logs, MAX_STORED_OUTPUT),
+          },
+        );
         await client
           .deleteSession(execution.sandboxId, execution.sessionId)
           .catch(() => undefined);
+        // Lost a race (e.g. cancelled meanwhile): the winner already notified.
+        if (transitioned) {
+          await notifyComplete(
+            ctx,
+            args.executionId,
+            execution.onComplete,
+            execution.onCompleteContext,
+          );
+        }
         return null;
       }
       // Still running: surface the logs so far (reactive), then poll again
@@ -399,11 +486,13 @@ export const pollExecution = internalAction({
         executionId: args.executionId,
         result: truncate(logs, MAX_STORED_OUTPUT),
       });
-      const nextDelay = Math.min(args.delayMs * 2, POLL_MAX_MS);
+      const maxDelay = args.maxDelayMs ?? POLL_MAX_MS;
+      const nextDelay = Math.min(args.delayMs * 2, maxDelay);
       await ctx.scheduler.runAfter(nextDelay, internal.process.pollExecution, {
         executionId: args.executionId,
         apiUrl,
         delayMs: nextDelay,
+        maxDelayMs: args.maxDelayMs,
         failures: 0,
       });
     } catch (error) {
@@ -415,20 +504,87 @@ export const pollExecution = internalAction({
         await client
           .deleteSession(execution.sandboxId, execution.sessionId)
           .catch(() => undefined);
-        await ctx.runMutation(internal.executions.finishExecution, {
-          executionId: args.executionId,
-          status: "failed",
-          error: error instanceof Error ? error.message : String(error),
-        });
+        const transitioned = await ctx.runMutation(
+          internal.executions.finishExecution,
+          {
+            executionId: args.executionId,
+            status: "failed",
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
+        if (transitioned) {
+          await notifyComplete(
+            ctx,
+            args.executionId,
+            execution.onComplete,
+            execution.onCompleteContext,
+          );
+        }
         return null;
       }
-      await ctx.scheduler.runAfter(POLL_MAX_MS, internal.process.pollExecution, {
+      const retryDelay = args.maxDelayMs ?? POLL_MAX_MS;
+      await ctx.scheduler.runAfter(retryDelay, internal.process.pollExecution, {
         executionId: args.executionId,
         apiUrl,
-        delayMs: POLL_MAX_MS,
+        delayMs: retryDelay,
+        maxDelayMs: args.maxDelayMs,
         failures: args.failures + 1,
       });
     }
+    return null;
+  },
+});
+
+/**
+ * Cancel a running background execution. Order matters: the command is
+ * killed FIRST, and only then does the row transition to "cancelled" — if
+ * Daytona can't kill it (transient error), this throws and the row stays
+ * "running" (truthful; the poller keeps supervising). The transition only
+ * succeeds from "running", so a concurrent finish/cancel wins cleanly and
+ * onComplete fires exactly once.
+ */
+export const cancelExecution = action({
+  args: {
+    executionId: v.id("executions"),
+    /** API base URL, forwarded by the client. The key comes from the component's env. */
+    apiUrl: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const config = backgroundConfig(args.apiUrl);
+    if (!config) throw new Error(MISSING_API_KEY);
+    const execution = await ctx.runQuery(internal.executions.getInternal, {
+      executionId: args.executionId,
+    });
+    if (!execution) throw new Error("Execution not found");
+    if (execution.status !== "running") {
+      throw new Error(`Execution is not running (status: ${execution.status})`);
+    }
+    if (!execution.sessionId) {
+      throw new Error("Only background executions can be cancelled");
+    }
+    const client = new DaytonaClient(config);
+    try {
+      await client.deleteSession(execution.sandboxId, execution.sessionId);
+    } catch (error) {
+      // Already gone (sandbox/session deleted) means it's not running: fine.
+      if (!(error instanceof DaytonaApiError && error.status === 404)) {
+        throw error;
+      }
+    }
+    const transitioned = await ctx.runMutation(
+      internal.executions.finishExecution,
+      { executionId: args.executionId, status: "cancelled" },
+    );
+    if (!transitioned) {
+      throw new Error("Execution finished before it could be cancelled");
+    }
+    await notifyComplete(
+      ctx,
+      args.executionId,
+      execution.onComplete,
+      execution.onCompleteContext,
+    );
     return null;
   },
 });

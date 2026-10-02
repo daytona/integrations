@@ -9,7 +9,12 @@
  */
 
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server.js";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server.js";
 import { executionFields } from "./schema.js";
 import { clampLimit } from "./types.js";
 
@@ -71,6 +76,8 @@ export const startExecution = internalMutation({
     kind: v.union(v.literal("command"), v.literal("code")),
     input: v.string(),
     cwd: v.optional(v.string()),
+    onComplete: v.optional(v.string()),
+    onCompleteContext: v.optional(v.any()),
   },
   returns: v.id("executions"),
   handler: async (ctx, args) => {
@@ -85,15 +92,62 @@ export const startExecution = internalMutation({
 export const finishExecution = internalMutation({
   args: {
     executionId: v.id("executions"),
-    status: v.union(v.literal("completed"), v.literal("failed")),
+    status: v.union(
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
     exitCode: v.optional(v.number()),
     result: v.optional(v.string()),
     error: v.optional(v.string()),
   },
-  returns: v.null(),
+  /** True if this call performed the running -> terminal transition. */
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const { executionId, ...rest } = args;
+    const execution = await ctx.db.get(executionId);
+    // Terminal states are final: a poll that raced a cancellation (or vice
+    // versa) must not overwrite the winner, and must not notify again.
+    if (!execution || execution.status !== "running") return false;
     await ctx.db.patch(executionId, { ...rest, finishedAt: Date.now() });
-    return null;
+    return true;
+  },
+});
+
+/**
+ * Delete terminal execution rows older than a cutoff, in bounded batches.
+ * Returns how many were deleted and whether more remain — call again until
+ * `hasMore` is false. Host apps gate access with their own auth.
+ */
+export const purge = mutation({
+  args: {
+    olderThanMs: v.number(),
+    sandboxId: v.optional(v.string()),
+  },
+  returns: v.object({ deleted: v.number(), hasMore: v.boolean() }),
+  handler: async (ctx, args) => {
+    if (!Number.isFinite(args.olderThanMs) || args.olderThanMs < 0) {
+      throw new Error("olderThanMs must be a non-negative finite number");
+    }
+    const cutoff = Date.now() - args.olderThanMs;
+    // Filter BEFORE taking the batch, so repeated calls always make progress
+    // (a prefix of running/recent rows can't stall the purge forever).
+    const base = args.sandboxId
+      ? ctx.db
+          .query("executions")
+          .withIndex("sandboxId", (q) => q.eq("sandboxId", args.sandboxId!))
+      : ctx.db.query("executions");
+    const victims = await base
+      .filter((q) =>
+        q.and(
+          q.neq(q.field("status"), "running"),
+          q.lte(q.field("startedAt"), cutoff),
+        ),
+      )
+      .take(200);
+    for (const victim of victims) {
+      await ctx.db.delete(victim._id);
+    }
+    return { deleted: victims.length, hasMore: victims.length === 200 };
   },
 });

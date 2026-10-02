@@ -146,6 +146,21 @@ export const training = query({
 });
 ```
 
+To let your backend react when the command finishes (instead of polling the row), pass an `onComplete` mutation — the component invokes it on every terminal state (`completed`, `failed`, or `cancelled`) with the outcome and an optional `context` you supply:
+
+```ts
+const { executionId } = await daytona.runBackground(ctx, {
+  sandboxId,
+  command: "cargo build",
+  onComplete: internal.build.buildFinished, // (ctx, { executionId, status, exitCode, result, error, context })
+  onCompleteContext: { appId },
+  minPollMs: 500,   // first poll + backoff floor (default 1000, min 250)
+  maxPollMs: 5000,  // backoff ceiling (default 10000, max 120000)
+});
+```
+
+Cancel a running background execution with `daytona.cancelExecution(ctx, { executionId })` — it stops the command (kills its session), marks the row `cancelled`, and fires the `onComplete` handler.
+
 A running background command does not reset the sandbox's [idle auto-stop timer](https://www.daytona.io/docs/sandboxes#what-resets-the-timer) — create sandboxes for long jobs with `autoStopInterval: 0`.
 
 `runBackground` needs the key passed down as shown in [Installation](#installation). Its poller runs from the scheduler, outside any of your calls, so it reads `DAYTONA_API_KEY` from the component's env on every poll instead of carrying it in scheduled function args.
@@ -205,6 +220,7 @@ export const mySandboxes = query({
 ### Limits & long-running work
 
 - Convex actions time out after 10 minutes, so synchronous `run`/`runCode` commands are always bounded below that ceiling: `timeoutSeconds` defaults to 540 and is capped at 570. For longer jobs, use `runBackground` — it has no duration bound and holds no action open.
+- Sandbox and execution rows are kept as audit history. They never clean themselves up — prune them in batches with `daytona.purgeSandboxes(ctx, { olderThanMs })` and `daytona.purgeExecutions(ctx, { olderThanMs })` (each call returns `hasMore`; terminal rows only, remote sandboxes untouched). `listSandboxes` accepts a `state` filter (e.g. `"started"` for a live count) and `listSandboxesPaginated` provides cursor pagination.
 - Stored execution output is truncated (64 KB); the action's return value carries up to 4 MB.
 - Sandboxes cost money while running: set `autoStopInterval`, and delete sandboxes you're done with. `refreshSandbox` reconciles records whose remote sandbox was removed out-of-band.
 

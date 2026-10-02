@@ -451,6 +451,326 @@ describe("process actions", () => {
   });
 });
 
+
+const sessionRoutes = (commandDone: () => boolean, exitCode = 0) => [
+  {
+    method: "GET",
+    match: "/api/sandbox/sbx-1",
+    response: () => json(startedSandbox),
+  },
+  {
+    method: "POST",
+    match: "/process/session/convex-exec-",
+    response: () => json({ cmdId: "cmd-1" }),
+  },
+  {
+    method: "POST",
+    match: "/process/session",
+    response: () => json({}),
+  },
+  {
+    // The toolbox serves logs as text/plain.
+    method: "GET",
+    match: "/command/cmd-1/logs",
+    response: () => new Response("partial output\n"),
+  },
+  {
+    method: "GET",
+    match: "/command/cmd-1",
+    response: () =>
+      json(
+        commandDone()
+          ? { id: "cmd-1", command: "sleep 5", exitCode }
+          : { id: "cmd-1", command: "sleep 5" },
+      ),
+  },
+  {
+    method: "DELETE",
+    match: "/process/session/convex-exec-",
+    response: () => new Response("", { status: 200 }),
+  },
+];
+
+
+type Test = ReturnType<typeof initConvexTest>;
+
+/** The args each scheduled poll was given (stored as `[args]`). */
+const scheduledPolls = (t: Test) =>
+  t.run(async (ctx) =>
+    (await ctx.db.system.query("_scheduled_functions").collect()).map(
+      (job) => job.args[0],
+    ),
+  );
+
+describe("background QoL (cancel, backoff, purge, delete-404)", () => {
+  beforeEach(() => {
+    vi.stubEnv("DAYTONA_API_KEY", config.apiKey);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test("delete treats an already-gone sandbox (404) as destroyed", async () => {
+    const t = initConvexTest();
+    await t.mutation(internal.sandboxes.upsertSandbox, {
+      sandboxId: "sbx-gone",
+      state: "started",
+    });
+    stubFetch([
+      {
+        method: "DELETE",
+        match: "/api/sandbox/sbx-gone",
+        response: () => new Response("not found", { status: 404 }),
+      },
+    ]);
+    await t.action(api.sandboxes.remove, { config, sandboxId: "sbx-gone" });
+    const sandbox = await t.query(api.sandboxes.get, { sandboxId: "sbx-gone" });
+    expect(sandbox?.state).toBe("destroyed");
+  });
+
+  test("list filters by state", async () => {
+    const t = initConvexTest();
+    await t.mutation(internal.sandboxes.upsertSandbox, {
+      sandboxId: "sbx-a",
+      state: "started",
+    });
+    await t.mutation(internal.sandboxes.upsertSandbox, {
+      sandboxId: "sbx-b",
+      state: "destroyed",
+    });
+    const started = await t.query(api.sandboxes.list, { state: "started" });
+    expect(started.map((s) => s.sandboxId)).toEqual(["sbx-a"]);
+    const page = await t.query(api.sandboxes.listPaginated, {
+      state: "destroyed",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(page.page.map((s) => s.sandboxId)).toEqual(["sbx-b"]);
+  });
+
+  test("purge deletes only old terminal rows", async () => {
+    const t = initConvexTest();
+    await t.mutation(internal.sandboxes.upsertSandbox, {
+      sandboxId: "sbx-old",
+      state: "destroyed",
+    });
+    await t.mutation(internal.sandboxes.upsertSandbox, {
+      sandboxId: "sbx-live",
+      state: "started",
+    });
+    // olderThanMs: 0 => cutoff is "now", everything terminal qualifies.
+    const result = await t.mutation(api.sandboxes.purge, { olderThanMs: 0 });
+    expect(result.deleted).toBe(1);
+    expect(await t.query(api.sandboxes.get, { sandboxId: "sbx-old" })).toBeNull();
+    expect(
+      (await t.query(api.sandboxes.get, { sandboxId: "sbx-live" }))?.state,
+    ).toBe("started");
+
+    const executionId = await t.mutation(internal.executions.startExecution, {
+      sandboxId: "sbx-live",
+      kind: "command",
+      input: "true",
+    });
+    // Running rows are never purged.
+    const kept = await t.mutation(api.executions.purge, { olderThanMs: 0 });
+    expect(kept.deleted).toBe(0);
+    await t.mutation(internal.executions.finishExecution, {
+      executionId,
+      status: "completed",
+      exitCode: 0,
+    });
+    const purged = await t.mutation(api.executions.purge, { olderThanMs: 0 });
+    expect(purged.deleted).toBe(1);
+  });
+
+  test("runBackground clamps poll options and rejects nonsense", async () => {
+    const t = initConvexTest();
+    stubFetch(sessionRoutes(() => false));
+    await expect(
+      t.action(api.process.runBackground, {
+        apiUrl: config.apiUrl,
+        sandboxId: "sbx-1",
+        command: "true",
+        minPollMs: -5,
+      }),
+    ).rejects.toThrow(/positive numbers/);
+
+    await t.action(api.process.runBackground, {
+      apiUrl: config.apiUrl,
+      sandboxId: "sbx-1",
+      command: "true",
+      minPollMs: 1, // below floor -> clamped to 250
+      maxPollMs: 999_999, // above ceiling -> clamped to 120000
+    });
+    const [pollArgs] = await scheduledPolls(t);
+    expect(pollArgs.delayMs).toBe(250);
+    expect(pollArgs.maxDelayMs).toBe(120_000);
+  });
+
+  test("finishExecution only transitions from running (terminal states are final)", async () => {
+    const t = initConvexTest();
+    const executionId = await t.mutation(internal.executions.startExecution, {
+      sandboxId: "sbx-1",
+      kind: "command",
+      input: "sleep 600",
+    });
+    expect(
+      await t.mutation(internal.executions.finishExecution, {
+        executionId,
+        status: "cancelled",
+      }),
+    ).toBe(true);
+    // A poll that read "running" before the cancel lands its finish late:
+    // it must lose, leaving "cancelled" intact.
+    expect(
+      await t.mutation(internal.executions.finishExecution, {
+        executionId,
+        status: "completed",
+        exitCode: 0,
+      }),
+    ).toBe(false);
+    const execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.status).toBe("cancelled");
+    expect(execution?.exitCode).toBeUndefined();
+  });
+
+  test("cancelExecution keeps the row running when the kill fails", async () => {
+    const t = initConvexTest();
+    stubFetch(sessionRoutes(() => false));
+    const { executionId } = await t.action(api.process.runBackground, {
+      apiUrl: config.apiUrl,
+      sandboxId: "sbx-1",
+      command: "sleep 600",
+    });
+    // Daytona fails the session delete with a transient 500.
+    stubFetch([
+      {
+        method: "GET",
+        match: "/api/sandbox/sbx-1",
+        response: () => json(startedSandbox),
+      },
+      {
+        method: "DELETE",
+        match: "/process/session/",
+        response: () => new Response("boom", { status: 500 }),
+      },
+    ]);
+    await expect(
+      t.action(api.process.cancelExecution, {
+        executionId,
+        apiUrl: config.apiUrl,
+      }),
+    ).rejects.toThrow(/500/);
+    expect(
+      (await t.query(api.executions.get, { executionId }))?.status,
+    ).toBe("running");
+  });
+
+  test("purge makes progress past a prefix of non-victims", async () => {
+    const t = initConvexTest();
+    // 205 running rows first (never purgeable), then one finished row.
+    for (let i = 0; i < 205; i++) {
+      await t.mutation(internal.executions.startExecution, {
+        sandboxId: "sbx-1",
+        kind: "command",
+        input: `running-${i}`,
+      });
+    }
+    const finishedId = await t.mutation(internal.executions.startExecution, {
+      sandboxId: "sbx-1",
+      kind: "command",
+      input: "done",
+    });
+    await t.mutation(internal.executions.finishExecution, {
+      executionId: finishedId,
+      status: "completed",
+      exitCode: 0,
+    });
+    const result = await t.mutation(api.executions.purge, { olderThanMs: 0 });
+    expect(result).toEqual({ deleted: 1, hasMore: false });
+    await expect(
+      t.mutation(api.executions.purge, { olderThanMs: -1 }),
+    ).rejects.toThrow(/non-negative/);
+  });
+
+  test("onComplete is stored on the row; a failing handler never corrupts terminal state", async () => {
+    const t = initConvexTest();
+    let done = false;
+    stubFetch(sessionRoutes(() => done));
+
+    const { executionId } = await t.action(api.process.runBackground, {
+      apiUrl: config.apiUrl,
+      sandboxId: "sbx-1",
+      command: "sleep 5",
+      // A handle string the test runtime can't resolve — invoking it throws,
+      // which must be swallowed (logged), leaving the row terminal.
+      onComplete: "function://bogus-handle-for-test",
+      onCompleteContext: { appId: "app-1" },
+    });
+
+    let execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.onComplete).toBe("function://bogus-handle-for-test");
+    expect(execution?.onCompleteContext).toEqual({ appId: "app-1" });
+
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      done = true;
+      const [pollArgs] = await scheduledPolls(t);
+      await t.action(internal.process.pollExecution, pollArgs);
+      execution = await t.query(api.executions.get, { executionId });
+      expect(execution?.status).toBe("completed");
+      expect(execution?.exitCode).toBe(0);
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringMatching(/onComplete handler failed/),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test("cancelExecution stops the command, marks cancelled, loses race to finish", async () => {
+    const t = initConvexTest();
+    const { calls } = stubFetch(sessionRoutes(() => false));
+
+    const { executionId } = await t.action(api.process.runBackground, {
+      apiUrl: config.apiUrl,
+      sandboxId: "sbx-1",
+      command: "sleep 600",
+    });
+    await t.action(api.process.cancelExecution, {
+      executionId,
+      apiUrl: config.apiUrl,
+    });
+    const execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.status).toBe("cancelled");
+    expect(execution?.finishedAt).toBeDefined();
+    expect(
+      calls.filter(
+        (c) => c.method === "DELETE" && c.url.includes("/process/session/"),
+      ).length,
+    ).toBeGreaterThan(0);
+
+    // Already terminal -> atomic claim refuses.
+    await expect(
+      t.action(api.process.cancelExecution, {
+        executionId,
+        apiUrl: config.apiUrl,
+      }),
+    ).rejects.toThrow(/not running/);
+
+    // A late poll sees the terminal row and does nothing.
+    await t.action(internal.process.pollExecution, {
+      executionId,
+      apiUrl: config.apiUrl,
+      delayMs: 1000,
+      failures: 0,
+    });
+    expect(
+      (await t.query(api.executions.get, { executionId }))?.status,
+    ).toBe("cancelled");
+  });
+});
+
 describe("background execution", () => {
   // runBackground reads the key from the component's env (passed down by the
   // app in convex.config.ts). convex-test runs everything in this process, so
@@ -463,54 +783,7 @@ describe("background execution", () => {
     vi.unstubAllEnvs();
   });
 
-  const sessionRoutes = (commandDone: () => boolean, exitCode = 0) => [
-    {
-      method: "GET",
-      match: "/api/sandbox/sbx-1",
-      response: () => json(startedSandbox),
-    },
-    {
-      method: "POST",
-      match: "/process/session/convex-exec-",
-      response: () => json({ cmdId: "cmd-1" }),
-    },
-    {
-      method: "POST",
-      match: "/process/session",
-      response: () => json({}),
-    },
-    {
-      // The toolbox serves logs as text/plain.
-      method: "GET",
-      match: "/command/cmd-1/logs",
-      response: () => new Response("partial output\n"),
-    },
-    {
-      method: "GET",
-      match: "/command/cmd-1",
-      response: () =>
-        json(
-          commandDone()
-            ? { id: "cmd-1", command: "sleep 5", exitCode }
-            : { id: "cmd-1", command: "sleep 5" },
-        ),
-    },
-    {
-      method: "DELETE",
-      match: "/process/session/convex-exec-",
-      response: () => new Response("", { status: 200 }),
-    },
-  ];
 
-  type Test = ReturnType<typeof initConvexTest>;
-
-  /** The args each scheduled poll was given (stored as `[args]`). */
-  const scheduledPolls = (t: Test) =>
-    t.run(async (ctx) =>
-      (await ctx.db.system.query("_scheduled_functions").collect()).map(
-        (job) => job.args[0],
-      ),
-    );
 
   /** A running background execution as 1.1.0 left it, mid-poll. */
   const legacyExecution = (t: Test) =>
@@ -649,6 +922,7 @@ describe("background execution", () => {
       executionId,
       apiUrl: config.apiUrl,
       delayMs: 1000,
+      maxDelayMs: 10_000,
       failures: 0,
     });
   });

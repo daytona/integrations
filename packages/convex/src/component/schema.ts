@@ -37,6 +37,7 @@ export const executionFields = {
     v.literal("running"),
     v.literal("completed"),
     v.literal("failed"),
+    v.literal("cancelled"),
   ),
   exitCode: v.optional(v.number()),
   /** Combined output (truncated for storage — full output is the action's return value). */
@@ -44,6 +45,10 @@ export const executionFields = {
   /** Set for background executions: the toolbox session/command driving them. */
   sessionId: v.optional(v.string()),
   commandId: v.optional(v.string()),
+  /** Function handle invoked when a background execution reaches a terminal state. */
+  onComplete: v.optional(v.string()),
+  /** Caller-supplied value passed through to the onComplete handler. */
+  onCompleteContext: v.optional(v.any()),
   error: v.optional(v.string()),
   startedAt: v.number(),
   finishedAt: v.optional(v.number()),
@@ -52,6 +57,8 @@ export const executionFields = {
 export default defineSchema({
   sandboxes: defineTable(sandboxFields)
     .index("sandboxId", ["sandboxId"])
-    .index("userKey", ["userKey"]),
+    .index("userKey", ["userKey"])
+    .index("state", ["state"])
+    .index("userKey_state", ["userKey", "state"]),
   executions: defineTable(executionFields).index("sandboxId", ["sandboxId"]),
 });
