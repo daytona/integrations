@@ -43,6 +43,40 @@ export const writeFile = action({
   },
 });
 
+/**
+ * Binary-safe read: returns the file's raw bytes (images, archives, PDFs).
+ * Use `readFile` for text. Payloads are bounded by Convex's function
+ * argument/return size limits.
+ */
+export const readFileBytes = action({
+  args: {
+    config: configValidator,
+    sandboxId: v.string(),
+    path: v.string(),
+  },
+  returns: v.bytes(),
+  handler: async (_ctx, args) => {
+    const client = new DaytonaClient(args.config);
+    return await client.downloadFileBytes(args.sandboxId, args.path);
+  },
+});
+
+/** Binary-safe write: uploads raw bytes as-is. Use `writeFile` for text. */
+export const writeFileBytes = action({
+  args: {
+    config: configValidator,
+    sandboxId: v.string(),
+    path: v.string(),
+    content: v.bytes(),
+  },
+  returns: v.null(),
+  handler: async (_ctx, args) => {
+    const client = new DaytonaClient(args.config);
+    await client.uploadFile(args.sandboxId, args.path, args.content);
+    return null;
+  },
+});
+
 export const listFiles = action({
   args: {
     config: configValidator,

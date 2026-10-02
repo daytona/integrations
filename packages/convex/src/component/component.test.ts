@@ -1063,6 +1063,63 @@ describe("background execution", () => {
   });
 });
 
+describe("binary file actions", () => {
+  // Every byte value 0..255: bytes >= 0x80 are invalid standalone UTF-8, so
+  // any accidental text decoding/encoding in the path would mangle them.
+  const allBytes = () => Uint8Array.from({ length: 256 }, (_, i) => i);
+
+  test("writeFileBytes uploads the exact bytes", async () => {
+    const t = initConvexTest();
+    let uploaded: Uint8Array | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/api/sandbox/sbx-1")) {
+          return new Response(JSON.stringify(startedSandbox));
+        }
+        if (url.includes("/files/upload-v2")) {
+          const file = (init?.body as FormData).get("file") as Blob;
+          uploaded = new Uint8Array(await file.arrayBuffer());
+          return new Response("{}");
+        }
+        return new Response("no stub", { status: 500 });
+      }),
+    );
+
+    await t.action(api.files.writeFileBytes, {
+      config,
+      sandboxId: "sbx-1",
+      path: "/home/daytona/blob.bin",
+      content: allBytes().buffer,
+    });
+    expect(uploaded).toEqual(allBytes());
+  });
+
+  test("readFileBytes returns the exact bytes", async () => {
+    const t = initConvexTest();
+    stubFetch([
+      {
+        method: "GET",
+        match: "/api/sandbox/sbx-1",
+        response: () => json(startedSandbox),
+      },
+      {
+        method: "GET",
+        match: "/files/download",
+        response: () => new Response(allBytes()),
+      },
+    ]);
+
+    const bytes = await t.action(api.files.readFileBytes, {
+      config,
+      sandboxId: "sbx-1",
+      path: "/home/daytona/blob.bin",
+    });
+    expect(new Uint8Array(bytes)).toEqual(allBytes());
+  });
+});
+
 describe("file actions", () => {
   test("readFile and writeFile round-trip through the toolbox", async () => {
     const t = initConvexTest();

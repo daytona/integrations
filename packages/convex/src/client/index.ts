@@ -319,6 +319,32 @@ export class Daytona {
     });
   }
 
+  /**
+   * Read a file's raw bytes — binary-safe for images, archives, PDFs, etc.
+   * Use `readFile` for text. Bounded by Convex's function argument/return
+   * size limits.
+   */
+  async readFileBytes(
+    ctx: RunActionCtx,
+    args: { sandboxId: string; path: string },
+  ): Promise<ArrayBuffer> {
+    return await ctx.runAction(this.component.files.readFileBytes, {
+      config: this.config,
+      ...args,
+    });
+  }
+
+  /** Write raw bytes to a file in the sandbox (binary-safe). */
+  async writeFileBytes(
+    ctx: RunActionCtx,
+    args: { sandboxId: string; path: string; content: ArrayBuffer },
+  ) {
+    return await ctx.runAction(this.component.files.writeFileBytes, {
+      config: this.config,
+      ...args,
+    });
+  }
+
   /** List a directory in the sandbox. */
   async listFiles(
     ctx: RunActionCtx,

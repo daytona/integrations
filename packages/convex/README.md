@@ -192,7 +192,16 @@ const entries = await daytona.listFiles(ctx, { sandboxId, path: "/home/daytona" 
 await daytona.deleteFile(ctx, { sandboxId, path: "/home/daytona/tmp", recursive: true });
 ```
 
-File content crosses the function boundary as UTF-8 strings; keep individual files under Convex's 16 MiB argument/return limits.
+`readFile`/`writeFile` move content as UTF-8 strings — the right default for code, configs, and logs. For binary files (images, PDFs, archives), use the byte variants, which pass raw `ArrayBuffer`s through untouched:
+
+```ts
+const png = await daytona.readFileBytes(ctx, { sandboxId, path: "/home/daytona/chart.png" });
+await ctx.storage.store(new Blob([png], { type: "image/png" })); // e.g. into Convex file storage
+
+await daytona.writeFileBytes(ctx, { sandboxId, path: "/home/daytona/data.zip", content: zipBuffer });
+```
+
+Either way, file content crosses the Convex function boundary, so keep individual files under Convex's 16 MiB argument/return limits.
 
 ### Preview URLs
 

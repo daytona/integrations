@@ -95,6 +95,16 @@ try {
   });
   assert(content === "convex-live-e2e", "writeFile/readFile round-trip (upload-v2)");
 
+  const binary = run("example:binaryRoundTrip", { sandboxId });
+  assert(
+    binary.roundTripOk,
+    "writeFileBytes/readFileBytes round-trip all 256 byte values intact",
+  );
+  assert(
+    binary.pngSignatureOk,
+    "readFileBytes reads a sandbox-generated binary (PNG signature) intact",
+  );
+
   const bg = run("example:runBackgroundCommand", {
     sandboxId,
     command: "sleep 5 && echo background-done",
@@ -164,8 +174,8 @@ try {
   const byStatus = (status) =>
     executions.filter((e) => e.status === status).length;
   assert(
-    executions.length === 4 && byStatus("completed") === 3 && byStatus("cancelled") === 1,
-    "executions table recorded 3 completed runs + 1 cancelled",
+    executions.length === 5 && byStatus("completed") === 4 && byStatus("cancelled") === 1,
+    "executions table recorded 4 completed runs + 1 cancelled",
   );
 
   run("example:deleteSandbox", { sandboxId });

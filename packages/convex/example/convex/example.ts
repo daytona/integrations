@@ -124,6 +124,48 @@ export const writeAndReadFile = action({
   },
 });
 
+/**
+ * Binary round-trip: write every byte value 0..255 and read it back, then
+ * read a binary file produced inside the sandbox (a PNG signature).
+ */
+export const binaryRoundTrip = action({
+  args: { sandboxId: v.string() },
+  handler: async (ctx, args) => {
+    const original = Uint8Array.from({ length: 256 }, (_, i) => i);
+    await daytona.writeFileBytes(ctx, {
+      sandboxId: args.sandboxId,
+      path: "/home/daytona/all-bytes.bin",
+      content: original.buffer,
+    });
+    const readBack = new Uint8Array(
+      await daytona.readFileBytes(ctx, {
+        sandboxId: args.sandboxId,
+        path: "/home/daytona/all-bytes.bin",
+      }),
+    );
+
+    await daytona.run(ctx, {
+      sandboxId: args.sandboxId,
+      command: "printf '\\211PNG\\r\\n\\032\\n' > /home/daytona/sig.bin",
+    });
+    const signature = new Uint8Array(
+      await daytona.readFileBytes(ctx, {
+        sandboxId: args.sandboxId,
+        path: "/home/daytona/sig.bin",
+      }),
+    );
+    const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+    return {
+      roundTripOk:
+        readBack.length === 256 && readBack.every((byte, i) => byte === i),
+      pngSignatureOk:
+        signature.length === 8 &&
+        signature.every((byte, i) => byte === pngSignature[i]),
+    };
+  },
+});
+
 /** Get a signed preview URL for a port (e.g. after starting a dev server). */
 export const previewUrl = action({
   args: { sandboxId: v.string(), port: v.number() },

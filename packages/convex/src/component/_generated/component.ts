@@ -120,12 +120,35 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         string,
         Name
       >;
+      readFileBytes: FunctionReference<
+        "action",
+        "internal",
+        {
+          config: { apiKey: string; apiUrl?: string };
+          path: string;
+          sandboxId: string;
+        },
+        ArrayBuffer,
+        Name
+      >;
       writeFile: FunctionReference<
         "action",
         "internal",
         {
           config: { apiKey: string; apiUrl?: string };
           content: string;
+          path: string;
+          sandboxId: string;
+        },
+        null,
+        Name
+      >;
+      writeFileBytes: FunctionReference<
+        "action",
+        "internal",
+        {
+          config: { apiKey: string; apiUrl?: string };
+          content: ArrayBuffer;
           path: string;
           sandboxId: string;
         },
