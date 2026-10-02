@@ -22,6 +22,11 @@ export const sandboxFields = {
    */
   userKey: v.optional(v.string()),
   lastError: v.optional(v.string()),
+  /**
+   * Daytona's timestamp (ms) of the last webhook state event applied. Events
+   * can arrive duplicated or out of order; older ones are discarded.
+   */
+  remoteUpdatedAt: v.optional(v.number()),
   createdAt: v.number(),
   updatedAt: v.number(),
 };
