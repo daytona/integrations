@@ -1,7 +1,7 @@
 import { Daytona } from "@daytona/convex";
 import { v } from "convex/values";
-import { components } from "./_generated/api.js";
-import { action, query } from "./_generated/server.js";
+import { components, internal } from "./_generated/api.js";
+import { action, internalMutation, query } from "./_generated/server.js";
 
 // Reads DAYTONA_API_KEY (and optional DAYTONA_API_URL) from this deployment's
 // environment variables: `npx convex env set DAYTONA_API_KEY ...`
@@ -47,9 +47,55 @@ export const runBackgroundCommand = action({
     sandboxId: v.string(),
     command: v.string(),
     cwd: v.optional(v.string()),
+    withCallback: v.optional(v.boolean()),
+  },
+  // Explicit return type: referencing internal.example.* from this module
+  // would otherwise make the export's inferred type self-referential.
+  handler: async (ctx, args): Promise<{ executionId: string }> => {
+    return await daytona.runBackground(ctx, {
+      sandboxId: args.sandboxId,
+      command: args.command,
+      cwd: args.cwd,
+      // The component calls this mutation when the command finishes — no
+      // polling loop needed on the app side.
+      onComplete: args.withCallback ? internal.example.backgroundFinished : undefined,
+      onCompleteContext: args.withCallback ? { source: "example" } : undefined,
+    });
+  },
+});
+
+/** Called by the component when a background execution reaches a terminal state. */
+export const backgroundFinished = internalMutation({
+  args: {
+    executionId: v.string(),
+    status: v.string(),
+    exitCode: v.optional(v.number()),
+    result: v.optional(v.string()),
+    error: v.optional(v.string()),
+    context: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    return await daytona.runBackground(ctx, args);
+    await ctx.db.insert("notifications", {
+      executionId: args.executionId,
+      status: args.status,
+      exitCode: args.exitCode,
+    });
+  },
+});
+
+/** Reactive: callback notifications written by `backgroundFinished`. */
+export const notifications = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("notifications").order("desc").take(20);
+  },
+});
+
+/** Cancel a running background execution. */
+export const cancelBackgroundCommand = action({
+  args: { executionId: v.string() },
+  handler: async (ctx, args) => {
+    return await daytona.cancelExecution(ctx, args);
   },
 });
 

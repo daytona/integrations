@@ -94,6 +94,7 @@ try {
   const bg = run("example:runBackgroundCommand", {
     sandboxId,
     command: "sleep 5 && echo background-done",
+    withCallback: true,
   });
   assert(typeof bg.executionId === "string", "runBackground returned immediately with executionId");
   let bgRow;
@@ -108,6 +109,47 @@ try {
     `background execution completed via scheduler polling (exit ${bgRow?.exitCode})`,
   );
 
+  let notification;
+  for (let i = 0; i < 10; i++) {
+    notification = run("example:notifications", {}).find(
+      (n) => n.executionId === bg.executionId,
+    );
+    if (notification) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  assert(
+    notification?.status === "completed" && notification.exitCode === 0,
+    "onComplete callback wrote a notification into the app's table",
+  );
+
+  const cancelTarget = run("example:runBackgroundCommand", {
+    sandboxId,
+    command: "sleep 600",
+    withCallback: true,
+  });
+  run("example:cancelBackgroundCommand", {
+    executionId: cancelTarget.executionId,
+  });
+  const cancelledRow = run("example:executions", { sandboxId }).find(
+    (e) => e._id === cancelTarget.executionId,
+  );
+  assert(
+    cancelledRow?.status === "cancelled",
+    "cancelExecution stopped the command and marked the row cancelled",
+  );
+  let cancelNote;
+  for (let i = 0; i < 10; i++) {
+    cancelNote = run("example:notifications", {}).find(
+      (n) => n.executionId === cancelTarget.executionId,
+    );
+    if (cancelNote) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  assert(
+    cancelNote?.status === "cancelled",
+    "onComplete fired for the cancelled execution too",
+  );
+
   const preview = run("example:previewUrl", { sandboxId, port: 3000 });
   assert(
     typeof preview.url === "string" && preview.url.startsWith("https://"),
@@ -115,9 +157,11 @@ try {
   );
 
   const executions = run("example:executions", { sandboxId });
+  const byStatus = (status) =>
+    executions.filter((e) => e.status === status).length;
   assert(
-    executions.length === 3 && executions.every((e) => e.status === "completed"),
-    "executions table recorded 3 completed runs (sync command, code, background)",
+    executions.length === 4 && byStatus("completed") === 3 && byStatus("cancelled") === 1,
+    "executions table recorded 3 completed runs + 1 cancelled",
   );
 
   run("example:deleteSandbox", { sandboxId });

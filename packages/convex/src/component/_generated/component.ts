@@ -38,11 +38,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           finishedAt?: number;
           input: string;
           kind: "command" | "code";
+          onComplete?: string;
+          onCompleteContext?: any;
           result?: string;
           sandboxId: string;
           sessionId?: string;
           startedAt: number;
-          status: "running" | "completed" | "failed";
+          status: "running" | "completed" | "failed" | "cancelled";
         },
         Name
       >;
@@ -60,12 +62,21 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           finishedAt?: number;
           input: string;
           kind: "command" | "code";
+          onComplete?: string;
+          onCompleteContext?: any;
           result?: string;
           sandboxId: string;
           sessionId?: string;
           startedAt: number;
-          status: "running" | "completed" | "failed";
+          status: "running" | "completed" | "failed" | "cancelled";
         }>,
+        Name
+      >;
+      purge: FunctionReference<
+        "mutation",
+        "internal",
+        { olderThanMs: number; sandboxId?: string },
+        { deleted: number; hasMore: boolean },
         Name
       >;
     };
@@ -123,6 +134,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       >;
     };
     process: {
+      cancelExecution: FunctionReference<
+        "action",
+        "internal",
+        { apiUrl?: string; executionId: string },
+        null,
+        Name
+      >;
       run: FunctionReference<
         "action",
         "internal",
@@ -147,6 +165,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           command: string;
           cwd?: string;
           envs?: Record<string, string>;
+          maxPollMs?: number;
+          minPollMs?: number;
+          onComplete?: string;
+          onCompleteContext?: any;
           sandboxId: string;
         },
         { executionId: string },
@@ -220,7 +242,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       list: FunctionReference<
         "query",
         "internal",
-        { limit?: number; userKey?: string },
+        { limit?: number; state?: string; userKey?: string },
         Array<{
           _creationTime: number;
           _id: string;
@@ -238,6 +260,24 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         }>,
         Name
       >;
+      listPaginated: FunctionReference<
+        "query",
+        "internal",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          state?: string;
+          userKey?: string;
+        },
+        any,
+        Name
+      >;
       previewUrl: FunctionReference<
         "action",
         "internal",
@@ -249,6 +289,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           signed?: boolean;
         },
         { port: number; token?: string; url: string },
+        Name
+      >;
+      purge: FunctionReference<
+        "mutation",
+        "internal",
+        { olderThanMs: number },
+        { deleted: number; hasMore: boolean },
         Name
       >;
       refresh: FunctionReference<

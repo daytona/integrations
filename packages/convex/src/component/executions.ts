@@ -9,7 +9,12 @@
  */
 
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server.js";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server.js";
 import { executionFields } from "./schema.js";
 import { clampLimit } from "./types.js";
 
@@ -71,6 +76,8 @@ export const startExecution = internalMutation({
     kind: v.union(v.literal("command"), v.literal("code")),
     input: v.string(),
     cwd: v.optional(v.string()),
+    onComplete: v.optional(v.string()),
+    onCompleteContext: v.optional(v.any()),
   },
   returns: v.id("executions"),
   handler: async (ctx, args) => {
@@ -85,7 +92,11 @@ export const startExecution = internalMutation({
 export const finishExecution = internalMutation({
   args: {
     executionId: v.id("executions"),
-    status: v.union(v.literal("completed"), v.literal("failed")),
+    status: v.union(
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
     exitCode: v.optional(v.number()),
     result: v.optional(v.string()),
     error: v.optional(v.string()),
@@ -95,5 +106,60 @@ export const finishExecution = internalMutation({
     const { executionId, ...rest } = args;
     await ctx.db.patch(executionId, { ...rest, finishedAt: Date.now() });
     return null;
+  },
+});
+
+/**
+ * Atomically claim a running background execution for cancellation. Losing a
+ * race against the poller's finish (or a concurrent cancel) throws instead of
+ * overwriting a terminal state.
+ */
+export const beginCancel = internalMutation({
+  args: { executionId: v.id("executions") },
+  returns: executionDoc,
+  handler: async (ctx, args) => {
+    const execution = await ctx.db.get(args.executionId);
+    if (!execution) throw new Error("Execution not found");
+    if (execution.status !== "running") {
+      throw new Error(`Execution is not running (status: ${execution.status})`);
+    }
+    if (!execution.sessionId) {
+      throw new Error("Only background executions can be cancelled");
+    }
+    await ctx.db.patch(args.executionId, {
+      status: "cancelled",
+      finishedAt: Date.now(),
+    });
+    return { ...execution, status: "cancelled" as const };
+  },
+});
+
+/**
+ * Delete terminal execution rows older than a cutoff, in bounded batches.
+ * Returns how many were deleted and whether more remain — call again until
+ * `hasMore` is false. Host apps gate access with their own auth.
+ */
+export const purge = mutation({
+  args: {
+    olderThanMs: v.number(),
+    sandboxId: v.optional(v.string()),
+  },
+  returns: v.object({ deleted: v.number(), hasMore: v.boolean() }),
+  handler: async (ctx, args) => {
+    const cutoff = Date.now() - args.olderThanMs;
+    const batch = args.sandboxId
+      ? await ctx.db
+          .query("executions")
+          .withIndex("sandboxId", (q) => q.eq("sandboxId", args.sandboxId!))
+          .take(200)
+      : await ctx.db.query("executions").take(200);
+    const victims = batch.filter(
+      (execution) =>
+        execution.status !== "running" && execution.startedAt <= cutoff,
+    );
+    for (const victim of victims) {
+      await ctx.db.delete(victim._id);
+    }
+    return { deleted: victims.length, hasMore: batch.length === 200 };
   },
 });

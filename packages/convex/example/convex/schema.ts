@@ -1,6 +1,11 @@
-import { defineSchema } from "convex/server";
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 
 export default defineSchema({
-  // Tables used by the example app itself would go here — the Daytona
-  // component keeps its own tables in its own namespace.
+  // Written by the onComplete callback when background executions finish.
+  notifications: defineTable({
+    executionId: v.string(),
+    status: v.string(),
+    exitCode: v.optional(v.number()),
+  }),
 });
