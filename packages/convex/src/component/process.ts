@@ -24,7 +24,7 @@ import {
   internalAction,
   type ActionCtx,
 } from "./_generated/server.js";
-import { DaytonaClient } from "./daytona.js";
+import { DaytonaApiError, DaytonaClient } from "./daytona.js";
 import {
   MAX_RETURNED_OUTPUT,
   MAX_STORED_INPUT,
@@ -378,12 +378,17 @@ export const runBackground = action({
           .deleteSession(args.sandboxId, sessionId)
           .catch(() => undefined);
       }
-      await ctx.runMutation(internal.executions.finishExecution, {
-        executionId,
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      });
-      await notifyComplete(ctx, executionId, args.onComplete, args.onCompleteContext);
+      const transitioned = await ctx.runMutation(
+        internal.executions.finishExecution,
+        {
+          executionId,
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      if (transitioned) {
+        await notifyComplete(ctx, executionId, args.onComplete, args.onCompleteContext);
+      }
       throw error;
     }
   },
@@ -452,21 +457,27 @@ export const pollExecution = internalAction({
         )
         .catch(() => "");
       if (command.exitCode !== undefined && command.exitCode !== null) {
-        await ctx.runMutation(internal.executions.finishExecution, {
-          executionId: args.executionId,
-          status: command.exitCode === 0 ? "completed" : "failed",
-          exitCode: command.exitCode,
-          result: truncate(logs, MAX_STORED_OUTPUT),
-        });
+        const transitioned = await ctx.runMutation(
+          internal.executions.finishExecution,
+          {
+            executionId: args.executionId,
+            status: command.exitCode === 0 ? "completed" : "failed",
+            exitCode: command.exitCode,
+            result: truncate(logs, MAX_STORED_OUTPUT),
+          },
+        );
         await client
           .deleteSession(execution.sandboxId, execution.sessionId)
           .catch(() => undefined);
-        await notifyComplete(
-          ctx,
-          args.executionId,
-          execution.onComplete,
-          execution.onCompleteContext,
-        );
+        // Lost a race (e.g. cancelled meanwhile): the winner already notified.
+        if (transitioned) {
+          await notifyComplete(
+            ctx,
+            args.executionId,
+            execution.onComplete,
+            execution.onCompleteContext,
+          );
+        }
         return null;
       }
       // Still running: surface the logs so far (reactive), then poll again
@@ -493,17 +504,22 @@ export const pollExecution = internalAction({
         await client
           .deleteSession(execution.sandboxId, execution.sessionId)
           .catch(() => undefined);
-        await ctx.runMutation(internal.executions.finishExecution, {
-          executionId: args.executionId,
-          status: "failed",
-          error: error instanceof Error ? error.message : String(error),
-        });
-        await notifyComplete(
-          ctx,
-          args.executionId,
-          execution.onComplete,
-          execution.onCompleteContext,
+        const transitioned = await ctx.runMutation(
+          internal.executions.finishExecution,
+          {
+            executionId: args.executionId,
+            status: "failed",
+            error: error instanceof Error ? error.message : String(error),
+          },
         );
+        if (transitioned) {
+          await notifyComplete(
+            ctx,
+            args.executionId,
+            execution.onComplete,
+            execution.onCompleteContext,
+          );
+        }
         return null;
       }
       const retryDelay = args.maxDelayMs ?? POLL_MAX_MS;
@@ -520,9 +536,12 @@ export const pollExecution = internalAction({
 });
 
 /**
- * Cancel a running background execution: atomically claim the row (losing a
- * race against the poller's finish throws), kill its session so the command
- * actually stops, and fire the onComplete handler with status "cancelled".
+ * Cancel a running background execution. Order matters: the command is
+ * killed FIRST, and only then does the row transition to "cancelled" — if
+ * Daytona can't kill it (transient error), this throws and the row stays
+ * "running" (truthful; the poller keeps supervising). The transition only
+ * succeeds from "running", so a concurrent finish/cancel wins cleanly and
+ * onComplete fires exactly once.
  */
 export const cancelExecution = action({
   args: {
@@ -534,15 +553,32 @@ export const cancelExecution = action({
   handler: async (ctx, args) => {
     const config = backgroundConfig(args.apiUrl);
     if (!config) throw new Error(MISSING_API_KEY);
-    const execution = await ctx.runMutation(internal.executions.beginCancel, {
+    const execution = await ctx.runQuery(internal.executions.getInternal, {
       executionId: args.executionId,
     });
-    // Best-effort: the row is already terminal; a failed session delete (e.g.
-    // sandbox auto-deleted) must not resurrect it.
+    if (!execution) throw new Error("Execution not found");
+    if (execution.status !== "running") {
+      throw new Error(`Execution is not running (status: ${execution.status})`);
+    }
+    if (!execution.sessionId) {
+      throw new Error("Only background executions can be cancelled");
+    }
     const client = new DaytonaClient(config);
-    await client
-      .deleteSession(execution.sandboxId, execution.sessionId!)
-      .catch(() => undefined);
+    try {
+      await client.deleteSession(execution.sandboxId, execution.sessionId);
+    } catch (error) {
+      // Already gone (sandbox/session deleted) means it's not running: fine.
+      if (!(error instanceof DaytonaApiError && error.status === 404)) {
+        throw error;
+      }
+    }
+    const transitioned = await ctx.runMutation(
+      internal.executions.finishExecution,
+      { executionId: args.executionId, status: "cancelled" },
+    );
+    if (!transitioned) {
+      throw new Error("Execution finished before it could be cancelled");
+    }
     await notifyComplete(
       ctx,
       args.executionId,

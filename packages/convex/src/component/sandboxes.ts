@@ -17,6 +17,7 @@ import {
   internalMutation,
   mutation,
   query,
+  type QueryCtx,
 } from "./_generated/server.js";
 import { DaytonaApiError, DaytonaClient } from "./daytona.js";
 import { sandboxFields } from "./schema.js";
@@ -44,6 +45,32 @@ export const get = query({
   },
 });
 
+/** Pick the narrowest index for the given filters — never a filtered full scan. */
+function sandboxesQuery(
+  ctx: QueryCtx,
+  userKey: string | undefined,
+  state: string | undefined,
+) {
+  if (userKey !== undefined && state !== undefined) {
+    return ctx.db
+      .query("sandboxes")
+      .withIndex("userKey_state", (q) =>
+        q.eq("userKey", userKey).eq("state", state),
+      );
+  }
+  if (userKey !== undefined) {
+    return ctx.db
+      .query("sandboxes")
+      .withIndex("userKey", (q) => q.eq("userKey", userKey));
+  }
+  if (state !== undefined) {
+    return ctx.db
+      .query("sandboxes")
+      .withIndex("state", (q) => q.eq("state", state));
+  }
+  return ctx.db.query("sandboxes");
+}
+
 export const list = query({
   args: {
     userKey: v.optional(v.string()),
@@ -54,16 +81,9 @@ export const list = query({
   returns: v.array(sandboxDoc),
   handler: async (ctx, args) => {
     const limit = clampLimit(args.limit, 100);
-    let query =
-      args.userKey !== undefined
-        ? ctx.db
-            .query("sandboxes")
-            .withIndex("userKey", (q) => q.eq("userKey", args.userKey))
-        : ctx.db.query("sandboxes");
-    if (args.state !== undefined) {
-      query = query.filter((q) => q.eq(q.field("state"), args.state));
-    }
-    return await query.order("desc").take(limit);
+    return await sandboxesQuery(ctx, args.userKey, args.state)
+      .order("desc")
+      .take(limit);
   },
 });
 
@@ -74,16 +94,9 @@ export const listPaginated = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    let query =
-      args.userKey !== undefined
-        ? ctx.db
-            .query("sandboxes")
-            .withIndex("userKey", (q) => q.eq("userKey", args.userKey))
-        : ctx.db.query("sandboxes");
-    if (args.state !== undefined) {
-      query = query.filter((q) => q.eq(q.field("state"), args.state));
-    }
-    return await query.order("desc").paginate(args.paginationOpts);
+    return await sandboxesQuery(ctx, args.userKey, args.state)
+      .order("desc")
+      .paginate(args.paginationOpts);
   },
 });
 
@@ -96,17 +109,28 @@ export const purge = mutation({
   args: { olderThanMs: v.number() },
   returns: v.object({ deleted: v.number(), hasMore: v.boolean() }),
   handler: async (ctx, args) => {
+    if (!Number.isFinite(args.olderThanMs) || args.olderThanMs < 0) {
+      throw new Error("olderThanMs must be a non-negative finite number");
+    }
     const cutoff = Date.now() - args.olderThanMs;
-    const batch = await ctx.db.query("sandboxes").take(200);
-    const victims = batch.filter(
-      (sandbox) =>
-        (sandbox.state === "destroyed" || sandbox.state === "error") &&
-        sandbox.updatedAt <= cutoff,
-    );
+    // Filter BEFORE taking the batch so repeated calls always make progress.
+    const victims = await ctx.db
+      .query("sandboxes")
+      .filter((q) =>
+        q.and(
+          q.or(
+            q.eq(q.field("state"), "destroyed"),
+            q.eq(q.field("state"), "error"),
+            q.eq(q.field("state"), "build_failed"),
+          ),
+          q.lte(q.field("updatedAt"), cutoff),
+        ),
+      )
+      .take(200);
     for (const victim of victims) {
       await ctx.db.delete(victim._id);
     }
-    return { deleted: victims.length, hasMore: batch.length === 200 };
+    return { deleted: victims.length, hasMore: victims.length === 200 };
   },
 });
 

@@ -101,36 +101,16 @@ export const finishExecution = internalMutation({
     result: v.optional(v.string()),
     error: v.optional(v.string()),
   },
-  returns: v.null(),
+  /** True if this call performed the running -> terminal transition. */
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const { executionId, ...rest } = args;
+    const execution = await ctx.db.get(executionId);
+    // Terminal states are final: a poll that raced a cancellation (or vice
+    // versa) must not overwrite the winner, and must not notify again.
+    if (!execution || execution.status !== "running") return false;
     await ctx.db.patch(executionId, { ...rest, finishedAt: Date.now() });
-    return null;
-  },
-});
-
-/**
- * Atomically claim a running background execution for cancellation. Losing a
- * race against the poller's finish (or a concurrent cancel) throws instead of
- * overwriting a terminal state.
- */
-export const beginCancel = internalMutation({
-  args: { executionId: v.id("executions") },
-  returns: executionDoc,
-  handler: async (ctx, args) => {
-    const execution = await ctx.db.get(args.executionId);
-    if (!execution) throw new Error("Execution not found");
-    if (execution.status !== "running") {
-      throw new Error(`Execution is not running (status: ${execution.status})`);
-    }
-    if (!execution.sessionId) {
-      throw new Error("Only background executions can be cancelled");
-    }
-    await ctx.db.patch(args.executionId, {
-      status: "cancelled",
-      finishedAt: Date.now(),
-    });
-    return { ...execution, status: "cancelled" as const };
+    return true;
   },
 });
 
@@ -146,20 +126,28 @@ export const purge = mutation({
   },
   returns: v.object({ deleted: v.number(), hasMore: v.boolean() }),
   handler: async (ctx, args) => {
+    if (!Number.isFinite(args.olderThanMs) || args.olderThanMs < 0) {
+      throw new Error("olderThanMs must be a non-negative finite number");
+    }
     const cutoff = Date.now() - args.olderThanMs;
-    const batch = args.sandboxId
-      ? await ctx.db
+    // Filter BEFORE taking the batch, so repeated calls always make progress
+    // (a prefix of running/recent rows can't stall the purge forever).
+    const base = args.sandboxId
+      ? ctx.db
           .query("executions")
           .withIndex("sandboxId", (q) => q.eq("sandboxId", args.sandboxId!))
-          .take(200)
-      : await ctx.db.query("executions").take(200);
-    const victims = batch.filter(
-      (execution) =>
-        execution.status !== "running" && execution.startedAt <= cutoff,
-    );
+      : ctx.db.query("executions");
+    const victims = await base
+      .filter((q) =>
+        q.and(
+          q.neq(q.field("status"), "running"),
+          q.lte(q.field("startedAt"), cutoff),
+        ),
+      )
+      .take(200);
     for (const victim of victims) {
       await ctx.db.delete(victim._id);
     }
-    return { deleted: victims.length, hasMore: batch.length === 200 };
+    return { deleted: victims.length, hasMore: victims.length === 200 };
   },
 });

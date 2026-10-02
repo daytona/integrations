@@ -607,6 +607,92 @@ describe("background QoL (cancel, backoff, purge, delete-404)", () => {
     expect(pollArgs.maxDelayMs).toBe(120_000);
   });
 
+  test("finishExecution only transitions from running (terminal states are final)", async () => {
+    const t = initConvexTest();
+    const executionId = await t.mutation(internal.executions.startExecution, {
+      sandboxId: "sbx-1",
+      kind: "command",
+      input: "sleep 600",
+    });
+    expect(
+      await t.mutation(internal.executions.finishExecution, {
+        executionId,
+        status: "cancelled",
+      }),
+    ).toBe(true);
+    // A poll that read "running" before the cancel lands its finish late:
+    // it must lose, leaving "cancelled" intact.
+    expect(
+      await t.mutation(internal.executions.finishExecution, {
+        executionId,
+        status: "completed",
+        exitCode: 0,
+      }),
+    ).toBe(false);
+    const execution = await t.query(api.executions.get, { executionId });
+    expect(execution?.status).toBe("cancelled");
+    expect(execution?.exitCode).toBeUndefined();
+  });
+
+  test("cancelExecution keeps the row running when the kill fails", async () => {
+    const t = initConvexTest();
+    stubFetch(sessionRoutes(() => false));
+    const { executionId } = await t.action(api.process.runBackground, {
+      apiUrl: config.apiUrl,
+      sandboxId: "sbx-1",
+      command: "sleep 600",
+    });
+    // Daytona fails the session delete with a transient 500.
+    stubFetch([
+      {
+        method: "GET",
+        match: "/api/sandbox/sbx-1",
+        response: () => json(startedSandbox),
+      },
+      {
+        method: "DELETE",
+        match: "/process/session/",
+        response: () => new Response("boom", { status: 500 }),
+      },
+    ]);
+    await expect(
+      t.action(api.process.cancelExecution, {
+        executionId,
+        apiUrl: config.apiUrl,
+      }),
+    ).rejects.toThrow(/500/);
+    expect(
+      (await t.query(api.executions.get, { executionId }))?.status,
+    ).toBe("running");
+  });
+
+  test("purge makes progress past a prefix of non-victims", async () => {
+    const t = initConvexTest();
+    // 205 running rows first (never purgeable), then one finished row.
+    for (let i = 0; i < 205; i++) {
+      await t.mutation(internal.executions.startExecution, {
+        sandboxId: "sbx-1",
+        kind: "command",
+        input: `running-${i}`,
+      });
+    }
+    const finishedId = await t.mutation(internal.executions.startExecution, {
+      sandboxId: "sbx-1",
+      kind: "command",
+      input: "done",
+    });
+    await t.mutation(internal.executions.finishExecution, {
+      executionId: finishedId,
+      status: "completed",
+      exitCode: 0,
+    });
+    const result = await t.mutation(api.executions.purge, { olderThanMs: 0 });
+    expect(result).toEqual({ deleted: 1, hasMore: false });
+    await expect(
+      t.mutation(api.executions.purge, { olderThanMs: -1 }),
+    ).rejects.toThrow(/non-negative/);
+  });
+
   test("onComplete is stored on the row; a failing handler never corrupts terminal state", async () => {
     const t = initConvexTest();
     let done = false;

@@ -68,7 +68,11 @@ export const runBackgroundCommand = action({
 export const backgroundFinished = internalMutation({
   args: {
     executionId: v.string(),
-    status: v.string(),
+    status: v.union(
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
     exitCode: v.optional(v.number()),
     result: v.optional(v.string()),
     error: v.optional(v.string()),

@@ -57,6 +57,8 @@ export const executionFields = {
 export default defineSchema({
   sandboxes: defineTable(sandboxFields)
     .index("sandboxId", ["sandboxId"])
-    .index("userKey", ["userKey"]),
+    .index("userKey", ["userKey"])
+    .index("state", ["state"])
+    .index("userKey_state", ["userKey", "state"]),
   executions: defineTable(executionFields).index("sandboxId", ["sandboxId"]),
 });

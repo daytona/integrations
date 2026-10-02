@@ -74,7 +74,11 @@ console.log("✓ example app deployed to local Convex with the daytona component
 
 let sandboxId;
 try {
-  const created = run("example:createSandbox", {});
+  const created = run("example:createSandbox", {
+    // Background commands don't reset the idle timer — never auto-stop a sandbox
+    // that hosts the long-running cancellation target.
+    autoStopInterval: 0,
+  });
   sandboxId = created.sandboxId;
   assert(created.state === "started", `createSandbox → started (${sandboxId})`);
 
