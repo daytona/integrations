@@ -1,6 +1,6 @@
 {
   "name": "@daytona/convex",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Convex component for Daytona — create sandboxes, run commands and code, and manage sandbox files from your Convex backend, with sandbox and execution state tracked in reactive Convex tables",
   "type": "module",
   "repository": {
