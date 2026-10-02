@@ -11,5 +11,6 @@ export default defineSchema({
       v.literal("cancelled"),
     ),
     exitCode: v.optional(v.number()),
+    context: v.optional(v.any()),
   }),
 });

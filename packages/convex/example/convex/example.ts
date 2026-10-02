@@ -83,6 +83,7 @@ export const backgroundFinished = internalMutation({
       executionId: args.executionId,
       status: args.status,
       exitCode: args.exitCode,
+      context: args.context,
     });
   },
 });
