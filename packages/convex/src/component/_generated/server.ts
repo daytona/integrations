@@ -40,6 +40,7 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly DAYTONA_API_KEY: string | undefined;
+  readonly DAYTONA_WEBHOOK_SECRET: string | undefined;
 };
 
 /**
