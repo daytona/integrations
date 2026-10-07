@@ -15,9 +15,17 @@ from .computer import DaytonaComputer
 
 if TYPE_CHECKING:
     from ._files import DaytonaFilePolicy
-    from .browser import DaytonaBrowser
 
-__all__ = ["DaytonaComputer", "AsyncDaytonaComputer", "DaytonaBrowser", "DaytonaFilePolicy"]
+    # Re-exported under its own name: a type checker resolves `daytona_toolsets.DaytonaBrowser`
+    # through this, while `__all__` below leaves it out of `import *` on purpose.
+    from .browser import DaytonaBrowser as DaytonaBrowser
+
+# `DaytonaBrowser` is deliberately not here. `import *` binds every name in `__all__`, which
+# would load the browser driver and its Playwright import, so a computer-only install would get
+# an ImportError instead of the names it can use. It stays available by name — `from
+# daytona_toolsets import DaytonaBrowser` — through `__getattr__` below, which is also what
+# reports the missing extra.
+__all__ = ["DaytonaComputer", "AsyncDaytonaComputer", "DaytonaFilePolicy"]
 
 
 def __getattr__(name: str) -> Any:
