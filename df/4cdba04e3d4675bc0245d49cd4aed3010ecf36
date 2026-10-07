@@ -1,0 +1,19 @@
+.github/workflows/ci.yml
+  s_80cd4903c6dfaa::t_c14b2fa592d48a 253-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df4cdba04e3d4675bc0245d49cd4aed3010ecf36",
+  "prompts": {},
+  "sessions": {
+    "s_80cd4903c6dfaa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee8003d7cffePPReSW6Nlwn1sF",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
