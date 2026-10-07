@@ -1,5 +1,6 @@
-"""Low-level desktop input that Daytona's Computer Use API has no call for: a button or key held
-down across calls, keys held during a click, triple clicks and horizontal scrolling.
+"""XTest fallback for input the Daytona Computer Use API does not represent natively: exotic
+keysyms without a Daytona key name, and mouse click, drag or scroll chords holding a non-modifier
+key token.
 
 A small Python script is uploaded into the sandbox once and replays a list of XTest events on the
 sandbox's X display (libX11 and libXtst through ctypes: nothing to install). It uses the same

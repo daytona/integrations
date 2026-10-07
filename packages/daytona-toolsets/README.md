@@ -65,10 +65,11 @@ With no `sandbox` argument, each driver creates a sandbox from Daytona's default
 | Members | How |
 |---|---|
 | `screenshot`, `zoom` | Computer Use screenshots. `zoom` crops the real screen and scales the crop up to a screenshot's size. |
-| `left_click`, `right_click`, `middle_click`, `double_click`, `mouse_move`, `left_click_drag`, `scroll` (up/down), `cursor_position` | Computer Use mouse API |
-| `triple_click`, `left_mouse_down`, `left_mouse_up`, horizontal `scroll`, any click, drag or scroll with keys held (`text`) | XTest events on the sandbox's X display, sent by a small helper script the driver uploads (libX11/libXtst via ctypes, nothing installed) |
-| `type`, `key` | Computer Use keyboard API. `key` takes xdotool-style names (`Return`, `Page_Up`, `ctrl+s`, `exclam`, single characters) and space-separated sequences. Keys the API lacks (numpad, `XF86…`, `Print`) go by X keysym. |
-| `hold_key` | XTest key down, wait, key up |
+| `left_click`, `right_click`, `middle_click`, `double_click` (plain), `mouse_move`, `cursor_position` | Native Computer Use mouse API; plain single/double clicks use `double` and work on older daemons too. |
+| `triple_click`, clicks with modifiers, `left_mouse_down`, `left_mouse_up`, `left_click_drag` (including modifier chords), `scroll` (all directions, including modifier chords) | Native Computer Use mouse API; migrated options are capability-probed and require a sandbox with native mouse hold endpoints. A click, drag or scroll chord holding a non-modifier key token uses XTest instead. |
+| `type` | One native Computer Use keyboard call, including tabs; capability-probed and requires the native keyboard hold endpoints. |
+| `key` | `key` takes xdotool-style names (`Return`, `Page_Up`, `ctrl+s`, `exclam`, single characters) and space-separated sequences. Named Daytona keys go through the native keyboard press (numpad keys are capability-probed); a single character with no named key is typed; modifier-only chords (`super`, `ctrl+alt`) and keysyms with no Daytona key name (`XF86…`) use XTest. |
+| `hold_key` | Native keyboard down, in-process sleep, and reverse-order up; capability-probed. An exotic keysym with no Daytona key name uses XTest. |
 | `wait` | sleeps in your process |
 
 - **Coordinates** off the screen are refused with an error, never clamped.
@@ -121,7 +122,7 @@ Upload paths are sandbox paths. The policy admits absolute paths under a root, w
 
 ## Limitations
 
-- **Computer:** `scroll` left/right, triple clicks, held buttons and held keys go through XTest, because the Computer Use API has no call for them. A character with no key on the sandbox keymap can be typed, but can't be pressed as part of a chord.
+- **Computer platform floor:** migrated members (triple/multi-click, modifier clicks/drags/scrolls, horizontal scroll, `left_mouse_down`/`up`, `hold_key`, `type`, and numpad key presses) need a sandbox on a Daytona version with the native mouse/keyboard hold endpoints. Older sandboxes return a `ToolError` telling you to recreate the sandbox. XTest remains for exotic keysyms without a Daytona key name and mouse click/drag/scroll chords holding a non-modifier key token.
 - **Browser:** frames are not traversed by `read_page`/`find`/`get_page_text`. `find` is keyword-based. A dropped CDP connection is not re-established, so build a new `DaytonaBrowser`. Use it from one thread, outside an asyncio event loop (Playwright's sync API).
 - **Both:** the default sandbox user's login shell is `/bin/sh`, so a terminal the model opens has no line editing (`ctrl+a` arrives as `^A`).
 
@@ -137,7 +138,11 @@ Upload paths are sandbox paths. The policy admits absolute paths under a root, w
 ## Development
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
+# until a daytona release with mouse/keyboard down/up is on PyPI, overlay a local daytona-clients checkout:
+pip install --no-deps -e <daytona-clients checkout>/toolbox-api-client-python -e <daytona-clients checkout>/toolbox-api-client-python-async -e <daytona-clients checkout>/sdk-python
 pytest                               # unit tests (offline, Daytona and Playwright mocked)
 python examples/exercise_computer.py # live checks (need DAYTONA_API_KEY)
 python examples/exercise_browser.py

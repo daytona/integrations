@@ -27,6 +27,7 @@ dependencies = [
     # Floor: the release that ships `anthropic.tools.computer` / `anthropic.tools.browser`
     # (computer_toolset_20260801, browser_toolset_20260801). Final pin waits for the SDK release.
     "anthropic>=1.9.0",
+    # green-light: bump to first release with mouse/keyboard down/up (expected >= 0.223.0); integrations CI stays red until it is on PyPI
     "daytona>=0.220.0,<0.221.0",
     "pillow>=10",
 ]
