@@ -148,8 +148,12 @@ def exercise(computer: DaytonaComputer) -> None:
     answered(computer, "type", {"text": "echo $((6*7)) > /tmp/exercise-type.txt"}, exercised)
     answered(computer, "key", {"text": "Return"}, exercised)
     assert read_file(computer, "/tmp/exercise-type.txt") == "42", "expected that the command ran"
-    answered(computer, "type", {"text": "printf 'tab\tok' > /tmp/exercise-tab.txt"}, exercised)
+    # Readline consumes Tab as completion, so type it into cat rather than a shell prompt.
+    answered(computer, "type", {"text": "cat > /tmp/exercise-tab.txt"}, exercised)
     answered(computer, "key", {"text": "Return"}, exercised)
+    answered(computer, "type", {"text": "tab\tok"}, exercised)
+    answered(computer, "key", {"text": "Return"}, exercised)
+    answered(computer, "key", {"text": "ctrl+d"}, exercised)
     assert read_file(computer, "/tmp/exercise-tab.txt") == "tab\tok", "expected tab typing"
 
     # a chord: type the command without its first letter, go to the line start with ctrl+a, add it.
