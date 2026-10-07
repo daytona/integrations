@@ -16,12 +16,14 @@ authors = [
 keywords = [
     "daytona",
     "sandbox",
+    "anthropic",
+    "claude",
     "computer-use",
+    "browser-use",
+    "cua",
     "browser",
     "toolset",
     "agent",
-    "anthropic",
-    "claude",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
