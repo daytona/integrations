@@ -32,9 +32,14 @@ from daytona_toolsets import DaytonaComputer
 
 
 def call(
-    computer: BetaAbstractComputerToolset20260801, name: str, input: dict[str, object]
+    computer: BetaAbstractComputerToolset20260801,
+    name: str,
+    input: dict[str, object],
+    exercised: set[str] | None = None,
 ) -> BetaToolResultBlockParam:
     """Send one tool call as the model would, and print the result as the model would see it."""
+    if exercised is not None:
+        exercised.add(name)
     tool_use = BetaToolUseBlock(
         type="tool_use", id=f"toolu_{name}", name=name, input=input, toolset_name="computer"
     )
@@ -74,14 +79,25 @@ def png_size(png: bytes) -> tuple[int, int]:
     return width, height
 
 
-def answered(computer: DaytonaComputer, name: str, input: dict[str, object]) -> str:
-    result = call(computer, name, input)
+def answered(
+    computer: DaytonaComputer,
+    name: str,
+    input: dict[str, object],
+    exercised: set[str] | None = None,
+) -> str:
+    result = call(computer, name, input, exercised)
     assert not result.get("is_error"), f"expected that {name} {input} is answered"
     return text_of(result)
 
 
-def refused(computer: DaytonaComputer, name: str, input: dict[str, object], phrase: str) -> None:
-    result = call(computer, name, input)
+def refused(
+    computer: DaytonaComputer,
+    name: str,
+    input: dict[str, object],
+    phrase: str,
+    exercised: set[str] | None = None,
+) -> None:
+    result = call(computer, name, input, exercised)
     assert result.get("is_error") is True and phrase in text_of(
         result
     ), f"expected that {name} {input} is refused with {phrase!r}"
@@ -97,8 +113,16 @@ def read_file(computer: DaytonaComputer, path: str, timeout: float = 10) -> str:
         time.sleep(0.5)
 
 
+def check_exercised_members(exercised: set[str], enabled: set[str]) -> None:
+    """Reject a live exercise that misses an enabled computer member."""
+    assert (
+        exercised == enabled
+    ), f"exercise coverage mismatch: missing={enabled - exercised}, extra={exercised - enabled}"
+
+
 def exercise(computer: DaytonaComputer) -> None:
-    first = call(computer, "screenshot", {})
+    exercised: set[str] = set()
+    first = call(computer, "screenshot", {}, exercised)
     assert png_size(png_of(first)) == (
         computer.width,
         computer.height,
@@ -118,49 +142,59 @@ def exercise(computer: DaytonaComputer) -> None:
         ),
     )
     time.sleep(4)
-    answered(computer, "left_click", {"coordinate": [300, 200]})
+    answered(computer, "left_click", {"coordinate": [300, 200]}, exercised)
 
     # type + key: a command typed into the terminal and run with Return writes its answer to a file.
-    answered(computer, "type", {"text": "echo $((6*7)) > /tmp/exercise-type.txt"})
-    answered(computer, "key", {"text": "Return"})
+    answered(computer, "type", {"text": "echo $((6*7)) > /tmp/exercise-type.txt"}, exercised)
+    answered(computer, "key", {"text": "Return"}, exercised)
     assert read_file(computer, "/tmp/exercise-type.txt") == "42", "expected that the command ran"
+    answered(computer, "type", {"text": "printf 'tab\tok' > /tmp/exercise-tab.txt"}, exercised)
+    answered(computer, "key", {"text": "Return"}, exercised)
+    assert read_file(computer, "/tmp/exercise-tab.txt") == "tab\tok", "expected tab typing"
 
     # a chord: type the command without its first letter, go to the line start with ctrl+a, add it.
-    answered(computer, "type", {"text": "cho chord-ok > /tmp/exercise-chord.txt"})
-    answered(computer, "key", {"text": "ctrl+a"})
-    answered(computer, "type", {"text": "e"})
-    answered(computer, "key", {"text": "Return", "repeat": 1})
+    answered(computer, "type", {"text": "cho chord-ok > /tmp/exercise-chord.txt"}, exercised)
+    answered(computer, "key", {"text": "ctrl+a"}, exercised)
+    answered(computer, "type", {"text": "e"}, exercised)
+    answered(computer, "key", {"text": "Return", "repeat": 1}, exercised)
     assert read_file(computer, "/tmp/exercise-chord.txt") == "chord-ok", "expected ctrl+a to work"
 
     # a key sequence with a shifted symbol sent as a key: `echo x! > file` built key by key.
-    answered(computer, "type", {"text": "echo x"})
-    answered(computer, "key", {"text": "exclam space greater space"})
-    answered(computer, "type", {"text": "/tmp/exercise-keys.txt"})
-    answered(computer, "key", {"text": "KP_Enter"})
+    answered(computer, "type", {"text": "echo x"}, exercised)
+    answered(computer, "key", {"text": "exclam space greater space"}, exercised)
+    answered(computer, "type", {"text": "/tmp/exercise-keys.txt"}, exercised)
+    answered(computer, "key", {"text": "KP_Enter"}, exercised)
+    answered(computer, "key", {"text": "XF86AudioPlay"}, exercised)
     assert read_file(computer, "/tmp/exercise-keys.txt") == "x!", "expected the key sequence"
 
-    second = call(computer, "screenshot", {})
+    second = call(computer, "screenshot", {}, exercised)
     assert png_of(second) != png_of(first), "expected that the screen changed after the typing"
 
     # pointer
-    answered(computer, "mouse_move", {"coordinate": [10, 20]})
-    position = answered(computer, "cursor_position", {})
+    answered(computer, "mouse_move", {"coordinate": [10, 20]}, exercised)
+    position = answered(computer, "cursor_position", {}, exercised)
     assert "X=10,Y=20" in position.replace(" ", ""), f"expected the pointer at 10,20: {position}"
     for name in ("right_click", "middle_click", "double_click", "triple_click"):
-        answered(computer, name, {"coordinate": [600, 20]})
-        answered(computer, "key", {"text": "Escape"})
-    answered(computer, "left_click", {"coordinate": [600, 20], "text": "shift"})  # XTest path
-    answered(computer, "left_click", {})  # no coordinate: where the pointer is
-    answered(computer, "left_click_drag", {"start_coordinate": [50, 50], "coordinate": [90, 90]})
+        answered(computer, name, {"coordinate": [600, 20]}, exercised)
+        answered(computer, "key", {"text": "Escape"}, exercised)
+    answered(computer, "left_click", {"coordinate": [600, 20], "text": "shift"}, exercised)
+    answered(computer, "left_click", {}, exercised)
+    answered(
+        computer,
+        "left_click_drag",
+        {"start_coordinate": [50, 50], "coordinate": [90, 90]},
+        exercised,
+    )
     answered(
         computer,
         "left_click_drag",
         {"start_coordinate": [50, 50], "coordinate": [90, 90], "text": "ctrl"},
+        exercised,
     )
-    answered(computer, "left_mouse_down", {})
-    answered(computer, "mouse_move", {"coordinate": [120, 120]})
-    answered(computer, "left_mouse_up", {})
-    position = answered(computer, "cursor_position", {})
+    answered(computer, "left_mouse_down", {}, exercised)
+    answered(computer, "mouse_move", {"coordinate": [120, 120]}, exercised)
+    answered(computer, "left_mouse_up", {}, exercised)
+    position = answered(computer, "cursor_position", {}, exercised)
     assert "X=120,Y=120" in position.replace(
         " ", ""
     ), f"expected the pointer at 120,120: {position}"
@@ -168,37 +202,58 @@ def exercise(computer: DaytonaComputer) -> None:
         computer,
         "scroll",
         {"coordinate": [300, 200], "scroll_direction": "down", "scroll_amount": 3},
+        exercised,
     )
     answered(
         computer,
         "scroll",
         {"coordinate": [300, 200], "scroll_direction": "left", "scroll_amount": 2},
+        exercised,
     )
     answered(
         computer,
         "scroll",
         {"scroll_direction": "up", "scroll_amount": 1, "text": "ctrl"},
+        exercised,
     )
 
     # keys held and waits
-    answered(computer, "hold_key", {"text": "shift", "duration": 1})
-    answered(computer, "wait", {"duration": 1})
+    answered(computer, "hold_key", {"text": "shift", "duration": 1}, exercised)
+    answered(computer, "wait", {"duration": 1}, exercised)
 
     # zoom: a 200x100 region comes back scaled up, keeping its shape, within a screenshot's size
-    zoomed = png_size(png_of(call(computer, "zoom", {"region": [0, 0, 200, 100]})))
+    zoomed = png_size(png_of(call(computer, "zoom", {"region": [0, 0, 200, 100]}, exercised)))
     assert zoomed[0] <= computer.width and zoomed[1] <= computer.height, "zoom fits the budget"
     assert zoomed[0] > 200 and abs(zoomed[0] / zoomed[1] - 2) < 0.02, f"zoom scaled up: {zoomed}"
 
     # refusals
-    refused(computer, "left_click", {"coordinate": [computer.width, computer.height]}, "outside")
-    refused(computer, "mouse_move", {"coordinate": [-1, 5]}, "outside")
-    refused(computer, "zoom", {"region": [100, 100, 50, 50]}, "region must satisfy")
-    refused(computer, "wait", {"duration": 31}, "between 0 and 30")
-    refused(computer, "hold_key", {"text": "shift", "duration": 60}, "between 0 and 30")
-    refused(computer, "key", {"text": "NoSuchKeyName"}, "Unknown key")
-    refused(computer, "key", {"text": "a+ctrl"}, "not a modifier")
-    refused(computer, "type", {"text": "bell\x07"}, "control keys")
-    refused(computer, "scroll", {"scroll_direction": "down", "scroll_amount": 0}, "scroll_amount")
+    refused(
+        computer,
+        "left_click",
+        {"coordinate": [computer.width, computer.height]},
+        "outside",
+        exercised,
+    )
+    refused(computer, "mouse_move", {"coordinate": [-1, 5]}, "outside", exercised)
+    refused(computer, "zoom", {"region": [100, 100, 50, 50]}, "region must satisfy", exercised)
+    refused(computer, "wait", {"duration": 31}, "between 0 and 30", exercised)
+    refused(computer, "hold_key", {"text": "shift", "duration": 60}, "between 0 and 30", exercised)
+    refused(computer, "key", {"text": "NoSuchKeyName"}, "Unknown key", exercised)
+    refused(computer, "key", {"text": "a+ctrl"}, "not a modifier", exercised)
+    refused(computer, "type", {"text": "bell\x07"}, "control keys", exercised)
+    refused(
+        computer,
+        "scroll",
+        {"scroll_direction": "down", "scroll_amount": 0},
+        "scroll_amount",
+        exercised,
+    )
+    enabled: set[str] = {
+        name
+        for name in computer._toolset_options.registry.names
+        if computer._toolset_options.is_enabled(name)
+    }
+    check_exercised_members(exercised, enabled)
 
 
 def main() -> None:
