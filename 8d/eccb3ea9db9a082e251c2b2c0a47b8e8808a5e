@@ -1,0 +1,18 @@
+packages/daytona-toolsets/daytona_toolsets/computer.py
+  h_634fa4b3782b12 54-57,106,236-249,254-260,270-273,275-282,284,389-392,394-396,398,406-408,414-416,423,425-427,429-431,433
+  h_634fa4b3782b12 250-253
+packages/daytona-toolsets/tests/unit_tests/test_computer.py
+  h_634fa4b3782b12 7,113,115-154,156,158,160,163,168-174,176-186,200-239,321,333-338,344-345,349-350
+  h_634fa4b3782b12 189,192-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8deccb3ea9db9a082e251c2b2c0a47b8e8808a5e",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
