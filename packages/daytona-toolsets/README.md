@@ -125,6 +125,7 @@ Upload paths are sandbox paths. The policy admits absolute paths under a root, w
 ## Limitations
 
 - **Computer platform floor:** migrated members (triple/multi-click, modifier clicks/drags/scrolls, horizontal scroll, `left_mouse_down`/`up`, `hold_key`, `type`, and native-routed numpad digits/decimal/equal/lock) need a sandbox on a Daytona version with the native mouse/keyboard hold endpoints. Older sandboxes return a `ToolError` telling you to recreate the sandbox. XTest remains for numpad Enter/operators, exotic keysyms without a Daytona key name and mouse click/drag/scroll chords holding a non-modifier key token.
+  - A sandbox created from a custom or older **image** may run an older daemon than the default snapshot does: `daytonaio/sandbox:latest` came up on daemon 0.217.0, where the capability probe gets a 404 and every migrated member returns that `ToolError`. Use the default snapshot (`create_params` omitted, or `CreateSandboxFromSnapshotParams()`) unless you have a reason not to.
 - **Browser:** frames are not traversed by `read_page`/`find`/`get_page_text`. `find` is keyword-based. A dropped CDP connection is not re-established, so build a new `DaytonaBrowser`. Use it from one thread, outside an asyncio event loop (Playwright's sync API).
 - **Both:** the default sandbox user's login shell is `/bin/sh`, so a terminal the model opens has no line editing (`ctrl+a` arrives as `^A`).
 
