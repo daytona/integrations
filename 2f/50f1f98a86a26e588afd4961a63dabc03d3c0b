@@ -1,0 +1,19 @@
+packages/daytona-toolsets/daytona_toolsets/computer.py
+  s_80cd4903c6dfaa::t_a9604e79590251 238-247,250-252,257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f50f1f98a86a26e588afd4961a63dabc03d3c0b",
+  "prompts": {},
+  "sessions": {
+    "s_80cd4903c6dfaa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee8003d7cffePPReSW6Nlwn1sF",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
