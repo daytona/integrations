@@ -1,0 +1,19 @@
+packages/daytona-claude-toolsets/pyproject.toml
+  s_547aaca5ecfd4c::t_58bf551771d15f 19-20,22-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7faaedcb14cd6a4849bfe5afe4e800db198f41b5",
+  "prompts": {},
+  "sessions": {
+    "s_547aaca5ecfd4c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee7c10d78ffeegNi90z1T7BxMX",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
