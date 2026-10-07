@@ -61,8 +61,8 @@ def test_split_sequence() -> None:
         ("minus", DesktopKey("-", "minus", char="-")),
         ("/", DesktopKey("/", "slash", char="/")),
         (" ", DesktopKey("space", "space", char=" ")),
-        # the numpad goes by keysym (Daytona's press("num_enter") types a backtick)
-        ("KP_Enter", DesktopKey(None, "KP_Enter")),
+        # the native daemon accepts grammar-safe numpad names
+        ("KP_Enter", DesktopKey("num_enter", "KP_Enter")),
         ("é", DesktopKey(None, "U00E9", char="é")),
         # not in the tables: an X keysym name, sent as written
         ("XF86AudioMute", DesktopKey(None, "XF86AudioMute")),

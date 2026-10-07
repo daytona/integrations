@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -453,6 +454,8 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         key = desktop_key(token)
         held = modifiers + (["shift"] if key.shift and "shift" not in modifiers else [])
         if key.daytona is not None:
+            if key.daytona.startswith("num"):
+                self._require_native_input()
             with self._desktop("press the key"):
                 self.sandbox.computer_use.keyboard.press(key.daytona, held)
         elif not modifiers and key.char is not None:
@@ -471,23 +474,46 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         chords = split_sequence(input.text)
         if len(chords) != 1:
             raise ToolError("hold_key holds one key or chord, such as shift or ctrl+a.")
-        keysyms = self._held_keysyms(chords[0])
-        self._run_xtest(self._with_keys_held(keysyms, [["sleep", input.duration]]))
+        modifiers, token = parse_chord(chords[0])
+        key = desktop_key(token) if token is not None else None
+        if key is not None and key.daytona is None:
+            keysyms = self._held_keysyms(chords[0])
+            self._run_xtest(self._with_keys_held(keysyms, [["sleep", input.duration]]))
+            return
+        held = list(modifiers)
+        if key is not None:
+            if key.shift and "shift" not in held:
+                held.append("shift")
+            if key.daytona is not None:
+                held.append(key.daytona)
+        self._require_native_input()
+        keyboard = self.sandbox.computer_use.keyboard
+        pressed: list[str] = []
+        with self._desktop("hold the key"):
+            try:
+                for name in held:
+                    keyboard.down(name)
+                    pressed.append(name)
+                time.sleep(input.duration)
+            finally:
+                release_error: DaytonaError | None = None
+                for name in reversed(pressed):
+                    try:
+                        keyboard.up(name)
+                    except DaytonaError as exc:
+                        if release_error is None:
+                            release_error = exc
+                if release_error is not None and sys.exc_info()[0] is None:
+                    raise release_error
 
     @override
     def type(self, context: BetaToolsetCallContext, input: BetaComputerTypeInput) -> None:
         text = input.text
         if any(ord(c) < 0x20 and c not in "\n\r\t" or c == "\x7f" for c in text):
             raise ToolError("type sends text; send control keys with key, as in ctrl+c.")
-        keyboard = self.sandbox.computer_use.keyboard
-        # Daytona types newlines as Enter but refuses a tab, so tabs are pressed between segments.
-        for index, segment in enumerate(text.split("\t")):
-            if index:
-                with self._desktop("press the key"):
-                    keyboard.press("tab")
-            if segment:
-                with self._desktop("type the text"):
-                    keyboard.type(segment, request_timeout=max(30.0, len(segment) / 20))
+        self._require_native_input()
+        with self._desktop("type the text"):
+            self.sandbox.computer_use.keyboard.type(text, request_timeout=max(30.0, len(text) / 20))
 
     @override
     def wait(self, context: BetaToolsetCallContext, input: BetaComputerWaitInput) -> None:

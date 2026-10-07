@@ -246,9 +246,6 @@ def desktop_key(token: str) -> DesktopKey:
         canonical = NAMED[lower]
         if len(canonical) == 1:
             return desktop_key(canonical)
-        if canonical.startswith("num"):
-            # Daytona 0.220's press("num_enter") types a backtick, so the numpad goes by keysym.
-            return DesktopKey(None, XKEYSYMS[canonical])
         return DesktopKey(canonical, XKEYSYMS[canonical])
     if lower in SHIFTED_NAMES:
         return desktop_key(SHIFTED_NAMES[lower])

@@ -4,7 +4,7 @@ import base64
 import io
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock, call as mock_call
+from unittest.mock import MagicMock, call as mock_call, patch
 
 import pytest
 from anthropic.tools import ToolsetClosedError, ToolsetConfigError
@@ -98,15 +98,36 @@ def test_key_sequence_and_repeat(sandbox: MagicMock) -> None:
     assert presses == [("a", ["ctrl"]), ("backspace", []), ("a", ["ctrl"]), ("backspace", [])]
 
 
-def test_keys_daytona_cannot_send_go_through_xtest(sandbox: MagicMock) -> None:
-    call(computer(sandbox), "key", {"text": "ctrl+KP_Enter"})
+def test_numpad_key_uses_probe_gated_native_press(sandbox: MagicMock) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    call(computer(sandbox), "key", {"text": "KP_Add"})
+    sandbox.computer_use.mouse.down.assert_called_once_with(x=0)
+    sandbox.computer_use.keyboard.press.assert_called_once_with("num_plus", [])
+    sandbox.process.exec.assert_not_called()
+
+
+def test_unsupported_keysym_goes_through_xtest(sandbox: MagicMock) -> None:
+    call(computer(sandbox), "key", {"text": "ctrl+XF86AudioPlay"})
     sandbox.computer_use.keyboard.press.assert_not_called()
     assert xtest_actions(sandbox) == [
         ["keydown", "Control_L"],
-        ["keydown", "KP_Enter"],
-        ["keyup", "KP_Enter"],
+        ["keydown", "XF86AudioPlay"],
+        ["keyup", "XF86AudioPlay"],
         ["keyup", "Control_L"],
     ]
+
+
+def test_hold_with_unsupported_keysym_uses_only_xtest(sandbox: MagicMock) -> None:
+    call(computer(sandbox), "hold_key", {"text": "ctrl+XF86AudioPlay", "duration": 2})
+    assert xtest_actions(sandbox) == [
+        ["keydown", "Control_L"],
+        ["keydown", "XF86AudioPlay"],
+        ["sleep", 2],
+        ["keyup", "XF86AudioPlay"],
+        ["keyup", "Control_L"],
+    ]
+    sandbox.computer_use.mouse.down.assert_not_called()
+    sandbox.computer_use.keyboard.down.assert_not_called()
 
 
 def test_modifiers_are_held_during_a_click(sandbox: MagicMock) -> None:
@@ -249,17 +270,97 @@ def test_durations_are_bounded(sandbox: MagicMock) -> None:
     for name, input in cases:
         result = call(toolset, name, input)
         assert result.get("is_error") is True and "between 0 and 30" in text_of(result)
-    call(toolset, "hold_key", {"text": "shift", "duration": 2})
-    assert xtest_actions(sandbox) == [["keydown", "Shift_L"], ["sleep", 2], ["keyup", "Shift_L"]]
 
 
-def test_type_presses_tab_between_segments(sandbox: MagicMock) -> None:
+def test_hold_modifier_chord_uses_native_down_and_reverse_up(sandbox: MagicMock) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    with patch("daytona_toolsets.computer.time.sleep") as sleep:
+        events = MagicMock()
+        events.attach_mock(sandbox.computer_use.keyboard.down, "down")
+        events.attach_mock(sleep, "sleep")
+        events.attach_mock(sandbox.computer_use.keyboard.up, "up")
+        call(computer(sandbox), "hold_key", {"text": "ctrl+shift", "duration": 2})
+    assert events.mock_calls == [
+        mock_call.down("ctrl"),
+        mock_call.down("shift"),
+        mock_call.sleep(2),
+        mock_call.up("shift"),
+        mock_call.up("ctrl"),
+    ]
+    sandbox.process.exec.assert_not_called()
+
+
+def test_hold_numpad_key_uses_native_name(sandbox: MagicMock) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    with patch("daytona_toolsets.computer.time.sleep"):
+        call(computer(sandbox), "hold_key", {"text": "KP_Add", "duration": 0})
+    assert sandbox.computer_use.keyboard.mock_calls == [
+        mock_call.down("num_plus"),
+        mock_call.up("num_plus"),
+    ]
+    sandbox.process.exec.assert_not_called()
+
+
+@pytest.mark.parametrize("text", ["A", "exclam", "shift+exclam"])
+def test_hold_shifted_key_uses_implicit_deduplicated_shift(sandbox: MagicMock, text: str) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    with patch("daytona_toolsets.computer.time.sleep"):
+        call(computer(sandbox), "hold_key", {"text": text, "duration": 0})
+    assert sandbox.computer_use.keyboard.mock_calls == [
+        mock_call.down("shift"),
+        mock_call.down("a" if text == "A" else "1"),
+        mock_call.up("a" if text == "A" else "1"),
+        mock_call.up("shift"),
+    ]
+    sandbox.process.exec.assert_not_called()
+
+
+def test_hold_runtime_failure_releases_held_keys_and_uses_desktop_error(
+    sandbox: MagicMock,
+) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    sandbox.computer_use.keyboard.down.side_effect = [None, DaytonaError("down failed")]
+    result = call(computer(sandbox), "hold_key", {"text": "ctrl+a", "duration": 1})
+    assert result.get("is_error") is True
+    assert text_of(result) == "The sandbox desktop could not hold the key."
+    sandbox.computer_use.keyboard.up.assert_called_once_with("ctrl")
+    assert "native held input" not in text_of(result)
+
+
+def test_type_sends_tab_in_one_native_call(sandbox: MagicMock) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
     call(computer(sandbox), "type", {"text": "a\tb\n"})
     keyboard = sandbox.computer_use.keyboard
-    assert [c.args[0] for c in keyboard.type.call_args_list] == ["a", "b\n"]
-    keyboard.press.assert_called_once_with("tab")
+    keyboard.type.assert_called_once_with("a\tb\n", request_timeout=30.0)
+    keyboard.press.assert_not_called()
+
+
+def test_type_refuses_control_characters_before_native_call(sandbox: MagicMock) -> None:
     refused = call(computer(sandbox), "type", {"text": "\x1b[A"})
     assert refused.get("is_error") is True
+    sandbox.computer_use.keyboard.type.assert_not_called()
+
+
+def test_probe_404_blocks_keyboard_migrations_and_is_cached(sandbox: MagicMock) -> None:
+    floor = (
+        "This sandbox's platform does not support native held input; recreate the sandbox on a "
+        "current Daytona version."
+    )
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("missing route", status_code=404)
+    toolset = computer(sandbox)
+    cases: list[tuple[str, dict[str, object]]] = [
+        ("hold_key", {"text": "ctrl", "duration": 0}),
+        ("type", {"text": "a\tb"}),
+        ("key", {"text": "KP_Add"}),
+    ]
+    for name, input in cases:
+        result = call(toolset, name, input)
+        assert result.get("is_error") is True
+        assert text_of(result) == floor
+    sandbox.computer_use.mouse.down.assert_called_once_with(x=0)
+    sandbox.computer_use.keyboard.down.assert_not_called()
+    sandbox.computer_use.keyboard.type.assert_not_called()
+    sandbox.computer_use.keyboard.press.assert_not_called()
 
 
 def test_daytona_errors_become_fixed_phrases(sandbox: MagicMock) -> None:
@@ -349,3 +450,38 @@ async def test_async_computer_delegates_mouse_down_to_the_sync_driver(sandbox: M
         assert result.get("is_error") is not True
     assert sandbox.computer_use.mouse.down.call_args_list == [mock_call(x=0), mock_call()]
     sandbox.delete.assert_not_called()
+
+
+async def test_async_computer_delegates_native_hold_to_the_sync_driver(sandbox: MagicMock) -> None:
+    from anthropic.types.beta import BetaToolUseBlock
+
+    from daytona_toolsets import AsyncDaytonaComputer
+
+    async def confirm(_context: object) -> bool:
+        return True
+
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    toolset = await AsyncDaytonaComputer.create(sandbox, confirm=confirm, settle_delay=0)
+    async with toolset:
+        tool_use = BetaToolUseBlock(
+            type="tool_use",
+            id="toolu_1",
+            name="hold_key",
+            input={"text": "ctrl+a", "duration": 2},
+            toolset_name="computer",
+        )
+        with patch("daytona_toolsets.computer.time.sleep") as sleep:
+            events = MagicMock()
+            events.attach_mock(sandbox.computer_use.keyboard.down, "down")
+            events.attach_mock(sleep, "sleep")
+            events.attach_mock(sandbox.computer_use.keyboard.up, "up")
+            result = await toolset.tool_result(tool_use)
+        assert result.get("is_error") is not True
+    assert events.mock_calls == [
+        mock_call.down("ctrl"),
+        mock_call.down("a"),
+        mock_call.sleep(2),
+        mock_call.up("a"),
+        mock_call.up("ctrl"),
+    ]
+    sandbox.process.exec.assert_not_called()
