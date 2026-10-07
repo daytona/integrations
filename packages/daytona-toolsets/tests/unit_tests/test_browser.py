@@ -341,6 +341,54 @@ def test_navigate_refuses_schemes_before_the_browser(browser: DaytonaBrowser) ->
     page.goto.assert_not_called()
 
 
+def test_a_navigation_that_redirects_somewhere_refused_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Playwright continues a redirected request itself instead of routing it, so interception
+    only ever saw the first hop; where the page landed has to be asked about separately."""
+
+    def policy(context: BetaURLContext, url: str) -> None:
+        if "evil" in url:
+            raise ToolError("blocked")
+
+    browser = make_browser(monkeypatch, url_policy=policy)
+    page: Any = browser._tabs["tab_1"].page
+
+    def land(url: str, **kwargs: object) -> MagicMock:
+        page.url = "https://evil.test/landed" if "a.test" in url else url
+        return MagicMock(status=200)
+
+    page.goto = MagicMock(side_effect=land)
+    refused = call(browser, "navigate", {"url": "https://a.test"})
+    assert refused.get("is_error")
+    assert "redirected to an address that is not allowed" in text_of(refused)
+    assert page.goto.call_args_list[-1].args[0] == "about:blank"  # the page is left behind
+    assert state(browser)["changes"] == []  # retreating is not reported as a refused navigation
+
+
+def test_a_navigation_that_stays_allowed_is_not_second_guessed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asked: list[tuple[str | None, str]] = []
+
+    def policy(context: BetaURLContext, url: str) -> None:
+        asked.append((context.member, url))
+
+    browser = make_browser(monkeypatch, url_policy=policy)
+    page: Any = browser._tabs["tab_1"].page
+
+    def land(url: str, **kwargs: object) -> MagicMock:
+        page.url = url
+        return MagicMock(status=200)
+
+    page.goto = MagicMock(side_effect=land)
+    result = call(browser, "navigate", {"url": "https://a.test"})
+    assert not result.get("is_error"), text_of(result)
+    # The SDK asks about the address the model gave; the driver asks about where it landed.
+    assert asked == [("navigate", "https://a.test"), (None, "https://a.test")]
+    assert page.goto.call_count == 1
+
+
 def test_state_never_raises(browser: DaytonaBrowser) -> None:
     cdp: Any = browser._browser_cdp
     cdp.send.side_effect = RuntimeError("connection lost")

@@ -520,7 +520,12 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         route.close(code=1008, reason="Policy violation")
 
     def _guard(self, route: Route) -> None:
-        """Request interception: the URL policy applied to every request a page makes."""
+        """Request interception: the URL policy applied to every request a page makes.
+
+        First hops only: Playwright continues a redirected request itself rather than routing it
+        again, so a `302` from an allowed address is not asked about here. `navigate` closes that
+        for the document by checking where the page landed; a sub-resource's chain is not
+        checked, and the sandbox's network tier is the backstop."""
         request = route.request
         tab = self._request_tab(request)
         refused = self._refuses(request.url, tab.id if tab else None)
@@ -851,10 +856,37 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         finally:
             self._navigating = False
         tab.world = None
+        self._check_where_it_landed(tab, before)
         return BetaBrowserNavigateResult(
             url=page.url,
             status=response.status if response is not None else None,
             title=(safe_title(page) or None),
+        )
+
+    def _check_where_it_landed(self, tab: Tab, before: str) -> None:
+        """Refuse a navigation that redirected onto an address the URL policy does not allow.
+
+        Request interception only ever sees the first hop: Playwright continues a redirected
+        request itself instead of handing it to the route handler, so an allowed address that
+        answers `302` can walk the page anywhere. Asking the policy once more about where the
+        page actually ended closes that for the document, which is what decides what the model
+        then reads. A sub-resource's redirect chain is still unchecked, and so is a redirect a
+        page triggers for itself later; the sandbox's network tier is the backstop for those."""
+        landed = tab.page.url
+        if not self._has_url_policy or landed in (before, "about:blank"):
+            return
+        if not self._refuses(landed, tab.id):
+            return
+        self._navigating = True  # retreating is not a navigation the model should be told about
+        try:
+            tab.page.goto("about:blank", wait_until="commit", timeout=self._navigation_ms)
+        except PlaywrightError:
+            log.debug("could not leave a page the url policy refused")
+        finally:
+            self._navigating = False
+            tab.world = None
+        raise ToolError(
+            "The navigation was refused: it redirected to an address that is not allowed."
         )
 
     # --- seeing ----------------------------------------------------------------------------------
