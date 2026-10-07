@@ -11,7 +11,7 @@ from anthropic.tools.browser import BetaDialogDismissed, BetaLocalFilePolicy, Be
 from anthropic.tools.browser import BetaURLContext
 
 from daytona_toolsets import DaytonaBrowser, DaytonaFilePolicy
-from daytona_toolsets.browser import failure_phrase, format_remote, normalize_url, rank
+from daytona_toolsets.browser import MAX_TEXT, failure_phrase, format_remote, normalize_url, rank
 
 from .conftest import blocks_of, call, fake_sandbox, text_of
 
@@ -327,6 +327,15 @@ def test_dialogs_are_dismissed_and_reported(browser: DaytonaBrowser) -> None:
     assert state(browser)["changes"] == [
         BetaDialogDismissed(kind="confirm", message="Delete everything?")
     ]
+
+
+def test_page_supplied_text_is_bounded(browser: DaytonaBrowser) -> None:
+    """A dialog message, like a console line, is written by the page and has no length of its own."""
+    browser._on_dialog(MagicMock(type="alert", message="x" * 10_000))
+    browser._log_console(browser._tabs["tab_1"].page, "y" * 10_000)
+    change = state(browser)["changes"][0]
+    assert isinstance(change, BetaDialogDismissed) and change.message == "x" * MAX_TEXT
+    assert browser._tabs["tab_1"].console[-1] == "y" * MAX_TEXT
 
 
 def test_interception_applies_the_url_policy(monkeypatch: pytest.MonkeyPatch) -> None:

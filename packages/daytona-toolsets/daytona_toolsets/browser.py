@@ -108,6 +108,9 @@ MAX_DURATION = 30.0
 MAX_REPEAT = 100
 MAX_ENTRIES = 1000
 """Console and network entries kept per tab between reads; older ones are dropped."""
+MAX_TEXT = 2000
+"""Characters kept of one piece of page-supplied text — a console line, a script's error, a
+dialog's message. A page can make any of them arbitrarily long."""
 FIND_LIMIT = 20
 WHEEL_NOTCH = 100
 """Pixels one scroll-wheel notch moves."""
@@ -593,7 +596,11 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             if dialog.type == "beforeunload":
                 dialog.accept()
                 return
-            self._changes.append(BetaDialogDismissed(kind=dialog.type, message=dialog.message))
+            # The message is the page's text, as long as the page cares to make it: bounded here
+            # like every other page-supplied text the driver keeps.
+            self._changes.append(
+                BetaDialogDismissed(kind=dialog.type, message=dialog.message[:MAX_TEXT])
+            )
             dialog.dismiss()
         except PlaywrightError as exc:  # the page went away first
             log.debug("dialog handling failed: %s", type(exc).__name__)
@@ -608,7 +615,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             return
         if len(tab.console) == tab.console.maxlen:
             tab.dropped_console += 1
-        tab.console.append(line[:2000])
+        tab.console.append(line[:MAX_TEXT])
 
     def _on_console(self, message: ConsoleMessage) -> None:
         self._log_console(message.page, f"[{message.type}] {message.text}")
@@ -1093,7 +1100,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             )
             if "terminated" in description.lower():
                 raise ToolError("The script did not finish within 10 seconds.")
-            raise ToolError(f"The script threw: {description[:2000]}")
+            raise ToolError(f"The script threw: {description[:MAX_TEXT]}")
         return format_remote(result.get("result") or {})
 
     # --- mouse -----------------------------------------------------------------------------------
