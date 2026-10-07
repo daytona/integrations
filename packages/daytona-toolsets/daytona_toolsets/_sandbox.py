@@ -13,7 +13,10 @@ CreateParams = Union[CreateSandboxFromSnapshotParams, CreateSandboxFromImagePara
 OnClose = Literal["delete", "stop"]
 
 LABELS = {"created-by": "daytona-toolsets"}
-"""Labels added to every sandbox this package creates, so a leftover one can be found and removed."""
+"""Labels put on every sandbox this package creates, so a leftover one can be found and removed.
+
+Reserved: a caller's `create_params.labels` cannot change them. Taking a sandbox off this list
+would hide it from the cleanup the README documents, which is the one thing the label is for."""
 
 
 class SandboxLease:
@@ -72,9 +75,13 @@ class SandboxLease:
 
 def with_defaults(params: Optional[CreateParams], default_env: dict[str, str]) -> CreateParams:
     """The caller's create params (or the default snapshot's) with this package's label and the
-    driver's default environment added where the caller did not set them. The caller's object is
-    not modified."""
+    driver's default environment added. The caller's object is not modified.
+
+    The environment the driver sets is a default: the caller's value for the same name wins.
+    `LABELS` is not — it is applied last, so a sandbox this package created always answers to
+    the label the README says to clean up by. Every other label the caller sets is kept.
+    """
     base: CreateParams = params if params is not None else CreateSandboxFromSnapshotParams()
     env = {**default_env, **(base.env_vars or {})}
-    labels = {**LABELS, **(base.labels or {})}
+    labels = {**(base.labels or {}), **LABELS}
     return base.model_copy(update={"env_vars": env, "labels": labels})

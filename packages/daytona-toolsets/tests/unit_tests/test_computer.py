@@ -447,6 +447,26 @@ def test_owned_sandbox_is_deleted_once() -> None:
     sandbox.delete.assert_called_once_with()
 
 
+def test_the_packages_marker_label_cannot_be_overridden() -> None:
+    """`created-by=daytona-toolsets` is how a leftover sandbox is found and removed, as the
+    README tells people to. A caller's own label must not take a sandbox off that list, while
+    every other label the caller sets is kept."""
+    from daytona import CreateSandboxFromSnapshotParams
+
+    sandbox = fake_sandbox()
+    client = MagicMock()
+    client.create.return_value = sandbox
+    DaytonaComputer(
+        daytona=client,
+        confirm=approve,
+        create_params=CreateSandboxFromSnapshotParams(
+            labels={"created-by": "someone-else", "purpose": "demo"}
+        ),
+    ).close()
+    params = client.create.call_args.args[0]
+    assert params.labels == {"created-by": "daytona-toolsets", "purpose": "demo"}
+
+
 def test_owned_sandbox_can_be_stopped_instead() -> None:
     sandbox = fake_sandbox()
     client = MagicMock()
