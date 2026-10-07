@@ -15,6 +15,7 @@ Packages published to **a package registry** live in [`packages/`](packages/):
 | [`pi-extension`](packages/pi-extension) — Pi coding-agent extension | npm · [`@daytona/pi`](https://www.npmjs.com/package/@daytona/pi) |
 | [`opencode-plugin`](packages/opencode-plugin) — OpenCode plugin | npm · [`@daytona/opencode`](https://www.npmjs.com/package/@daytona/opencode) |
 | [`pydantic-ai-daytona`](packages/pydantic-ai-daytona) — Pydantic AI sandbox capability | PyPI · [`pydantic-ai-daytona`](https://pypi.org/project/pydantic-ai-daytona/) |
+| [`daytona-claude-toolsets`](packages/daytona-claude-toolsets) — Anthropic computer and browser toolset drivers | PyPI · [`daytona-claude-toolsets`](https://pypi.org/project/daytona-claude-toolsets/) |
 
 ## Apps
 
