@@ -1,0 +1,20 @@
+packages/daytona-toolsets/daytona_toolsets/_text.py
+  s_e36a18757b9fbd::t_7650b2dc766fef 22-24
+  s_e36a18757b9fbd::t_6d5105e57f6284 43-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c46d8c0f9fdc3b92ced832e04e2bd09b4ab6cb16",
+  "prompts": {},
+  "sessions": {
+    "s_e36a18757b9fbd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee869d002ffe3W2nIZmXL9KOAC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
