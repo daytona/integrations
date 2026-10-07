@@ -37,6 +37,11 @@
       "release-type": "node",
       "package-name": "@daytona/convex",
       "component": "convex"
+    },
+    "packages/daytona-claude-toolsets": {
+      "release-type": "python",
+      "package-name": "daytona-claude-toolsets",
+      "component": "daytona-claude-toolsets"
     }
   }
 }

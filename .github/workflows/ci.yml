@@ -28,6 +28,7 @@ jobs:
       opencode: ${{ steps.filter.outputs.opencode }}
       pydantic_ai: ${{ steps.filter.outputs.pydantic_ai }}
       convex: ${{ steps.filter.outputs.convex }}
+      toolsets: ${{ steps.filter.outputs.toolsets }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -48,6 +49,8 @@ jobs:
               - 'packages/pydantic-ai-daytona/**'
             convex:
               - 'packages/convex/**'
+            toolsets:
+              - 'packages/daytona-claude-toolsets/**'
 
   adk:
     needs: changes
@@ -241,6 +244,42 @@ jobs:
         working-directory: packages/convex
         run: npm test
 
+  toolsets:
+    needs: changes
+    if: needs.changes.outputs.toolsets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned to 3.12 for the same reason as pydantic-ai (obstore wheels via the daytona SDK).
+          python-version: "3.12"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/daytona-claude-toolsets/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/daytona-claude-toolsets
+        run: python -m pip install -e ".[dev]"
+      - name: Lint (ruff)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/daytona-claude-toolsets
+        run: ruff check .
+      - name: Type check (mypy)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/daytona-claude-toolsets
+        run: mypy daytona_claude_toolsets
+      - name: Unit tests (offline, Daytona and Playwright mocked)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/daytona-claude-toolsets
+        run: pytest
+      # NOTE: live checks (examples/exercise_*.py, real Daytona sandboxes) are not in per-PR CI.
+
   # Single, stable status check to require in branch protection.
   # It ALWAYS runs (if: always()) and fails only if a relevant job failed or
   # was cancelled. A "skipped" job (a package this PR didn't touch) is fine —
@@ -248,7 +287,7 @@ jobs:
   # merges when a touched package's lint/test/build fails.
   ci-success:
     name: ci-success
-    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai, convex]
+    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai, convex, toolsets]
     if: always()
     runs-on: ubuntu-latest
     steps:

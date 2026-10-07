@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daytona-claude-toolsets"
+version = "0.0.0"
+description = "Daytona sandbox drivers for the Anthropic SDK's computer and browser toolsets"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Daytona Platforms Inc.", email = "support@daytona.io"}
+]
+keywords = [
+    "daytona",
+    "sandbox",
+    "anthropic",
+    "claude",
+    "computer-use",
+    "browser-use",
+    "cua",
+    "browser",
+    "toolset",
+    "agent",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # 1.12.0 is the first public release that ships `anthropic.tools.computer` and
+    # `anthropic.tools.browser` (computer_toolset_20260801, browser_toolset_20260801).
+    "anthropic>=1.12.0",
+    "daytona>=0.223.0,<0.224.0",
+    "pillow>=10",
+]
+
+[project.optional-dependencies]
+# DaytonaBrowser drives Chromium inside the sandbox over CDP with Playwright. Only the Playwright
+# client is needed locally: no `playwright install`, no local browser.
+browser = [
+    "playwright>=1.49",
+]
+dev = [
+    "playwright>=1.49",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.24.0",
+    "black>=23.0.0",
+    "ruff>=0.15,<0.17",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/daytona/integrations/tree/main/packages/daytona-claude-toolsets#readme"
+Repository = "https://github.com/daytona/integrations"
+Documentation = "https://github.com/daytona/integrations/tree/main/packages/daytona-claude-toolsets#readme"
+Issues = "https://github.com/daytona/integrations/issues"
+
+[tool.setuptools]
+packages = ["daytona_claude_toolsets"]
+
+[tool.setuptools.package-data]
+daytona_claude_toolsets = ["py.typed"]
+
+[tool.pytest.ini_options]
+# Unit tests only (offline, Daytona mocked). The live checks are examples/exercise_*.py.
+testpaths = ["tests/unit_tests"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+# Select rules explicitly: ruff's *default* set is not a stable contract (0.16.0
+# widened it from E4/E7/E9/F to also include I, UP, B, BLE, S, ... ), so relying
+# on it lets a ruff release turn a green package red without a code change.
+# This is the set this package was written and verified against.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
