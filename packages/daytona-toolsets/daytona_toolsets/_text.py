@@ -59,7 +59,9 @@ def normalize_url(url: str) -> str:
 
 def failure_phrase(exc: Exception) -> str:
     """A fixed phrase for a failed navigation: the net:: error code, never the URL or call log."""
-    code = re.search(r"net::ERR_[A-Z_]+", str(exc))
+    # Digits belong to the code: without them `net::ERR_HTTP2_PROTOCOL_ERROR` would be reported
+    # as `net::ERR_HTTP`, which is not a code Chromium has.
+    code = re.search(r"net::ERR_[A-Z0-9_]+", str(exc))
     if code and code.group() == "net::ERR_BLOCKED_BY_CLIENT":
         return "The navigation was refused."
     return f"The navigation failed ({code.group()})." if code else "The navigation failed."

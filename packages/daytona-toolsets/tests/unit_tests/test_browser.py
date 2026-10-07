@@ -97,6 +97,24 @@ def test_failure_phrase_keeps_urls_out() -> None:
     assert failure_phrase(Exception("Target closed https://x")) == "The navigation failed."
 
 
+def test_failure_phrase_keeps_the_whole_error_code() -> None:
+    """Chromium's codes carry digits (`ERR_HTTP2_PROTOCOL_ERROR`, `ERR_SSL_VERSION_OR_CIPHER_
+    MISMATCH` after an `SSL3`). Stopping at the first one reports a code that does not exist."""
+    assert (
+        failure_phrase(Exception("net::ERR_HTTP2_PROTOCOL_ERROR at https://a.test"))
+        == "The navigation failed (net::ERR_HTTP2_PROTOCOL_ERROR)."
+    )
+    assert (
+        failure_phrase(Exception("net::ERR_SPDY_PROTOCOL_ERROR"))
+        == "The navigation failed (net::ERR_SPDY_PROTOCOL_ERROR)."
+    )
+    # A trailing digit is part of the code too, and lower case still ends it.
+    assert (
+        failure_phrase(Exception("net::ERR_QUIC_PROTOCOL_ERROR2 while loading"))
+        == "The navigation failed (net::ERR_QUIC_PROTOCOL_ERROR2)."
+    )
+
+
 # --- DaytonaFilePolicy -----------------------------------------------------------------------
 
 CONTEXT = BetaURLContext(member="file_upload")
