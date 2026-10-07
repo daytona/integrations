@@ -35,7 +35,10 @@ TASK = "Open example.com and tell me the page heading."
 
 def example_policy(allowed_hosts: list[str]) -> BetaURLPolicy:
     """http(s) pages on the allowed hosts or their subdomains, and the empty tab."""
-    hosts = [h.strip().lower().rstrip(".") for h in allowed_hosts if h.strip()]
+    # Dropped after normalizing, not before: `.` is not blank, but it normalizes to the empty
+    # host, which `host.endswith("." + allowed)` then matches for every name written as a fully
+    # qualified one (`evil.test.`). One such entry would switch the allowlist off.
+    hosts = [normal for h in allowed_hosts if (normal := h.strip().lower().rstrip("."))]
 
     def policy(_context: BetaURLContext, url: str) -> None:
         if url.lower() == "about:blank":
