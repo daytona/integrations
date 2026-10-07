@@ -1,0 +1,21 @@
+packages/daytona-toolsets/daytona_toolsets/_tabs.py
+  s_fa08bc7b5382ac::t_caabaa58e17f42 1-101
+packages/daytona-toolsets/daytona_toolsets/browser.py
+  s_fa08bc7b5382ac::t_7f0d9b02fd429d 16-19,93,95,223,391,433,439-440,445,453-454,458-459,463-464,547,559,565,572,615,639,668,676,869,875,1201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "11914d3f11e5c695d1f7bc50db3388b78ae0023a",
+  "prompts": {},
+  "sessions": {
+    "s_fa08bc7b5382ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee898e109ffeaMcn4qVJt1HpsH",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
