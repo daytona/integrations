@@ -1,0 +1,31 @@
+release-please-config.json
+  s_75ab800bc96945::t_c41f6ebfaaa9e4 41-44
+  s_75ab800bc96945::t_d5a59f2d561784 45
+.github/workflows/release.yml
+  s_75ab800bc96945::t_f8e4ae355a71c3 289-315
+  s_75ab800bc96945::t_48d78f3490e982 60-61
+  s_75ab800bc96945::t_e23461ca9699e8 316
+.github/workflows/ci.yml
+  s_75ab800bc96945::t_b6488c8e182257 332
+  s_75ab800bc96945::t_f7f0490055e8f7 32
+  s_75ab800bc96945::t_750f06194bfd0c 55-58
+  s_75ab800bc96945::t_a7603e61045c09 288-324
+.release-please-manifest.json
+  s_75ab800bc96945::t_5b39c1739945aa 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "318eee55677b96586bf97820403708486aa7ce68",
+  "prompts": {},
+  "sessions": {
+    "s_75ab800bc96945": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee736c2adffe2s1TGx1JdrrvW5",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
