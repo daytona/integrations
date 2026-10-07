@@ -113,6 +113,8 @@ WHEEL_NOTCH = 100
 """Pixels one scroll-wheel notch moves."""
 ACTIVE_PORT_FILE = "DevToolsActivePort"
 """Chromium writes the debugging port it bound into this file in its user-data-dir."""
+KEEP_ALIVE = 60.0
+"""Seconds between the calls that tell Daytona the sandbox is still in use."""
 
 SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
 OPAQUE_SCHEMES = frozenset(
@@ -342,6 +344,8 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._downloads: dict[str, str] = {}
         self._navigating = False
         self._disconnected = False
+        self._last_activity = time.monotonic()
+        """When the sandbox last saw something Daytona counts as activity. Construction does."""
         try:
             self._lease = SandboxLease.acquire(
                 sandbox,
@@ -875,10 +879,31 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
 
     # --- browser state ---------------------------------------------------------------------------
 
+    def _keep_alive(self) -> None:
+        """Tell Daytona the sandbox is in use, at most once every `KEEP_ALIVE` seconds.
+
+        Daytona's auto-stop (and auto-pause) counts interactions made through the SDK and
+        explicitly not traffic through a preview URL — which, once Chromium is up, is everything
+        this driver sends: clicks, screenshots and page reads all ride the CDP connection. A long
+        browsing session would look idle and the sandbox would be stopped underneath it.
+
+        Refreshing the activity timestamp is all this does, so a borrowed sandbox keeps whatever
+        auto-stop interval its owner chose, and an owned one keeps Daytona's default as the
+        backstop against a leaked sandbox. A failure here is never worth failing a call for."""
+        now = time.monotonic()
+        if now - self._last_activity < KEEP_ALIVE:
+            return
+        self._last_activity = now
+        try:
+            self.sandbox.refresh_activity()
+        except Exception as exc:
+            log.debug("could not refresh the sandbox activity: %s", type(exc).__name__)
+
     @override
     def _browser_state(self, context: BetaToolsetCallContext) -> BetaBrowserState:
         """Every open tab, exactly one active, and the changes since the last report. Never raises:
         a browser that stopped answering is reported from what the driver last knew."""
+        self._keep_alive()  # runs after every call, which is where a browsing session shows itself
         try:
             for tab in list(self._tabs.values()):
                 if tab.target_id is None and not self._disconnected:

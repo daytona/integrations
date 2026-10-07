@@ -485,6 +485,30 @@ def test_owned_sandbox_is_deleted_even_if_launch_fails(monkeypatch: pytest.Monke
     sandbox.delete.assert_called_once_with()
 
 
+def test_a_browsing_session_keeps_the_sandbox_from_auto_stopping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CDP traffic rides a preview URL, which Daytona does not count as activity, so the driver
+    says so itself — throttled, and without touching the sandbox's own auto-stop interval."""
+    browser = make_browser(monkeypatch)
+    sandbox: Any = browser.sandbox
+    state(browser)  # construction just talked to the sandbox; nothing to refresh yet
+    sandbox.refresh_activity.assert_not_called()
+    browser._last_activity -= 61
+    state(browser)
+    state(browser)
+    sandbox.refresh_activity.assert_called_once_with()
+    sandbox.set_autostop_interval.assert_not_called()
+
+
+def test_a_failed_keep_alive_does_not_break_the_report(monkeypatch: pytest.MonkeyPatch) -> None:
+    browser = make_browser(monkeypatch)
+    sandbox: Any = browser.sandbox
+    sandbox.refresh_activity.side_effect = RuntimeError("gone")
+    browser._last_activity -= 61
+    assert state(browser)["tabs"][0]["tab_id"] == "tab_1"
+
+
 # --- launching Chromium in the sandbox -------------------------------------------------------
 
 

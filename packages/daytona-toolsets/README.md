@@ -56,6 +56,8 @@ With no `sandbox` argument, each driver creates a sandbox from Daytona's default
 
 `close()` is idempotent and safe after a failed construction: a sandbox created before the failure is still removed. Sandboxes the drivers create carry the label `created-by=daytona-toolsets`. Keyword arguments the drivers don't define (`confirm`, `configs`, `url_policy`, `file_policy`, `tool_configs`) go to the SDK unchanged.
 
+Daytona auto-stops an idle sandbox, and counts only interactions made through the SDK — not traffic through a preview URL, which is how `DaytonaBrowser` reaches Chromium. It therefore refreshes the sandbox's activity itself, at most once a minute while the browser is in use, so a long browsing session is not stopped underneath it. It never changes the sandbox's auto-stop interval, so a borrowed sandbox keeps the lifecycle you configured.
+
 `AsyncDaytonaComputer` takes the same arguments through `await AsyncDaytonaComputer.create(...)`, for `AsyncAnthropic`. There is no async browser driver yet.
 
 ## What's implemented
