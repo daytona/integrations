@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -13,6 +14,9 @@ from daytona_toolsets import DaytonaBrowser, DaytonaFilePolicy
 from daytona_toolsets.browser import failure_phrase, format_remote, normalize_url, rank
 
 from .conftest import blocks_of, call, fake_sandbox, text_of
+
+REAL_LAUNCH = DaytonaBrowser._launch
+"""Captured before any fixture replaces it, so the launch itself can be tested."""
 
 
 def approve(_context: object) -> bool:
@@ -479,6 +483,54 @@ def test_owned_sandbox_is_deleted_even_if_launch_fails(monkeypatch: pytest.Monke
     with pytest.raises(RuntimeError):
         DaytonaBrowser(daytona=client)
     sandbox.delete.assert_called_once_with()
+
+
+# --- launching Chromium in the sandbox -------------------------------------------------------
+
+
+def exec_script(answers: dict[str, tuple[int, str]]) -> Callable[[str], Any]:
+    """A `sandbox.process.exec` double answering by the first key the command contains."""
+
+    def run(command: str, *args: Any, **kwargs: Any) -> SimpleNamespace:
+        for fragment, (exit_code, out) in answers.items():
+            if fragment in command:
+                return SimpleNamespace(exit_code=exit_code, result=out)
+        return SimpleNamespace(exit_code=0, result="")
+
+    return run
+
+
+def test_launch_takes_the_port_chromium_bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    browser = make_browser(monkeypatch)
+    sandbox: Any = browser.sandbox
+    sandbox.process.exec.side_effect = exec_script(
+        {"head -n 1": (0, "45725\n/devtools/browser/abc\n"), "127.0.0.1:45725": (0, "")}
+    )
+    assert REAL_LAUNCH(browser, "chromium", True) == 45725
+    commands = [c.args[0] for c in sandbox.process.exec.call_args_list]
+    started = sandbox.process.execute_session_command.call_args.args[1].command
+    # The kernel picks the port, so nothing can collide with a browser already in the sandbox.
+    assert "--remote-debugging-port=0" in started
+    assert any("rm -f --" in c and "DevToolsActivePort" in c for c in commands)
+    assert any("127.0.0.1:45725/json/version" in c for c in commands)
+
+
+def test_launch_waits_instead_of_probing_a_port_it_does_not_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Another Chromium answering on some port is not this driver's: without DevToolsActivePort
+    in its own profile the launch times out loudly rather than attaching to it."""
+    browser = make_browser(monkeypatch)
+    sandbox: Any = browser.sandbox
+    sandbox.process.exec.side_effect = exec_script({"head -n 1": (1, "")})
+    monkeypatch.setattr("daytona_toolsets.browser.time.sleep", lambda seconds: None)
+    clock = iter([0.0, 0.0, 1.0, 100.0, 100.0])
+    monkeypatch.setattr("daytona_toolsets.browser.time.monotonic", lambda: next(clock))
+    with pytest.raises(RuntimeError, match="Chromium did not start"):
+        REAL_LAUNCH(browser, "chromium", True)
+    assert not any(
+        "/json/version" in c.args[0] for c in sandbox.process.exec.call_args_list
+    )  # never probed a port it had no proof of
 
 
 def test_rank_prefers_elements_of_the_named_role() -> None:

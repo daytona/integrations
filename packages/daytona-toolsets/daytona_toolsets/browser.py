@@ -111,6 +111,8 @@ MAX_ENTRIES = 1000
 FIND_LIMIT = 20
 WHEEL_NOTCH = 100
 """Pixels one scroll-wheel notch moves."""
+ACTIVE_PORT_FILE = "DevToolsActivePort"
+"""Chromium writes the debugging port it bound into this file in its user-data-dir."""
 
 SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
 OPAQUE_SCHEMES = frozenset(
@@ -408,7 +410,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
 
     def _launch(self, chromium: str, headless: bool) -> int:
         """Start Chromium in the sandbox with a fresh profile and a scrubbed environment, and return
-        its debugging port (loopback only inside the sandbox)."""
+        the debugging port it bound (loopback only inside the sandbox)."""
         sandbox = self.sandbox
         if str(getattr(sandbox.state, "value", sandbox.state)) != "started":
             sandbox.start()
@@ -416,12 +418,14 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             computer_use = sandbox.computer_use
             if computer_use.get_status().status != "active":
                 computer_use.start()
-        port = 20000 + secrets.randbelow(20000)
         width, height = self._viewport
         is_root = sandbox.process.exec("id -u").result.strip() == "0"
         flags = [
             *(["--headless=new"] if headless else []),
-            f"--remote-debugging-port={port}",
+            # Port 0: the kernel picks one that is free, so a sandbox that already runs a browser
+            # of its own cannot be collided with, and Chromium reports its choice in
+            # DevToolsActivePort below.
+            "--remote-debugging-port=0",
             f"--user-data-dir={self._profile}",
             f"--window-size={width},{height}",
             "--no-first-run",
@@ -443,7 +447,8 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         if not headless:
             env.append("DISPLAY=:0")
         dirs = " ".join(shlex.quote(d) for d in (self._profile, self._download_dir))
-        sandbox.process.exec(f"mkdir -p -m 700 {dirs}")
+        active = shlex.quote(f"{self._profile}/{ACTIVE_PORT_FILE}")
+        sandbox.process.exec(f"mkdir -p -m 700 {dirs} && rm -f -- {active}")
         command = (
             f"env -i {' '.join(shlex.quote(e) for e in env)} {shlex.quote(chromium)} "
             f"{' '.join(shlex.quote(f) for f in flags)} >{shlex.quote(self._profile)}/chromium.log 2>&1"
@@ -453,14 +458,32 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             self._session_id, SessionExecuteRequest(command=command, run_async=True)
         )
         deadline = time.monotonic() + 30
-        probe = f"curl -sf -o /dev/null http://127.0.0.1:{port}/json/version"
-        while sandbox.process.exec(probe).exit_code != 0:
+        while True:
+            port = self._bound_port(sandbox, active)
+            if port is not None:
+                return port
             if time.monotonic() > deadline:
                 raise RuntimeError(
                     f"Chromium did not start in the sandbox; see {self._profile}/chromium.log there"
                 )
             time.sleep(0.5)
-        return port
+
+    def _bound_port(self, sandbox: Sandbox, active: str) -> Optional[int]:
+        """The debugging port Chromium bound, once it answers there, or `None` while it is starting.
+
+        Chromium writes the port it chose, with the browser's websocket path, into
+        `DevToolsActivePort` in its user-data-dir. That directory is this driver's own fresh
+        profile, so reading the port back from it is what proves the endpoint answering below
+        belongs to the Chromium this call started — on a borrowed sandbox another browser may
+        already be listening, and probing a port the driver merely guessed would otherwise hand the
+        model someone else's pages."""
+        read = sandbox.process.exec(f"head -n 1 -- {active} 2>/dev/null")
+        line = (read.result or "").partition("\n")[0].strip()
+        if read.exit_code != 0 or not line.isdigit():
+            return None
+        port = int(line)
+        probe = f"curl -sf -o /dev/null http://127.0.0.1:{port}/json/version"
+        return port if sandbox.process.exec(probe).exit_code == 0 else None
 
     def _connect(self, port: int) -> None:
         """Connect Playwright over a signed preview URL for the debugging port, then open the first
