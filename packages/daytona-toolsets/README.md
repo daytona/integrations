@@ -120,7 +120,7 @@ browser = DaytonaBrowser(
 )
 ```
 
-Upload paths are sandbox paths. The policy admits absolute paths under a root, with `..` refused. The driver then resolves each one inside the sandbox, following symlinks, and checks the resolved path against the roots again. A file policy of your own declares no roots to re-check against, so there a path that resolves to somewhere else is refused outright — a link planted in an upload directory cannot carry the upload out of it. Files API `document_ids` are refused. Downloads are saved to `browser.download_dir` in the sandbox (created `0700`, outside the upload roots). The model sees a download's path only with `expose_download_paths=True`. Treat downloaded files as untrusted.
+Upload paths are sandbox paths. The policy admits absolute paths under a root, with `..` refused. The driver then resolves each one inside the sandbox, following symlinks, and checks the resolved path against the roots again. A file policy of your own declares no roots to re-check against, so there a path that resolves to somewhere else is refused outright — a link planted in an upload directory cannot carry the upload out of it. Resolving and uploading are two steps, not one — the toolbox API hands back a path, not a handle to hold — so anything else running in the sandbox that can write to the upload directory could swap a checked file in between; keep that directory writable only by you. Files API `document_ids` are refused. Downloads are saved to `browser.download_dir` in the sandbox (created `0700`, outside the upload roots). The model sees a download's path only with `expose_download_paths=True`. Treat downloaded files as untrusted.
 
 ## Limitations
 
