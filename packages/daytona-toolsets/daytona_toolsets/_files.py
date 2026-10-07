@@ -10,13 +10,40 @@ from __future__ import annotations
 
 import posixpath
 from collections.abc import Sequence
+from pathlib import PurePosixPath
 from typing import Optional
 
 from anthropic.tools.browser import BetaURLContext, UploadRefusedError
 
 
+def is_filesystem_root(path: str) -> bool:
+    """Whether `path` is the filesystem root itself (`/`, and the POSIX-special `//`)."""
+    pure = PurePosixPath(path)
+    return pure.is_absolute() and pure == pure.parent
+
+
 def is_under(path: str, root: str) -> bool:
-    return path == root or path.startswith(root.rstrip("/") + "/")
+    """Whether the sandbox path `path` is `root` itself or lies inside it.
+
+    Compared component by component as pure POSIX paths — never touched on this machine's disk,
+    which is not where either of them lives. A textual prefix test would read `/tmp/upload` as
+    inside `/tmp/up`; comparing components does not, however the root is spelled.
+
+    The filesystem root is not a containing root. Every absolute path is under `/`, so accepting
+    it would make this a no-op — which is exactly what an upload root that resolves to `/`, by
+    being a symlink to it, would otherwise buy: the driver re-checks resolved upload paths against
+    resolved roots, and one root of `/` would admit the whole filesystem.
+
+    A `..` component is refused rather than normalized away, for the reason `DaytonaFilePolicy`
+    gives for refusing one in a root or an upload path: normalizing changes which directory is
+    being spoken about.
+    """
+    if ".." in path.split("/") or ".." in root.split("/"):
+        return False
+    target, base = PurePosixPath(path), PurePosixPath(root)
+    if not target.is_absolute() or not base.is_absolute() or is_filesystem_root(root):
+        return False
+    return target.is_relative_to(base)
 
 
 class DaytonaFilePolicy:
@@ -49,7 +76,7 @@ class DaytonaFilePolicy:
         if isinstance(upload_roots, str):
             raise TypeError("upload_roots is a sequence of directories, not one path")
         roots = [self._absolute(root, "upload root") for root in upload_roots]
-        if any(root == "/" for root in roots):
+        if any(is_filesystem_root(root) for root in roots):
             raise ValueError("an upload root cannot be the filesystem root")
         self.upload_roots: tuple[str, ...] = tuple(roots)
         self.download_dir = (

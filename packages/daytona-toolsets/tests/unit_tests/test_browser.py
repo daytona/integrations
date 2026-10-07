@@ -13,6 +13,7 @@ from anthropic.tools.browser import BetaDialogDismissed, BetaLocalFilePolicy, Be
 from anthropic.tools.browser import BetaURLContext
 
 from daytona_toolsets import DaytonaBrowser, DaytonaFilePolicy
+from daytona_toolsets._files import is_under
 from daytona_toolsets.browser import (
     KEEP_ALIVE,
     MAX_TEXT,
@@ -99,6 +100,35 @@ def test_failure_phrase_keeps_urls_out() -> None:
 # --- DaytonaFilePolicy -----------------------------------------------------------------------
 
 CONTEXT = BetaURLContext(member="file_upload")
+
+
+@pytest.mark.parametrize(
+    ("path", "root", "contained"),
+    [
+        # The filesystem root contains every absolute path, so accepting it as a containing root
+        # would turn the check into a no-op — which is what an upload root that resolves to `/`
+        # would otherwise buy.
+        ("/etc/shadow", "/", False),
+        ("/", "/", False),
+        ("/etc/shadow", "//", False),
+        # A root is a directory however it is spelled.
+        ("/tmp/up", "/tmp/up/", True),
+        ("/tmp/up/a.txt", "/tmp/up/", True),
+        ("/tmp/up", "/tmp/up", True),
+        # Whole components only: a sibling whose name starts with the root's name is outside it.
+        ("/tmp/upload/a.txt", "/tmp/up", False),
+        ("/tmp/up-other", "/tmp/up", False),
+        ("/tmp/up.txt", "/tmp/up", False),
+        # A parent step is refused, not walked: `/tmp/up/../etc/passwd` is not in `/tmp/up`.
+        ("/tmp/up/../etc/passwd", "/tmp/up", False),
+        ("/etc/passwd", "/tmp/up/..", False),
+        # Relative paths are not sandbox paths.
+        ("tmp/up/a.txt", "/tmp/up", False),
+        ("/tmp/up/a.txt", "tmp/up", False),
+    ],
+)
+def test_is_under_compares_whole_path_components(path: str, root: str, contained: bool) -> None:
+    assert is_under(path, root) is contained
 
 
 def test_file_policy_admits_paths_under_a_root() -> None:
@@ -825,6 +855,27 @@ def test_a_symlinked_upload_root_is_resolved_before_the_containment_check(
         {"realpath -e": (0, "/srv/real/a.txt\n"), "realpath -m": (1, "")}
     )
     with pytest.raises(ToolError, match="could not be checked"):
+        browser._resolve_in_sandbox(["/link/a.txt"])
+
+
+def test_an_upload_root_that_resolves_to_the_filesystem_root_admits_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The constructor refuses `/` as a root, but only the sandbox knows where a root points. A
+    root that is a link to `/` would otherwise re-check every path against a root that contains
+    the whole filesystem, which is no check at all."""
+    browser = make_browser(monkeypatch, file_policy=DaytonaFilePolicy(upload_roots=["/link"]))
+    sandbox: Any = browser.sandbox
+    sandbox.process.exec.side_effect = exec_script(
+        {"realpath -e": (0, "/etc/shadow\n"), "realpath -m": (0, "/\n")}
+    )
+    with pytest.raises(ToolError, match="outside the upload directory"):
+        browser._resolve_in_sandbox(["/link/../etc/shadow"])
+    # Not even a path that really is under the link's target gets through it.
+    sandbox.process.exec.side_effect = exec_script(
+        {"realpath -e": (0, "/srv/real/a.txt\n"), "realpath -m": (0, "/\n")}
+    )
+    with pytest.raises(ToolError, match="outside the upload directory"):
         browser._resolve_in_sandbox(["/link/a.txt"])
 
 
