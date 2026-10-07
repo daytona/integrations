@@ -59,7 +59,13 @@ class Tab:
         if len(self.network) >= MAX_ENTRIES:
             self.network.pop(next(iter(self.network)))
             self.dropped_network += 1
-        self.network[request] = {"method": request.method, "url": request.url, "status": "pending"}
+        # The page chooses the URL and its length; `take_network` hands back up to MAX_ENTRIES of
+        # them at once, so each is bounded like every other piece of page-supplied text.
+        self.network[request] = {
+            "method": request.method,
+            "url": request.url[:MAX_TEXT],
+            "status": "pending",
+        }
 
     def answer_request(self, response: Response) -> None:
         entry = self.network.get(response.request)

@@ -550,6 +550,16 @@ def test_page_supplied_text_is_bounded(browser: DaytonaBrowser) -> None:
     assert browser._tabs["tab_1"].console[-1] == "y" * MAX_TEXT
 
 
+def test_a_recorded_request_url_is_bounded(browser: DaytonaBrowser) -> None:
+    """A page chooses the URLs it requests and can make them any length. `read_network` hands
+    back up to 1,000 of them at once, so an uncapped one is both per-tab memory and tool output."""
+    tab = browser._tabs["tab_1"]
+    long_url = "https://a.test/?q=" + "z" * 10_000
+    tab.start_request(MagicMock(url=long_url, method="GET"))
+    assert tab.network[next(iter(tab.network))]["url"] == long_url[:MAX_TEXT]
+    assert len(tab.take_network()) < MAX_TEXT + 100
+
+
 def test_interception_applies_the_url_policy(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[tuple[str | None, str]] = []
 
