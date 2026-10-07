@@ -1,0 +1,19 @@
+README.md
+  s_ee1a564b3f52fa::t_cb0fab02d97731 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5856c066419f309e5e8efd8774541ee0399cc330",
+  "prompts": {},
+  "sessions": {
+    "s_ee1a564b3f52fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee7ce5b64ffeZutl5Q3r3hQrxd",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
