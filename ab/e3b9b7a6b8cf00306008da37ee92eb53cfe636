@@ -1,0 +1,14 @@
+packages/daytona-toolsets/examples/exercise_computer.py
+  h_634fa4b3782b12 35-38,41-42,82-88,93-100,116-122,124-125,145,148-149,151-153,156-159,163-167,170,174-175,178-187,192,194-197,205,211,217,221-222,225,230-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "abe3b9b7a6b8cf00306008da37ee92eb53cfe636",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}

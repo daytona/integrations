@@ -1,0 +1,14 @@
+packages/daytona-toolsets/examples/exercise_computer.py
+  h_634fa4b3782b12 151-152,154-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b2236fea4c5fab61e5a08d887947db39134655dc",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}

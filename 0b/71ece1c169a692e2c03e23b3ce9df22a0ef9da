@@ -1,0 +1,14 @@
+.github/workflows/release.yml
+  h_634fa4b3782b12 56-57,120-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0b71ece1c169a692e2c03e23b3ce9df22a0ef9da",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
