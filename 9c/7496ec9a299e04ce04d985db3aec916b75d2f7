@@ -1,0 +1,22 @@
+packages/daytona-toolsets/examples/exercise_computer.py
+  s_80cd4903c6dfaa::t_6291f98349fa2e 29
+  s_80cd4903c6dfaa::t_593bab66d92e01 314-318,321-323,325
+packages/daytona-toolsets/examples/exercise_browser.py
+  s_80cd4903c6dfaa::t_e0bd743dc383bb 474-478
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c7496ec9a299e04ce04d985db3aec916b75d2f7",
+  "prompts": {},
+  "sessions": {
+    "s_80cd4903c6dfaa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee8003d7cffePPReSW6Nlwn1sF",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
