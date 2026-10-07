@@ -1214,6 +1214,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
                     f"{ref} is a radio button and cannot be cleared; set the one you want in "
                     "its group to true instead."
                 ),
+                "disabled": f"{ref} is disabled, so it cannot be ticked or cleared.",
                 "not-checkable": f"{ref} is not a checkbox; give it a text or number value.",
                 "file-input": f"{ref} is a file input; use file_upload.",
                 "not-a-field": f"{ref} is not a form field.",

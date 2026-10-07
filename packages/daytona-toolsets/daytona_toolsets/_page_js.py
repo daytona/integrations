@@ -287,9 +287,16 @@ TOOLKIT = r"""
       if (tag === 'INPUT' && (type === 'checkbox' || type === 'radio')) {
         if (typeof value !== 'boolean') return { error: 'want-boolean' };
         // Clicking a selected radio leaves it selected, so `false` would report a change that did
-        // not happen. Only choosing another button in the group clears this one.
-        if (type === 'radio' && value === false) return { error: 'radio-off' };
-        if (el.checked !== value) el.click();
+        // not happen. Only choosing another button in the group clears this one. A radio that is
+        // already clear is the state `false` asks for, so that call has nothing to refuse.
+        if (type === 'radio' && value === false && el.checked) return { error: 'radio-off' };
+        if (el.checked === value) return {};
+        // A click is the only way to change one of these, and a disabled control ignores it, so
+        // clicking would report a change that did not happen. `:disabled` and not `.disabled`:
+        // an ancestor <fieldset disabled> disables the control without setting its attribute.
+        // The branches below write the value directly, which a disabled field does take.
+        if (el.matches(':disabled')) return { error: 'disabled' };
+        el.click();
         return {};
       }
       if (typeof value === 'boolean') return { error: 'not-checkable' };

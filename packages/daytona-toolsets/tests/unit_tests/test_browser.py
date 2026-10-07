@@ -626,18 +626,39 @@ def test_a_radio_button_cannot_be_cleared(monkeypatch: pytest.MonkeyPatch) -> No
     assert "cannot be cleared" in text_of(refused)
 
 
+def set_value_body() -> str:
+    """The `setValue` entry point of the in-page toolkit, as source."""
+    from daytona_toolsets import _page_js
+
+    return _page_js.TOOLKIT.split("setValue(ref, value) {", 1)[1].split("\n    fileInput(", 1)[0]
+
+
 def test_every_set_value_refusal_has_a_message() -> None:
     """The in-page `setValue` and the member's message table are one contract; a code added to
     the script with no message would reach the model as "The value could not be set."."""
-    from daytona_toolsets import _page_js
-
-    script = _page_js.TOOLKIT
-    body = script.split("setValue(ref, value) {", 1)[1].split("\n    fileInput(", 1)[0]
+    body = set_value_body()
     codes = set(re.findall(r"error: '([a-z-]+)'", body))
-    assert "radio-off" in codes
+    assert {"radio-off", "disabled"} <= codes
     source = inspect.getsource(DaytonaBrowser.form_input)
     missing = sorted(code for code in codes if f'"{code}":' not in source)
     assert missing == []
+
+
+def test_set_value_refuses_clearing_only_a_radio_that_is_set() -> None:
+    """A radio that is already clear is in the state `false` asks for, so the call is a no-op
+    success; only clearing a *selected* one is something a click cannot do."""
+    body = set_value_body()
+    assert "type === 'radio' && value === false && el.checked" in body
+    # The already-correct state returns before anything can refuse it.
+    assert body.index("el.checked === value") < body.index("':disabled'")
+
+
+def test_set_value_refuses_a_checkable_it_cannot_click() -> None:
+    """A click is the only way to change a checkbox or radio, and a disabled one ignores it, so
+    clicking and returning success would report a change that did not happen."""
+    body = set_value_body()
+    assert "el.matches(':disabled')" in body
+    assert body.index("':disabled'") < body.index("el.click()")
 
 
 def test_interception_covers_websocket_handshakes(monkeypatch: pytest.MonkeyPatch) -> None:
