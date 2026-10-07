@@ -1,0 +1,27 @@
+packages/daytona-claude-toolsets/daytona_claude_toolsets/__init__.py
+  s_ee1a564b3f52fa::t_de9ad49c0a2f48 1-42
+packages/daytona-claude-toolsets/tests/unit_tests/test_package.py
+  s_ee1a564b3f52fa::t_71ebffb1c4dfbd 1-78
+packages/daytona-claude-toolsets/examples/exercise_browser.py
+  s_ee1a564b3f52fa::t_b5bca24791b8a4 1-487
+packages/daytona-claude-toolsets/daytona_claude_toolsets/_sandbox.py
+  s_ee1a564b3f52fa::t_f2ff00238e2ced 1-88
+packages/daytona-claude-toolsets/pyproject.toml
+  s_ee1a564b3f52fa::t_904839c1102d15 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3d3e761230fa533dbeb90ad44814fbd15397438b",
+  "prompts": {},
+  "sessions": {
+    "s_ee1a564b3f52fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee7ce5b64ffeZutl5Q3r3hQrxd",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
