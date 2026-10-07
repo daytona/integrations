@@ -381,13 +381,41 @@ def test_downloads_are_reported_with_their_url(browser: DaytonaBrowser) -> None:
         "url": "https://a.test/f.zip",
     }
     assert changes[1]["type"] == "download_completed" and changes[1]["size_bytes"] == 10
-    assert changes[1]["path"] == f"{browser.download_dir}/g1"
+    assert "path" not in changes[1]  # no file policy: nothing exposes the path
     assert changes[3] == {
         "type": "download_failed",
         "download_id": "g2",
         "url": "https://a.test/g.zip",
         "error": "The download was cancelled or failed.",
     }
+
+
+def completed_download(browser: DaytonaBrowser) -> dict[str, Any]:
+    browser._on_download_begin({"guid": "g1", "url": "https://a.test/f.zip"})
+    browser._on_download_progress({"guid": "g1", "state": "completed", "receivedBytes": 10})
+    change: dict[str, Any] = dict(state(browser)["changes"][1])
+    return change
+
+
+def test_download_paths_need_expose_download_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    hidden = make_browser(monkeypatch, file_policy=DaytonaFilePolicy(download_dir="/dl"))
+    assert "path" not in completed_download(hidden)
+    shown = make_browser(
+        monkeypatch,
+        file_policy=DaytonaFilePolicy(download_dir="/dl", expose_download_paths=True),
+    )
+    assert completed_download(shown)["path"] == "/dl/g1"
+
+
+def test_a_file_policy_that_raises_hides_the_download_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    policy = DaytonaFilePolicy(download_dir="/dl", expose_download_paths=True)
+    monkeypatch.setattr(
+        type(policy), "is_path_visible", lambda self, path: 1 / 0, raising=True  # noqa: ARG005
+    )
+    browser = make_browser(monkeypatch, file_policy=policy)
+    assert "path" not in completed_download(browser)
 
 
 def test_durations_and_bounds(browser: DaytonaBrowser) -> None:

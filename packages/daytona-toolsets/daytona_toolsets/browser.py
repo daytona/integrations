@@ -311,6 +311,8 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         super().__init__(**options)
 
         policy = options.get("file_policy")
+        self._policy: Any = policy
+        """The file policy as configured, of whatever class, for the download-path check."""
         self._file_policy = policy if isinstance(policy, DaytonaFilePolicy) else None
         self._viewport = viewport
         self._navigation_ms = navigation_timeout * 1000
@@ -652,6 +654,23 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._downloads[guid] = url
         self._changes.append({"type": "download_started", "download_id": guid, "url": url})
 
+    def _path_visible(self, path: str) -> bool:
+        """Whether the file policy shows the model where a completed download was saved.
+
+        Only `True` shows it, and anything the policy raises hides it, matching the SDK's own check
+        of the same hook. The driver asks before it records the path, so a path the policy does not
+        expose is never held in a change at all — `expose_download_paths=False` is what the
+        `DaytonaFilePolicy` docstring and the README promise, and the SDK's check at render time
+        cannot cover a change this driver still holds when a call fails or `close()` runs."""
+        policy = self._policy
+        if policy is None:
+            return False
+        try:
+            return bool(policy.is_path_visible(path) is True)
+        except Exception as exc:  # fail closed: a policy that cannot answer hides the path
+            log.debug("the file policy could not judge a download path: %s", type(exc).__name__)
+            return False
+
     def _on_download_progress(self, event: dict[str, Any]) -> None:
         guid = str(event.get("guid", ""))
         state = event.get("state")
@@ -659,15 +678,16 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             return
         url = self._downloads.pop(guid)
         if state == "completed":
-            self._changes.append(
-                {
-                    "type": "download_completed",
-                    "download_id": guid,
-                    "url": url,
-                    "path": posixpath.join(self._download_dir, guid),
-                    "size_bytes": int(event.get("receivedBytes") or 0),
-                }
-            )
+            change: dict[str, Any] = {
+                "type": "download_completed",
+                "download_id": guid,
+                "url": url,
+                "size_bytes": int(event.get("receivedBytes") or 0),
+            }
+            path = posixpath.join(self._download_dir, guid)
+            if self._path_visible(path):
+                change["path"] = path
+            self._changes.append(change)
         else:
             self._changes.append(
                 {
