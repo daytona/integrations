@@ -2,6 +2,7 @@
   h_634fa4b3782b12 31,52-53,247-278,286
 .release-please-manifest.json
   h_634fa4b3782b12 9
+  s_099ffe0d5218dd::t_911c80e44bcbe5 8
 packages/daytona-toolsets/.gitignore
   h_634fa4b3782b12 1-79
 packages/daytona-toolsets/LICENSE
@@ -53,6 +54,16 @@ release-please-config.json
   "humans": {
     "h_634fa4b3782b12": {
       "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_099ffe0d5218dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee8ae6955ffekgnwb3MUFK8ZAj",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
     }
   }
 }
