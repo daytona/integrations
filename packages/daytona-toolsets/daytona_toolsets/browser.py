@@ -11,11 +11,11 @@ subclass of `BetaAbstractBrowserToolset20260801`, and those methods share mutabl
 tab map, the per-tab CDP sessions and isolated worlds, and the state changes queued for the next
 report — that the Playwright event handlers write to while a member is waiting on the network.
 Splitting the class across collaborators would mean threading that state between them for no
-isolation gained. What does not need it lives next door, each unit-tested on its own: the file
-policy in `_files.py`, the sandbox lease in `_sandbox.py`, the URL, ranking and value-formatting
-vocabulary in `_text.py`, the key tables in `_keys.py`, the in-page JavaScript in `_page_js.py`.
-Read what is left by its section banners: setup, events, helpers, then the members in the
-toolset's own groups.
+isolation gained. What does not need it lives next door, each testable on its own: starting
+Chromium in the sandbox in `_chromium.py`, the sandbox lease in `_sandbox.py`, the file policy in
+`_files.py`, the URL, ranking and value-formatting vocabulary in `_text.py`, the key tables in
+`_keys.py`, the in-page JavaScript in `_page_js.py`. Read what is left by its section banners:
+setup, events, helpers, then the members in the toolset's own groups.
 """
 
 from __future__ import annotations
@@ -84,10 +84,10 @@ from anthropic.types.beta import (
     BetaBrowserWaitInput,
     BetaBrowserZoomInput,
 )
-from daytona import Daytona, Sandbox, SessionExecuteRequest
+from daytona import Daytona, Sandbox
 from typing_extensions import override
 
-from . import _page_js
+from . import _chromium, _page_js
 from ._files import DaytonaFilePolicy as DaytonaFilePolicy, is_under
 from ._keys import parse_chord, playwright_chord, split_sequence, PLAYWRIGHT
 from ._sandbox import CreateParams, OnClose, SandboxLease
@@ -132,8 +132,6 @@ dialog's message. A page can make any of them arbitrarily long."""
 FIND_LIMIT = 20
 WHEEL_NOTCH = 100
 """Pixels one scroll-wheel notch moves."""
-ACTIVE_PORT_FILE = "DevToolsActivePort"
-"""Chromium writes the debugging port it bound into this file in its user-data-dir."""
 KEEP_ALIVE = 60.0
 """Seconds between the calls that tell Daytona the sandbox is still in use."""
 
@@ -320,8 +318,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
     # --- setup -----------------------------------------------------------------------------------
 
     def _launch(self, chromium: str, headless: bool) -> int:
-        """Start Chromium in the sandbox with a fresh profile and a scrubbed environment, and return
-        the debugging port it bound (loopback only inside the sandbox)."""
+        """Start Chromium in the sandbox and return the debugging port it bound."""
         sandbox = self.sandbox
         if str(getattr(sandbox.state, "value", sandbox.state)) != "started":
             sandbox.start()
@@ -329,72 +326,15 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             computer_use = sandbox.computer_use
             if computer_use.get_status().status != "active":
                 computer_use.start()
-        width, height = self._viewport
-        is_root = sandbox.process.exec("id -u").result.strip() == "0"
-        flags = [
-            *(["--headless=new"] if headless else []),
-            # Port 0: the kernel picks one that is free, so a sandbox that already runs a browser
-            # of its own cannot be collided with, and Chromium reports its choice in
-            # DevToolsActivePort below.
-            "--remote-debugging-port=0",
-            f"--user-data-dir={self._profile}",
-            f"--window-size={width},{height}",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-background-networking",
-            "--disable-component-update",
-            "--disable-default-apps",
-            "--disable-extensions",
-            "--disable-sync",
-            "--password-store=basic",
-            "--enable-features=LocalNetworkAccessChecks",
-            # Pages restored from the back-forward cache fire no load events to wait for.
-            "--disable-features=BackForwardCache",
-            # Chromium's sandbox cannot start as root; the Daytona sandbox is then the isolation.
-            *(["--no-sandbox"] if is_root else []),
-            "about:blank",
-        ]
-        env = ["HOME=" + self._profile, "PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8"]
-        if not headless:
-            env.append("DISPLAY=:0")
-        dirs = " ".join(shlex.quote(d) for d in (self._profile, self._download_dir))
-        active = shlex.quote(f"{self._profile}/{ACTIVE_PORT_FILE}")
-        sandbox.process.exec(f"mkdir -p -m 700 {dirs} && rm -f -- {active}")
-        command = (
-            f"env -i {' '.join(shlex.quote(e) for e in env)} {shlex.quote(chromium)} "
-            f"{' '.join(shlex.quote(f) for f in flags)} >{shlex.quote(self._profile)}/chromium.log 2>&1"
+        return _chromium.launch(
+            sandbox,
+            chromium=chromium,
+            headless=headless,
+            session_id=self._session_id,
+            profile=self._profile,
+            download_dir=self._download_dir,
+            viewport=self._viewport,
         )
-        sandbox.process.create_session(self._session_id)
-        sandbox.process.execute_session_command(
-            self._session_id, SessionExecuteRequest(command=command, run_async=True)
-        )
-        deadline = time.monotonic() + 30
-        while True:
-            port = self._bound_port(sandbox, active)
-            if port is not None:
-                return port
-            if time.monotonic() > deadline:
-                raise RuntimeError(
-                    f"Chromium did not start in the sandbox; see {self._profile}/chromium.log there"
-                )
-            time.sleep(0.5)
-
-    def _bound_port(self, sandbox: Sandbox, active: str) -> Optional[int]:
-        """The debugging port Chromium bound, once it answers there, or `None` while it is starting.
-
-        Chromium writes the port it chose, with the browser's websocket path, into
-        `DevToolsActivePort` in its user-data-dir. That directory is this driver's own fresh
-        profile, so reading the port back from it is what proves the endpoint answering below
-        belongs to the Chromium this call started — on a borrowed sandbox another browser may
-        already be listening, and probing a port the driver merely guessed would otherwise hand the
-        model someone else's pages."""
-        read = sandbox.process.exec(f"head -n 1 -- {active} 2>/dev/null")
-        line = (read.result or "").partition("\n")[0].strip()
-        if read.exit_code != 0 or not line.isdigit():
-            return None
-        port = int(line)
-        probe = f"curl -sf -o /dev/null http://127.0.0.1:{port}/json/version"
-        return port if sandbox.process.exec(probe).exit_code == 0 else None
 
     def _connect(self, port: int) -> None:
         """Connect Playwright over a signed preview URL for the debugging port, then open the first

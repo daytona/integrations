@@ -655,9 +655,9 @@ def test_launch_waits_instead_of_probing_a_port_it_does_not_own(
     browser = make_browser(monkeypatch)
     sandbox: Any = browser.sandbox
     sandbox.process.exec.side_effect = exec_script({"head -n 1": (1, "")})
-    monkeypatch.setattr("daytona_toolsets.browser.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("daytona_toolsets._chromium.time.sleep", lambda seconds: None)
     clock = iter([0.0, 0.0, 1.0, 100.0, 100.0])
-    monkeypatch.setattr("daytona_toolsets.browser.time.monotonic", lambda: next(clock))
+    monkeypatch.setattr("daytona_toolsets._chromium.time.monotonic", lambda: next(clock))
     with pytest.raises(RuntimeError, match="Chromium did not start"):
         REAL_LAUNCH(browser, "chromium", True)
     assert not any(
