@@ -543,6 +543,29 @@ def test_a_custom_policy_does_not_let_a_link_carry_an_upload_out(
     assert browser._resolve_in_sandbox(["/task/uploads/./notes.txt"]) == ["/task/uploads/notes.txt"]
 
 
+def test_a_symlinked_upload_root_is_resolved_before_the_containment_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The roots go through the sandbox like the paths do, so a root that is a link to the real
+    directory still admits what is under it — and a path that leaves it is still refused."""
+    browser = make_browser(monkeypatch, file_policy=DaytonaFilePolicy(upload_roots=["/link"]))
+    sandbox: Any = browser.sandbox
+    sandbox.process.exec.side_effect = exec_script(
+        {"realpath -e": (0, "/srv/real/a.txt\n"), "realpath -m": (0, "/srv/real\n")}
+    )
+    assert browser._resolve_in_sandbox(["/link/a.txt"]) == ["/srv/real/a.txt"]
+    sandbox.process.exec.side_effect = exec_script(
+        {"realpath -e": (0, "/etc/shadow\n"), "realpath -m": (0, "/srv/real\n")}
+    )
+    with pytest.raises(ToolError, match="outside the upload directory"):
+        browser._resolve_in_sandbox(["/link/a.txt"])
+    sandbox.process.exec.side_effect = exec_script(
+        {"realpath -e": (0, "/srv/real/a.txt\n"), "realpath -m": (1, "")}
+    )
+    with pytest.raises(ToolError, match="could not be checked"):
+        browser._resolve_in_sandbox(["/link/a.txt"])
+
+
 def test_a_browsing_session_keeps_the_sandbox_from_auto_stopping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

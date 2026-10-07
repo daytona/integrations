@@ -1215,10 +1215,16 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         if result.exit_code != 0 or len(resolved) != len(paths):
             raise ToolError("An upload path does not exist in the sandbox.")
         if self._file_policy is not None:
+            # The roots go through the sandbox too, so a root that is itself a link is compared as
+            # what it points at, like the paths are. `-m` and not `-e`: a root that does not exist
+            # yet still has an answer, and answers for all of them or the check cannot be made.
+            declared = self._file_policy.upload_roots
             roots_result = self.sandbox.process.exec(
-                "realpath -m -- " + " ".join(shlex.quote(r) for r in self._file_policy.upload_roots)
+                "realpath -m -- " + " ".join(shlex.quote(r) for r in declared)
             )
             roots = (roots_result.result or "").splitlines()
+            if roots_result.exit_code != 0 or len(roots) != len(declared):
+                raise ToolError("An upload path could not be checked against the upload directory.")
             if not all(any(is_under(path, root) for root in roots) for path in resolved):
                 raise ToolError("An upload path is outside the upload directory.")
         elif resolved != [posixpath.normpath(path) for path in paths]:
