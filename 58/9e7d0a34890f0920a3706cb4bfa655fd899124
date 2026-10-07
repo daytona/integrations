@@ -1,0 +1,19 @@
+packages/daytona-toolsets/daytona_toolsets/_tabs.py
+  s_80cd4903c6dfaa::t_18e975c444ebde 62-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "589e7d0a34890f0920a3706cb4bfa655fd899124",
+  "prompts": {},
+  "sessions": {
+    "s_80cd4903c6dfaa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee8003d7cffePPReSW6Nlwn1sF",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
