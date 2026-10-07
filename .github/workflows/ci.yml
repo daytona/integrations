@@ -29,6 +29,7 @@ jobs:
       pydantic_ai: ${{ steps.filter.outputs.pydantic_ai }}
       convex: ${{ steps.filter.outputs.convex }}
       toolsets: ${{ steps.filter.outputs.toolsets }}
+      claude_toolsets: ${{ steps.filter.outputs.claude_toolsets }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -51,6 +52,10 @@ jobs:
               - 'packages/convex/**'
             toolsets:
               - 'packages/daytona-claude-toolsets/**'
+            # npm (TypeScript) package — distinct from the `toolsets` filter above,
+            # which routes the PyPI/Python packages/daytona-claude-toolsets.
+            claude_toolsets:
+              - 'packages/claude-toolsets/**'
 
   adk:
     needs: changes
@@ -280,6 +285,43 @@ jobs:
         run: pytest
       # NOTE: live checks (examples/exercise_*.py, real Daytona sandboxes) are not in per-PR CI.
 
+  # npm (TypeScript) toolsets — distinct from the `toolsets` job above, which
+  # covers the PyPI/Python packages/daytona-claude-toolsets.
+  claude-toolsets:
+    needs: changes
+    if: needs.changes.outputs.claude_toolsets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Detect package
+        id: guard
+        run: |
+          test -f packages/claude-toolsets/package.json && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/claude-toolsets
+        run: npm ci
+      - name: Typecheck
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/claude-toolsets
+        run: npm run typecheck
+      - name: Build
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/claude-toolsets
+        run: npm run build
+      - name: Unit tests (offline, Daytona and Playwright mocked)
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: packages/claude-toolsets
+        run: npm test
+      # NOTE: live checks (examples/, real Daytona sandboxes) are not in per-PR CI.
+
   # Single, stable status check to require in branch protection.
   # It ALWAYS runs (if: always()) and fails only if a relevant job failed or
   # was cancelled. A "skipped" job (a package this PR didn't touch) is fine —
@@ -287,7 +329,7 @@ jobs:
   # merges when a touched package's lint/test/build fails.
   ci-success:
     name: ci-success
-    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai, convex, toolsets]
+    needs: [changes, adk, langchain, n8n, pi, opencode, pydantic-ai, convex, toolsets, claude-toolsets]
     if: always()
     runs-on: ubuntu-latest
     steps:

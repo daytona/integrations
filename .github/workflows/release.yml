@@ -57,6 +57,8 @@ jobs:
       daytona_claude_toolsets_tag: ${{ steps.release.outputs['packages/daytona-claude-toolsets--tag_name'] }}
       convex_released: ${{ steps.release.outputs['packages/convex--release_created'] }}
       convex_tag: ${{ steps.release.outputs['packages/convex--tag_name'] }}
+      claude_toolsets_released: ${{ steps.release.outputs['packages/claude-toolsets--release_created'] }}
+      claude_toolsets_tag: ${{ steps.release.outputs['packages/claude-toolsets--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -283,4 +285,32 @@ jobs:
         run: |
           npm ci
           npm run build --if-present
+          npm publish --provenance --access public
+
+  # ---- npm: @daytona/claude-toolsets (Anthropic toolset drivers) ----------
+  # npm (TypeScript) — distinct from publish-daytona-claude-toolsets (PyPI/Python).
+  publish-claude-toolsets:
+    needs: release-please
+    if: needs.release-please.outputs.claude_toolsets_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC -> npm Trusted Publishing + provenance
+      contents: read
+    # See publish-n8n for the npm environment contract (repo Settings + npm).
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org"
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+      # `npm run build` compiles src/ to the ESM-only dist/ that the package's
+      # exports map points at — nothing else ships.
+      - name: Install, build, publish
+        working-directory: packages/claude-toolsets
+        run: |
+          npm ci
+          npm run build
           npm publish --provenance --access public
