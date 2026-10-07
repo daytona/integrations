@@ -1,0 +1,1394 @@
+"""`DaytonaBrowser`: the browser toolset (`browser_toolset_20260801`) on Chromium inside a Daytona
+sandbox.
+
+Chromium runs in the sandbox; the model loop, the API key and the toolset stay in your process and
+drive it over the Chrome DevTools Protocol (CDP) with Playwright's `connect_over_cdp`, through a
+signed Daytona preview URL for the debugging port. The signed URL is bound to that one port, lives
+only long enough to connect (an established connection outlives it), and is revoked on `close()`.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import posixpath
+import re
+import secrets
+import shlex
+import time
+from collections import deque
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any, Literal, Optional, Union
+from urllib.parse import urlsplit
+
+import httpx
+from anthropic.tools import ToolError, ToolsetConfigError
+from anthropic.tools.browser import (
+    BetaAbstractBrowserToolset20260801,
+    BetaBrowserNavigateResult,
+    BetaBrowserState,
+    BetaDialogDismissed,
+    BetaLocalFilePolicy,
+    BetaNavigationRefused,
+    BetaScreenshotResult,
+    BetaToolsetCallContext,
+    BetaURLContext,
+    TabMissingError,
+    UploadRefusedError,
+)
+from anthropic.types.beta import (
+    BetaBrowserCloseTabInput,
+    BetaBrowserCoordinateTarget,
+    BetaBrowserDoubleClickInput,
+    BetaBrowserFileUploadInput,
+    BetaBrowserFindInput,
+    BetaBrowserFormInputInput,
+    BetaBrowserGetPageTextInput,
+    BetaBrowserHoldKeyInput,
+    BetaBrowserHoverInput,
+    BetaBrowserJavascriptExecInput,
+    BetaBrowserKeyInput,
+    BetaBrowserLeftClickDragInput,
+    BetaBrowserLeftClickInput,
+    BetaBrowserLeftMouseDownInput,
+    BetaBrowserLeftMouseUpInput,
+    BetaBrowserListTabsInput,
+    BetaBrowserMiddleClickInput,
+    BetaBrowserMouseMoveInput,
+    BetaBrowserNavigateInput,
+    BetaBrowserNewTabInput,
+    BetaBrowserReadConsoleInput,
+    BetaBrowserReadNetworkInput,
+    BetaBrowserReadPageInput,
+    BetaBrowserRefTarget,
+    BetaBrowserRightClickInput,
+    BetaBrowserScreenshotInput,
+    BetaBrowserScrollInput,
+    BetaBrowserScrollToInput,
+    BetaBrowserStateTabEntryParam,
+    BetaBrowserSwitchTabInput,
+    BetaBrowserTripleClickInput,
+    BetaBrowserTypeInput,
+    BetaBrowserWaitInput,
+    BetaBrowserZoomInput,
+)
+from daytona import Daytona, Sandbox, SessionExecuteRequest
+from typing_extensions import override
+
+from . import _page_js
+from ._keys import parse_chord, playwright_chord, split_sequence, PLAYWRIGHT
+from ._sandbox import CreateParams, OnClose, SandboxLease
+
+try:
+    from playwright.sync_api import (
+        Browser,
+        BrowserContext,
+        CDPSession,
+        ConsoleMessage,
+        Dialog,
+        Error as PlaywrightError,
+        Page,
+        Playwright,
+        Request,
+        Response,
+        Route,
+        TimeoutError as PlaywrightTimeoutError,
+        sync_playwright,
+    )
+except ImportError as exc:  # pragma: no cover - depends on the environment
+    raise ImportError(
+        "DaytonaBrowser needs Playwright: pip install 'daytona-toolsets[browser]'"
+    ) from exc
+
+log = logging.getLogger("daytona_toolsets")
+
+MAX_TABS = 100
+MAX_DURATION = 30.0
+MAX_REPEAT = 100
+MAX_ENTRIES = 1000
+"""Console and network entries kept per tab between reads; older ones are dropped."""
+FIND_LIMIT = 20
+WHEEL_NOTCH = 100
+"""Pixels one scroll-wheel notch moves."""
+
+SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
+OPAQUE_SCHEMES = frozenset(
+    {
+        "about", "blob", "chrome", "chrome-extension", "chrome-untrusted", "data", "devtools",
+        "file", "filesystem", "intent", "javascript", "mailto", "sms", "tel", "view-source",
+    }
+)  # fmt: skip
+"""Schemes written without `//`. With any other `x:` prefix (`localhost:3000`) the address is a
+host and port with no scheme, and opens as https."""
+
+PLAYWRIGHT_MODIFIERS = {"ctrl": "Control", "alt": "Alt", "shift": "Shift", "cmd": "Meta"}
+
+Button = Literal["left", "middle", "right"]
+
+
+def normalize_url(url: str) -> str:
+    """The address `navigate` opens: `https://` added to a bare host, and every scheme other than
+    http and https (and the empty tab, `about:blank`) refused. The SDK checks no scheme itself."""
+    # Browsers drop tabs and newlines anywhere in an address and trim C0 controls and spaces.
+    text = re.sub(r"[\t\n\r]", "", url)
+    text = re.sub(r"^[\x00-\x20]+|[\x00-\x20]+$", "", text)
+    if not text:
+        raise ToolError("navigate needs a URL, or back, forward or reload.")
+    if text.lower() == "about:blank":
+        return "about:blank"
+    match = SCHEME.match(text)
+    if match and (text[match.end() :].startswith("//") or match.group(1).lower() in OPAQUE_SCHEMES):
+        scheme = match.group(1).lower()
+    else:
+        text, scheme = f"https://{text}", "https"
+    if scheme not in ("http", "https"):
+        raise ToolError(f"navigate does not open {scheme}: URLs; use an http or https address.")
+    return text
+
+
+def failure_phrase(exc: Exception) -> str:
+    """A fixed phrase for a failed navigation: the net:: error code, never the URL or call log."""
+    code = re.search(r"net::ERR_[A-Z_]+", str(exc))
+    if code and code.group() == "net::ERR_BLOCKED_BY_CLIENT":
+        return "The navigation was refused."
+    return f"The navigation failed ({code.group()})." if code else "The navigation failed."
+
+
+def is_under(path: str, root: str) -> bool:
+    return path == root or path.startswith(root.rstrip("/") + "/")
+
+
+class DaytonaFilePolicy:
+    """A `BetaFilePolicy` for a browser in a Daytona sandbox: upload paths are paths inside the
+    sandbox, and so is the download directory.
+
+    `BetaLocalFilePolicy` judges paths on the machine running the SDK, which is not where this
+    browser reads files, so `DaytonaBrowser` refuses it. This policy admits an upload path only when
+    it is absolute and lies under one of `upload_roots` (whole components, `..` refused). The driver
+    then resolves each admitted path inside the sandbox, symlinks followed, and checks it again
+    against the roots before the browser sees it.
+
+    Args:
+        upload_roots: Directories in the sandbox that `file_upload` may read from. Keep this to one
+            dedicated directory holding only the task's files. Empty: path uploads are refused.
+        download_dir: The sandbox directory downloads are saved to (created `0700`). Outside every
+            upload root. Default: a fresh directory under `/tmp` per browser.
+        expose_download_paths: Show the model where a completed download was saved.
+    """
+
+    def __init__(
+        self,
+        *,
+        upload_roots: Sequence[str] = (),
+        download_dir: Optional[str] = None,
+        expose_download_paths: bool = False,
+    ) -> None:
+        if isinstance(upload_roots, str):
+            raise TypeError("upload_roots is a sequence of directories, not one path")
+        roots = [self._absolute(root, "upload root") for root in upload_roots]
+        if any(root == "/" for root in roots):
+            raise ValueError("an upload root cannot be the filesystem root")
+        self.upload_roots: tuple[str, ...] = tuple(roots)
+        self.download_dir = (
+            None if download_dir is None else self._absolute(download_dir, "download_dir")
+        )
+        if self.download_dir is not None and any(
+            is_under(self.download_dir, root) or is_under(root, self.download_dir) for root in roots
+        ):
+            raise ValueError("download_dir must be outside every upload root")
+        self.expose_download_paths = expose_download_paths
+
+    @staticmethod
+    def _absolute(path: str, what: str) -> str:
+        if not path or not path.startswith("/"):
+            raise ValueError(f"{what} must be an absolute path in the sandbox")
+        return posixpath.normpath(path)
+
+    def resolve_upload_paths(self, context: BetaURLContext, paths: Sequence[str]) -> list[str]:
+        if not self.upload_roots:
+            raise UploadRefusedError("File uploads by path are not enabled for this browser.")
+        resolved = []
+        for path in paths:
+            if not path.startswith("/") or ".." in path.split("/"):
+                raise UploadRefusedError(
+                    "An upload path must be an absolute path in the upload directory."
+                )
+            normal = posixpath.normpath(path)
+            if not any(is_under(normal, root) for root in self.upload_roots):
+                raise UploadRefusedError("An upload path is outside the upload directory.")
+            resolved.append(normal)
+        return resolved
+
+    def resolve_upload_documents(
+        self, context: BetaURLContext, document_ids: Sequence[str]
+    ) -> list[str]:
+        raise UploadRefusedError(
+            "This browser runs in a Daytona sandbox and cannot upload Files API documents; put the "
+            "file in the upload directory and upload it by path."
+        )
+
+    def is_path_visible(self, path: str) -> bool:
+        return bool(
+            self.expose_download_paths
+            and self.download_dir is not None
+            and is_under(posixpath.normpath(path), self.download_dir)
+        )
+
+
+@dataclass
+class _Tab:
+    id: str
+    page: Page
+    cdp: Optional[CDPSession] = None
+    target_id: Optional[str] = None
+    world: Optional[int] = None
+    """The execution context id of the driver's isolated world in the current document."""
+    title: str = ""
+    console: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_ENTRIES))
+    network: dict[Request, dict[str, Any]] = field(default_factory=dict)
+    dropped_console: int = 0
+    dropped_network: int = 0
+
+
+class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
+    """The browser toolset, driving Chromium inside a Daytona sandbox over CDP.
+
+    Pass an existing `sandbox` (never stopped or deleted; the Chromium the driver started in it is
+    stopped on `close()`), or leave it out and the driver creates one from `create_params`
+    (Daytona's default snapshot, which ships Chromium) and deletes it on `close()`, or stops it with
+    `on_close="stop"`.
+
+    Keyword arguments not listed here are the SDK's toolset options (`url_policy`, `file_policy`,
+    `confirm`, `configs`, `tool_configs`) and are passed on unchanged. A `url_policy` is also applied
+    to every request the pages make (`member=None`); a page-started navigation it refuses reaches the
+    model as a refused navigation. `file_policy` must be a `DaytonaFilePolicy` or your own
+    `BetaFilePolicy` for sandbox paths: `BetaLocalFilePolicy` is refused.
+
+    Use it from one thread: Playwright's sync API is bound to the thread that started it, and cannot
+    run inside an asyncio event loop.
+
+    Args:
+        sandbox: A running Daytona sandbox with Chromium on `PATH` (Daytona's default snapshot).
+        daytona: The client used to create a sandbox; `Daytona()` when omitted.
+        create_params: How to create the sandbox when none is passed. Its `domain_allow_list` /
+            `network_allow_list` / `network_block_all` are the browser's egress policy.
+        on_close: What `close()` does to a sandbox the driver created: `"delete"` or `"stop"`.
+        viewport: The page size in CSS pixels, which is also the screenshot size (at most
+            1920x1200, inside the API's image limits).
+        headless: Run Chromium headless. `False` shows it on the sandbox desktop (VNC).
+        chromium: The Chromium binary in the sandbox.
+        navigation_timeout: Seconds `navigate` waits for the new document.
+        settle_delay: Seconds an input waits for the page to react before the call returns.
+    """
+
+    def __init__(
+        self,
+        sandbox: Optional[Sandbox] = None,
+        *,
+        daytona: Optional[Daytona] = None,
+        create_params: Optional[CreateParams] = None,
+        on_close: OnClose = "delete",
+        viewport: tuple[int, int] = (1280, 800),
+        headless: bool = True,
+        chromium: str = "chromium",
+        navigation_timeout: float = 30.0,
+        settle_delay: float = 0.3,
+        create_timeout: float = 120,
+        **options: Any,
+    ) -> None:
+        if isinstance(options.get("file_policy"), BetaLocalFilePolicy):
+            raise ToolsetConfigError(
+                "BetaLocalFilePolicy checks paths on this machine, but the browser runs in a Daytona "
+                "sandbox; pass a DaytonaFilePolicy"
+            )
+        width, height = viewport
+        if not (0 < width <= 1920 and 0 < height <= 1200):
+            raise ValueError("viewport must be at most 1920x1200 (screenshots are the viewport)")
+        # Kept for request interception, which applies the same policy to what pages request.
+        self._url_policy = options.get("url_policy")
+        self._has_url_policy = "url_policy" in options
+        super().__init__(**options)
+
+        policy = options.get("file_policy")
+        self._file_policy = policy if isinstance(policy, DaytonaFilePolicy) else None
+        self._viewport = viewport
+        self._navigation_ms = navigation_timeout * 1000
+        self._settle_ms = settle_delay * 1000
+        self._lease: Optional[SandboxLease] = None
+        self._playwright: Optional[Playwright] = None
+        self._browser: Optional[Browser] = None
+        self._context: Optional[BrowserContext] = None
+        self._browser_cdp: Optional[CDPSession] = None
+        self._signed: Optional[tuple[int, str]] = None
+        self._session_id = f"daytona-toolsets-{secrets.token_hex(4)}"
+        self._profile = f"/tmp/{self._session_id}-profile"
+        self._download_dir = (
+            self._file_policy.download_dir
+            if self._file_policy is not None and self._file_policy.download_dir
+            else f"/tmp/{self._session_id}-downloads"
+        )
+        self._tabs: dict[str, _Tab] = {}
+        self._by_page: dict[Page, str] = {}
+        self._recent: list[str] = []
+        """Tab ids, most recently active last."""
+        self._active: Optional[str] = None
+        self._next_tab = 1
+        self._changes: list[Any] = []
+        self._downloads: dict[str, str] = {}
+        self._navigating = False
+        self._disconnected = False
+        try:
+            self._lease = SandboxLease.acquire(
+                sandbox,
+                daytona=daytona,
+                create_params=create_params,
+                default_env={},
+                on_close=on_close,
+                create_timeout=create_timeout,
+            )
+            port = self._launch(chromium, headless)
+            self._connect(port)
+        except BaseException:
+            self.close()
+            raise
+
+    @property
+    def sandbox(self) -> Sandbox:
+        """The sandbox Chromium runs in."""
+        if self._lease is None:
+            raise RuntimeError("this DaytonaBrowser is closed")
+        return self._lease.sandbox
+
+    @property
+    def download_dir(self) -> str:
+        """Where downloads are saved, inside the sandbox."""
+        return self._download_dir
+
+    @override
+    def close(self) -> None:
+        """Disconnect, stop Chromium and release the sandbox: delete (or stop) it if the driver
+        created it. Safe to call more than once, and after a failed construction."""
+        super().close()
+        browser, self._browser = self._browser, None
+        playwright, self._playwright = self._playwright, None
+        self._context = self._browser_cdp = None
+        for step in (
+            (lambda: browser.close()) if browser is not None else None,
+            (lambda: playwright.stop()) if playwright is not None else None,
+        ):
+            if step is not None:
+                try:
+                    step()
+                except Exception as exc:  # the connection may be gone already
+                    log.debug("browser close step failed: %s", type(exc).__name__)
+        lease, self._lease = self._lease, None
+        if lease is None:
+            return
+        signed, self._signed = self._signed, None
+        if signed is not None:
+            try:
+                lease.sandbox.expire_signed_preview_url(signed[0], signed[1])
+            except Exception as exc:
+                log.debug("could not revoke the preview URL: %s", type(exc).__name__)
+        if not lease.owned:
+            try:
+                lease.sandbox.process.exec(
+                    f"pkill -f -- {shlex.quote('--user-data-dir=' + self._profile)}; "
+                    f"rm -rf -- {shlex.quote(self._profile)}"
+                )
+                lease.sandbox.process.delete_session(self._session_id)
+            except Exception as exc:
+                log.debug("could not stop Chromium in the sandbox: %s", type(exc).__name__)
+        lease.release()
+
+    # --- setup -----------------------------------------------------------------------------------
+
+    def _launch(self, chromium: str, headless: bool) -> int:
+        """Start Chromium in the sandbox with a fresh profile and a scrubbed environment, and return
+        its debugging port (loopback only inside the sandbox)."""
+        sandbox = self.sandbox
+        if str(getattr(sandbox.state, "value", sandbox.state)) != "started":
+            sandbox.start()
+        if not headless:
+            computer_use = sandbox.computer_use
+            if computer_use.get_status().status != "active":
+                computer_use.start()
+        port = 20000 + secrets.randbelow(20000)
+        width, height = self._viewport
+        is_root = sandbox.process.exec("id -u").result.strip() == "0"
+        flags = [
+            *(["--headless=new"] if headless else []),
+            f"--remote-debugging-port={port}",
+            f"--user-data-dir={self._profile}",
+            f"--window-size={width},{height}",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-background-networking",
+            "--disable-component-update",
+            "--disable-default-apps",
+            "--disable-extensions",
+            "--disable-sync",
+            "--password-store=basic",
+            "--enable-features=LocalNetworkAccessChecks",
+            # Pages restored from the back-forward cache fire no load events to wait for.
+            "--disable-features=BackForwardCache",
+            # Chromium's sandbox cannot start as root; the Daytona sandbox is then the isolation.
+            *(["--no-sandbox"] if is_root else []),
+            "about:blank",
+        ]
+        env = ["HOME=" + self._profile, "PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8"]
+        if not headless:
+            env.append("DISPLAY=:0")
+        dirs = " ".join(shlex.quote(d) for d in (self._profile, self._download_dir))
+        sandbox.process.exec(f"mkdir -p -m 700 {dirs}")
+        command = (
+            f"env -i {' '.join(shlex.quote(e) for e in env)} {shlex.quote(chromium)} "
+            f"{' '.join(shlex.quote(f) for f in flags)} >{shlex.quote(self._profile)}/chromium.log 2>&1"
+        )
+        sandbox.process.create_session(self._session_id)
+        sandbox.process.execute_session_command(
+            self._session_id, SessionExecuteRequest(command=command, run_async=True)
+        )
+        deadline = time.monotonic() + 30
+        probe = f"curl -sf -o /dev/null http://127.0.0.1:{port}/json/version"
+        while sandbox.process.exec(probe).exit_code != 0:
+            if time.monotonic() > deadline:
+                raise RuntimeError(
+                    f"Chromium did not start in the sandbox; see {self._profile}/chromium.log there"
+                )
+            time.sleep(0.5)
+        return port
+
+    def _connect(self, port: int) -> None:
+        """Connect Playwright over a signed preview URL for the debugging port, then open the first
+        tab in a fresh browser context."""
+        signed = self.sandbox.create_signed_preview_url(port, expires_in_seconds=120)
+        self._signed = (port, signed.token)
+        try:
+            base = signed.url.rstrip("/")
+            version = httpx.get(f"{base}/json/version", timeout=30).raise_for_status().json()
+            path = urlsplit(str(version["webSocketDebuggerUrl"])).path
+            self._playwright = sync_playwright().start()
+            browser = self._playwright.chromium.connect_over_cdp(
+                "wss://" + urlsplit(base).netloc + path, timeout=30000
+            )
+        except Exception:
+            # The signed URL is a credential: its text stays out of the error and the traceback.
+            raise RuntimeError("could not connect to Chromium in the sandbox over CDP") from None
+        self._browser = browser
+        browser.on("disconnected", lambda _browser: self._on_disconnected())
+        width, height = self._viewport
+        context = browser.new_context(
+            viewport={"width": width, "height": height},
+            service_workers="block",  # service-worker requests would bypass request interception
+            accept_downloads=True,
+        )
+        self._context = context
+        context.on("page", self._on_page)
+        context.on("dialog", self._on_dialog)
+        context.on("console", self._on_console)
+        context.on(
+            "weberror", lambda error: self._log_console(error.page, f"[error] {error.error}")
+        )
+        context.on("request", self._on_request)
+        context.on("response", self._on_response)
+        context.on("requestfinished", lambda request: self._finish_request(request, None))
+        context.on("requestfailed", lambda request: self._finish_request(request, request.failure))
+        if self._has_url_policy:
+            context.route("**/*", self._guard)
+        page = context.new_page()
+        self._on_page(page)
+        tab = self._tabs[self._by_page[page]]
+        info = self._cdp(tab).send("Target.getTargetInfo")["targetInfo"]
+        browser_cdp = browser.new_browser_cdp_session()
+        self._browser_cdp = browser_cdp
+        browser_cdp.on("Browser.downloadWillBegin", self._on_download_begin)
+        browser_cdp.on("Browser.downloadProgress", self._on_download_progress)
+        # Downloads land in the sandbox, reported through this session's events: Playwright's own
+        # download objects cannot reach a file on a remote browser.
+        browser_cdp.send(
+            "Browser.setDownloadBehavior",
+            {
+                "behavior": "allowAndName",
+                "browserContextId": info["browserContextId"],
+                "downloadPath": self._download_dir,
+                "eventsEnabled": True,
+            },
+        )
+        self._changes.clear()  # the first tab was not opened by a call
+
+    # --- events (they run while Playwright waits on the network) ---------------------------------
+
+    def _on_page(self, page: Page) -> None:
+        if page in self._by_page:
+            return
+        if len(self._tabs) >= MAX_TABS:
+            try:
+                page.close()
+            except PlaywrightError:
+                pass
+            return
+        tab_id = f"tab_{self._next_tab}"
+        self._next_tab += 1
+        self._tabs[tab_id] = _Tab(id=tab_id, page=page)
+        self._by_page[page] = tab_id
+        page.on("close", self._forget)
+        self._changes.append({"type": "tab_opened", "tab_id": tab_id})
+        self._activate(tab_id)  # a new tab or popup takes focus, as in a desktop browser
+
+    def _forget(self, page: Page) -> None:
+        tab_id = self._by_page.pop(page, None)
+        if tab_id is None:
+            return
+        self._tabs.pop(tab_id, None)
+        if tab_id in self._recent:
+            self._recent.remove(tab_id)
+        if self._active == tab_id:
+            self._active = self._recent[-1] if self._recent else None
+
+    def _activate(self, tab_id: str) -> None:
+        if tab_id in self._recent:
+            self._recent.remove(tab_id)
+        self._recent.append(tab_id)
+        self._active = tab_id
+
+    def _on_disconnected(self) -> None:
+        self._disconnected = True
+
+    def _on_dialog(self, dialog: Dialog) -> None:
+        """Dismiss every native dialog so none hangs the tab, and tell the model the page asked. A
+        `beforeunload` prompt is accepted instead, so the navigation or close the model asked for
+        goes ahead."""
+        try:
+            if dialog.type == "beforeunload":
+                dialog.accept()
+                return
+            self._changes.append(BetaDialogDismissed(kind=dialog.type, message=dialog.message))
+            dialog.dismiss()
+        except PlaywrightError as exc:  # the page went away first
+            log.debug("dialog handling failed: %s", type(exc).__name__)
+
+    def _tab_of(self, page: Optional[Page]) -> Optional[_Tab]:
+        tab_id = self._by_page.get(page) if page is not None else None
+        return self._tabs.get(tab_id) if tab_id is not None else None
+
+    def _log_console(self, page: Optional[Page], line: str) -> None:
+        tab = self._tab_of(page)
+        if tab is None:
+            return
+        if len(tab.console) == tab.console.maxlen:
+            tab.dropped_console += 1
+        tab.console.append(line[:2000])
+
+    def _on_console(self, message: ConsoleMessage) -> None:
+        self._log_console(message.page, f"[{message.type}] {message.text}")
+
+    def _request_tab(self, request: Request) -> Optional[_Tab]:
+        try:
+            return self._tab_of(request.frame.page)
+        except PlaywrightError:  # a service worker's request has no frame
+            return None
+
+    def _on_request(self, request: Request) -> None:
+        tab = self._request_tab(request)
+        if tab is None:
+            return
+        if len(tab.network) >= MAX_ENTRIES:
+            tab.network.pop(next(iter(tab.network)))
+            tab.dropped_network += 1
+        tab.network[request] = {"method": request.method, "url": request.url, "status": "pending"}
+
+    def _on_response(self, response: Response) -> None:
+        tab = self._request_tab(response.request)
+        entry = tab.network.get(response.request) if tab is not None else None
+        if entry is not None:
+            entry["status"] = str(response.status)
+            entry["type"] = response.headers.get("content-type", "").split(";")[0]
+
+    def _finish_request(self, request: Request, failure: Optional[str]) -> None:
+        tab = self._request_tab(request)
+        entry = tab.network.get(request) if tab is not None else None
+        if entry is None:
+            return
+        if failure is not None:
+            entry["status"] = f"failed ({failure})"
+        end = request.timing.get("responseEnd", -1)
+        if end >= 0:
+            entry["ms"] = round(end)
+
+    def _guard(self, route: Route) -> None:
+        """Request interception: the URL policy applied to every request a page makes."""
+        request = route.request
+        tab = self._request_tab(request)
+        refused = False
+        try:
+            policy = self._url_policy
+            if policy is None:
+                refused = True  # url_policy=None refuses everything, as the SDK treats navigate
+            else:
+                policy(BetaURLContext(member=None, tab_id=tab.id if tab else None), request.url)
+        except ToolError:
+            refused = True
+        except Exception as exc:  # the policy failed: fail closed
+            log.warning("url_policy raised %s on a page request; refused it", type(exc).__name__)
+            refused = True
+        try:
+            if not refused:
+                route.continue_()
+                return
+            route.abort("blockedbyclient")
+        except PlaywrightError:
+            return  # the page went away meanwhile
+        try:
+            top_level = request.is_navigation_request() and request.frame.parent_frame is None
+        except PlaywrightError:
+            top_level = False
+        if top_level and not self._navigating:
+            self._changes.append(BetaNavigationRefused())
+
+    def _on_download_begin(self, event: dict[str, Any]) -> None:
+        guid, url = str(event.get("guid", "")), str(event.get("url", ""))
+        self._downloads[guid] = url
+        self._changes.append({"type": "download_started", "download_id": guid, "url": url})
+
+    def _on_download_progress(self, event: dict[str, Any]) -> None:
+        guid = str(event.get("guid", ""))
+        state = event.get("state")
+        if guid not in self._downloads or state == "inProgress":
+            return
+        url = self._downloads.pop(guid)
+        if state == "completed":
+            self._changes.append(
+                {
+                    "type": "download_completed",
+                    "download_id": guid,
+                    "url": url,
+                    "path": posixpath.join(self._download_dir, guid),
+                    "size_bytes": int(event.get("receivedBytes") or 0),
+                }
+            )
+        else:
+            self._changes.append(
+                {
+                    "type": "download_failed",
+                    "download_id": guid,
+                    "url": url,
+                    "error": "The download was cancelled or failed.",
+                }
+            )
+
+    # --- helpers ---------------------------------------------------------------------------------
+
+    def _tab(self, tab_id: Optional[str]) -> _Tab:
+        if self._disconnected or self._context is None:
+            raise ToolError("The browser in the sandbox is no longer connected.")
+        if tab_id is None:
+            if self._active is None:
+                raise ToolError("No tab is open; open one with new_tab.")
+            tab_id = self._active
+        tab = self._tabs.get(tab_id)
+        if tab is None:
+            raise TabMissingError()
+        return tab
+
+    def _cdp(self, tab: _Tab) -> CDPSession:
+        if tab.cdp is None:
+            assert self._context is not None
+            tab.cdp = self._context.new_cdp_session(tab.page)
+        return tab.cdp
+
+    def _target_id(self, tab: _Tab) -> str:
+        if tab.target_id is None:
+            tab.target_id = str(
+                self._cdp(tab).send("Target.getTargetInfo")["targetInfo"]["targetId"]
+            )
+        return tab.target_id
+
+    def _in_world(self, tab: _Tab, function: str, *args: object, by_value: bool = True) -> Any:
+        """Call the driver's in-page toolkit in its isolated world, creating the world (and
+        installing the toolkit) for a new document."""
+        cdp = self._cdp(tab)
+        for attempt in range(2):
+            if tab.world is None:
+                frame_id = cdp.send("Page.getFrameTree")["frameTree"]["frame"]["id"]
+                tab.world = int(
+                    cdp.send(
+                        "Page.createIsolatedWorld",
+                        {"frameId": frame_id, "worldName": "daytona-toolsets"},
+                    )["executionContextId"]
+                )
+                cdp.send(
+                    "Runtime.evaluate", {"expression": _page_js.TOOLKIT, "contextId": tab.world}
+                )
+            try:
+                result = cdp.send(
+                    "Runtime.evaluate",
+                    {
+                        "expression": _page_js.call(function, *args),
+                        "contextId": tab.world,
+                        "returnByValue": by_value,
+                    },
+                )
+            except PlaywrightError as exc:
+                if attempt == 0 and "context" in str(exc).lower():
+                    tab.world = None  # the document changed: a fresh world for the new one
+                    continue
+                raise
+            if "exceptionDetails" in result:
+                if attempt == 0:
+                    tab.world = None
+                    continue
+                raise ToolError("The page could not be read.")
+            remote = result["result"]
+            return remote.get("value") if by_value else remote
+        raise ToolError("The page could not be read.")
+
+    def _stale(self, ref: str) -> ToolError:
+        return ToolError(f"Unknown or stale ref {ref}; call read_page or find for current refs.")
+
+    def _point(
+        self, tab: _Tab, target: Union[BetaBrowserCoordinateTarget, BetaBrowserRefTarget]
+    ) -> tuple[float, float]:
+        """A target as a viewport point: a coordinate, checked against the viewport, or the centre
+        of a referenced element, scrolled into view."""
+        if isinstance(target, BetaBrowserRefTarget):
+            result = self._in_world(tab, "center", target.ref) or {}
+            if result.get("error") == "invisible":
+                raise ToolError(f"The element {target.ref} is not visible.")
+            if "x" not in result:
+                raise self._stale(target.ref)
+            return float(result["x"]), float(result["y"])
+        width, height = self._viewport
+        if not (0 <= target.x < width and 0 <= target.y < height):
+            raise ToolError(f"({target.x}, {target.y}) is outside the {width}x{height} viewport.")
+        return float(target.x), float(target.y)
+
+    def _modifiers(self, text: Optional[str]) -> list[str]:
+        if not text:
+            return []
+        modifiers, token = parse_chord(text.strip())
+        if token is not None:
+            raise ToolError("modifiers takes modifier keys only, such as shift or ctrl+shift.")
+        return [PLAYWRIGHT_MODIFIERS[modifier] for modifier in modifiers]
+
+    def _settle(self, tab: _Tab) -> None:
+        # Waited on the page, not with time.sleep, so dialogs and popups are handled meanwhile.
+        try:
+            tab.page.wait_for_timeout(self._settle_ms)
+        except PlaywrightError:
+            pass  # the action closed the tab
+
+    def _click(
+        self,
+        tab_id: Optional[str],
+        target: Union[BetaBrowserCoordinateTarget, BetaBrowserRefTarget],
+        modifiers: Optional[str],
+        button: Button = "left",
+        count: int = 1,
+    ) -> None:
+        tab = self._tab(tab_id)
+        held = self._modifiers(modifiers)
+        x, y = self._point(tab, target)
+        keyboard = tab.page.keyboard
+        for key in held:
+            keyboard.down(key)
+        try:
+            tab.page.mouse.click(x, y, button=button, click_count=count)
+        finally:
+            for key in reversed(held):
+                keyboard.up(key)
+        self._settle(tab)
+
+    def _screenshot(
+        self, tab: _Tab, clip: Optional[dict[str, float]] = None
+    ) -> BetaScreenshotResult:
+        params: dict[str, Any] = {"format": "png"}
+        if clip is not None:
+            params["clip"] = clip
+        data = self._cdp(tab).send("Page.captureScreenshot", params)["data"]
+        return BetaScreenshotResult(data=str(data), media_type="image/png")
+
+    def _entry(
+        self, tab: _Tab, titles: dict[str, tuple[str, str]]
+    ) -> BetaBrowserStateTabEntryParam:
+        url = tab.page.url
+        title = tab.title
+        if tab.target_id is not None and tab.target_id in titles:
+            title, url = titles[tab.target_id]
+            tab.title = title
+        return {"tab_id": tab.id, "title": title, "url": url, "active": tab.id == self._active}
+
+    def _targets(self) -> dict[str, tuple[str, str]]:
+        """Every page's title and URL in one CDP round trip."""
+        if self._browser_cdp is None or self._disconnected:
+            return {}
+        infos = self._browser_cdp.send("Target.getTargets")["targetInfos"]
+        return {
+            str(info["targetId"]): (str(info.get("title", "")), str(info.get("url", "")))
+            for info in infos
+            if info.get("type") == "page"
+        }
+
+    # --- browser state ---------------------------------------------------------------------------
+
+    @override
+    def _browser_state(self, context: BetaToolsetCallContext) -> BetaBrowserState:
+        """Every open tab, exactly one active, and the changes since the last report. Never raises:
+        a browser that stopped answering is reported from what the driver last knew."""
+        try:
+            for tab in list(self._tabs.values()):
+                if tab.target_id is None and not self._disconnected:
+                    self._target_id(tab)
+            titles = self._targets()
+        except Exception as exc:
+            log.debug("could not read the tab titles: %s", type(exc).__name__)
+            titles = {}
+        if self._active not in self._tabs:
+            self._active = self._recent[-1] if self._recent else next(iter(self._tabs), None)
+        tabs = [self._entry(tab, titles) for tab in list(self._tabs.values())[:MAX_TABS]]
+        # Drained last: events (a popup's tab_opened) arrive during the round trips above, and a
+        # change must go out with the first report whose tabs include what it describes.
+        changes, self._changes = self._changes, []
+        return BetaBrowserState(tabs=tabs, state_changes=changes)
+
+    # --- navigation ------------------------------------------------------------------------------
+
+    @override
+    def navigate(
+        self, context: BetaToolsetCallContext, input: BetaBrowserNavigateInput
+    ) -> BetaBrowserNavigateResult:
+        tab = self._tab(input.tab_id)
+        page = tab.page
+        before = page.url
+        self._navigating = True
+        try:
+            if input.url in ("back", "forward", "reload"):
+                history = {"back": page.go_back, "forward": page.go_forward, "reload": page.reload}
+                # Wait for the commit, then for the document: a history entry can be restored
+                # without a new DOMContentLoaded.
+                response = history[input.url](wait_until="commit", timeout=self._navigation_ms)
+                if response is None and input.url != "reload" and page.url == before:
+                    raise ToolError(f"There is no page to go {input.url} to.")
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=self._navigation_ms)
+                except PlaywrightTimeoutError:
+                    pass  # committed; the model reads the page as it is
+            else:
+                response = page.goto(
+                    normalize_url(input.url),
+                    wait_until="domcontentloaded",
+                    timeout=self._navigation_ms,
+                )
+        except PlaywrightTimeoutError:
+            raise ToolError(
+                f"The page did not load within {self._navigation_ms / 1000:g} seconds."
+            ) from None
+        except PlaywrightError as exc:
+            if "Download is starting" not in str(exc):
+                raise ToolError(failure_phrase(exc)) from None
+            response = None  # the address is a download, reported in the browser state
+        finally:
+            self._navigating = False
+        tab.world = None
+        return BetaBrowserNavigateResult(
+            url=page.url,
+            status=response.status if response is not None else None,
+            title=(safe_title(page) or None),
+        )
+
+    # --- seeing ----------------------------------------------------------------------------------
+
+    @override
+    def screenshot(
+        self, context: BetaToolsetCallContext, input: BetaBrowserScreenshotInput
+    ) -> BetaScreenshotResult:
+        return self._screenshot(self._tab(input.tab_id))
+
+    @override
+    def zoom(
+        self, context: BetaToolsetCallContext, input: BetaBrowserZoomInput
+    ) -> BetaScreenshotResult:
+        tab = self._tab(input.tab_id)
+        x0, y0, x1, y1 = input.region
+        width, height = self._viewport
+        if not (0 <= x0 < x1 <= width and 0 <= y0 < y1 <= height):
+            raise ToolError(
+                f"region must satisfy 0 <= x0 < x1 <= {width} and 0 <= y0 < y1 <= {height} "
+                "(viewport pixels)."
+            )
+        # Rendered at a higher scale rather than upscaled, so the detail is real. CDP clips in
+        # document coordinates, so the scroll offset is added.
+        scroll = tab.page.evaluate("[window.scrollX, window.scrollY]")
+        scale = min(width / (x1 - x0), height / (y1 - y0), 8.0)
+        clip = {
+            "x": x0 + float(scroll[0]),
+            "y": y0 + float(scroll[1]),
+            "width": float(x1 - x0),
+            "height": float(y1 - y0),
+            "scale": scale,
+        }
+        return self._screenshot(tab, clip)
+
+    @override
+    def read_page(self, context: BetaToolsetCallContext, input: BetaBrowserReadPageInput) -> str:
+        tab = self._tab(input.tab_id)
+        depth = 15 if input.depth is None else input.depth
+        if depth < 1:
+            raise ToolError("depth must be at least 1.")
+        options = {
+            "ref": input.ref,
+            "depth": depth,
+            "all": input.filter == "all",
+            "interactive": input.filter == "interactive",
+        }
+        result = self._in_world(tab, "readPage", options) or {}
+        if result.get("error") == "stale" and input.ref:
+            raise self._stale(input.ref)
+        return str(result.get("text", ""))
+
+    @override
+    def find(self, context: BetaToolsetCallContext, input: BetaBrowserFindInput) -> str:
+        """Keyword matching over the page's elements (their role, name and attributes), not a
+        semantic search: this driver has no model of its own."""
+        tab = self._tab(input.tab_id)
+        candidates = self._in_world(tab, "candidates") or []
+        matches = rank(input.query, candidates)[:FIND_LIMIT]
+        if not matches:
+            return f"No element matched {json.dumps(input.query)}. Try read_page."
+        return "\n".join(str(candidate["line"]) for candidate in matches)
+
+    @override
+    def get_page_text(
+        self, context: BetaToolsetCallContext, input: BetaBrowserGetPageTextInput
+    ) -> str:
+        return str(self._in_world(self._tab(input.tab_id), "pageText") or "")
+
+    @override
+    def read_console(
+        self, context: BetaToolsetCallContext, input: BetaBrowserReadConsoleInput
+    ) -> str:
+        tab = self._tab(input.tab_id)
+        lines = list(tab.console)
+        if tab.dropped_console:
+            lines.insert(0, f"[{tab.dropped_console} earlier entries were dropped]")
+        tab.console.clear()
+        tab.dropped_console = 0
+        return "\n".join(lines)
+
+    @override
+    def read_network(
+        self, context: BetaToolsetCallContext, input: BetaBrowserReadNetworkInput
+    ) -> str:
+        tab = self._tab(input.tab_id)
+        lines = [
+            " ".join(
+                part
+                for part in (
+                    entry["method"],
+                    entry["status"],
+                    entry.get("type", ""),
+                    f"{entry['ms']}ms" if "ms" in entry else "",
+                    entry["url"],
+                )
+                if part
+            )
+            for entry in tab.network.values()
+        ]
+        if tab.dropped_network:
+            lines.insert(0, f"[{tab.dropped_network} earlier requests were dropped]")
+        tab.network = {r: e for r, e in tab.network.items() if e["status"] == "pending"}
+        tab.dropped_network = 0
+        return "\n".join(lines)
+
+    @override
+    def javascript_exec(
+        self, context: BetaToolsetCallContext, input: BetaBrowserJavascriptExecInput
+    ) -> str:
+        """Runs in the page's own world (its globals and variables), stopped after 10 seconds."""
+        tab = self._tab(input.tab_id)
+        result = self._cdp(tab).send(
+            "Runtime.evaluate",
+            {
+                "expression": input.text,
+                "returnByValue": True,
+                "awaitPromise": True,
+                "userGesture": True,
+                "replMode": True,
+                "timeout": 10000,
+            },
+        )
+        details = result.get("exceptionDetails")
+        if details:
+            description = str(
+                (details.get("exception") or {}).get("description") or details.get("text") or ""
+            )
+            if "terminated" in description.lower():
+                raise ToolError("The script did not finish within 10 seconds.")
+            raise ToolError(f"The script threw: {description[:2000]}")
+        return format_remote(result.get("result") or {})
+
+    # --- mouse -----------------------------------------------------------------------------------
+
+    @override
+    def left_click(self, context: BetaToolsetCallContext, input: BetaBrowserLeftClickInput) -> None:
+        self._click(input.tab_id, input.target, input.modifiers)
+
+    @override
+    def right_click(
+        self, context: BetaToolsetCallContext, input: BetaBrowserRightClickInput
+    ) -> None:
+        self._click(input.tab_id, input.target, input.modifiers, "right")
+
+    @override
+    def middle_click(
+        self, context: BetaToolsetCallContext, input: BetaBrowserMiddleClickInput
+    ) -> None:
+        self._click(input.tab_id, input.target, input.modifiers, "middle")
+
+    @override
+    def double_click(
+        self, context: BetaToolsetCallContext, input: BetaBrowserDoubleClickInput
+    ) -> None:
+        self._click(input.tab_id, input.target, input.modifiers, count=2)
+
+    @override
+    def triple_click(
+        self, context: BetaToolsetCallContext, input: BetaBrowserTripleClickInput
+    ) -> None:
+        self._click(input.tab_id, input.target, input.modifiers, count=3)
+
+    @override
+    def hover(self, context: BetaToolsetCallContext, input: BetaBrowserHoverInput) -> None:
+        tab = self._tab(input.tab_id)
+        x, y = self._point(tab, input.target)
+        tab.page.mouse.move(x, y)
+        self._settle(tab)
+
+    @override
+    def mouse_move(self, context: BetaToolsetCallContext, input: BetaBrowserMouseMoveInput) -> None:
+        tab = self._tab(input.tab_id)
+        tab.page.mouse.move(*self._point(tab, input.target))
+
+    @override
+    def left_mouse_down(
+        self, context: BetaToolsetCallContext, input: BetaBrowserLeftMouseDownInput
+    ) -> None:
+        tab = self._tab(input.tab_id)
+        tab.page.mouse.move(*self._point(tab, input.target))
+        tab.page.mouse.down()
+
+    @override
+    def left_mouse_up(
+        self, context: BetaToolsetCallContext, input: BetaBrowserLeftMouseUpInput
+    ) -> None:
+        tab = self._tab(input.tab_id)
+        tab.page.mouse.move(*self._point(tab, input.target))
+        tab.page.mouse.up()
+        self._settle(tab)
+
+    @override
+    def left_click_drag(
+        self, context: BetaToolsetCallContext, input: BetaBrowserLeftClickDragInput
+    ) -> None:
+        tab = self._tab(input.tab_id)
+        start = self._point(tab, input.from_)
+        end = self._point(tab, input.target)
+        mouse = tab.page.mouse
+        mouse.move(*start)
+        mouse.down()
+        mouse.move(*end, steps=10)
+        mouse.up()
+        self._settle(tab)
+
+    @override
+    def scroll(self, context: BetaToolsetCallContext, input: BetaBrowserScrollInput) -> None:
+        tab = self._tab(input.tab_id)
+        amount = 3 if input.scroll_amount is None else input.scroll_amount
+        if not 1 <= amount <= 10:
+            raise ToolError("scroll_amount must be between 1 and 10.")
+        x, y = self._point(tab, input.target)
+        distance = amount * WHEEL_NOTCH
+        dx, dy = {
+            "up": (0, -distance),
+            "down": (0, distance),
+            "left": (-distance, 0),
+            "right": (distance, 0),
+        }[input.scroll_direction]
+        tab.page.mouse.move(x, y)
+        tab.page.mouse.wheel(dx, dy)
+        self._settle(tab)
+
+    @override
+    def scroll_to(self, context: BetaToolsetCallContext, input: BetaBrowserScrollToInput) -> None:
+        tab = self._tab(input.tab_id)
+        result = self._in_world(tab, "scrollTo", input.target.ref) or {}
+        if result.get("error"):
+            raise self._stale(input.target.ref)
+
+    # --- keyboard and forms ----------------------------------------------------------------------
+
+    @override
+    def type(self, context: BetaToolsetCallContext, input: BetaBrowserTypeInput) -> None:
+        tab = self._tab(input.tab_id)
+        tab.page.keyboard.type(input.text)
+        self._settle(tab)
+
+    @override
+    def key(self, context: BetaToolsetCallContext, input: BetaBrowserKeyInput) -> None:
+        tab = self._tab(input.tab_id)
+        repeat = 1 if input.repeat is None else input.repeat
+        if not 1 <= repeat <= MAX_REPEAT:
+            raise ToolError(f"repeat must be between 1 and {MAX_REPEAT}.")
+        chords = [playwright_chord(chord) for chord in split_sequence(input.text)]
+        for _ in range(repeat):
+            for chord in chords:
+                try:
+                    tab.page.keyboard.press(chord)
+                except PlaywrightError as exc:
+                    if "Unknown key" in str(exc):
+                        raise ToolError(
+                            f"Unknown key in {chord!r}; use a key name such as Return, Tab or "
+                            "Page_Up, or a single character."
+                        ) from None
+                    raise
+        self._settle(tab)
+
+    @override
+    def hold_key(self, context: BetaToolsetCallContext, input: BetaBrowserHoldKeyInput) -> None:
+        tab = self._tab(input.tab_id)
+        if not 0 <= input.duration <= MAX_DURATION:
+            raise ToolError(f"duration must be between 0 and {MAX_DURATION:g} seconds.")
+        chords = split_sequence(input.text)
+        if len(chords) != 1:
+            raise ToolError("hold_key holds one key or chord, such as shift or ctrl+a.")
+        modifiers, token = parse_chord(chords[0])
+        keys = [PLAYWRIGHT[modifier] for modifier in modifiers]
+        if token is not None:
+            keys.append(playwright_chord(token))
+        keyboard = tab.page.keyboard
+        pressed: list[str] = []
+        try:
+            for key in keys:
+                keyboard.down(key)
+                pressed.append(key)
+            tab.page.wait_for_timeout(input.duration * 1000)
+        except PlaywrightError as exc:
+            if "Unknown key" in str(exc):
+                raise ToolError(f"Unknown key in {chords[0]!r}.") from None
+            raise
+        finally:
+            for key in reversed(pressed):
+                keyboard.up(key)
+
+    @override
+    def form_input(self, context: BetaToolsetCallContext, input: BetaBrowserFormInputInput) -> None:
+        tab = self._tab(input.tab_id)
+        ref = input.target.ref
+        result = self._in_world(tab, "setValue", ref, input.value) or {}
+        error = result.get("error")
+        if error is None:
+            self._settle(tab)
+            return
+        raise ToolError(
+            {
+                "stale": f"Unknown or stale ref {ref}; call read_page or find for current refs.",
+                "no-option": f"The select {ref} has no option with that value or text.",
+                "want-boolean": f"{ref} is a checkbox or radio button; set it to true or false.",
+                "not-checkable": f"{ref} is not a checkbox; give it a text or number value.",
+                "file-input": f"{ref} is a file input; use file_upload.",
+                "not-a-field": f"{ref} is not a form field.",
+            }.get(str(error), "The value could not be set.")
+        )
+
+    @override
+    def file_upload(
+        self, context: BetaToolsetCallContext, input: BetaBrowserFileUploadInput
+    ) -> None:
+        tab = self._tab(input.tab_id)
+        if input.document_ids:
+            raise ToolError(
+                "This browser runs in a Daytona sandbox and cannot upload Files API documents."
+            )
+        paths = list(input.paths or [])
+        if not paths:
+            raise ToolError("file_upload needs at least one path.")
+        paths = self._resolve_in_sandbox(paths)
+        element = self._in_world(tab, "fileInput", input.target.ref, by_value=False)
+        if element.get("subtype") != "node" or "objectId" not in element:
+            value = element.get("value") or {}
+            if isinstance(value, dict) and value.get("error") == "not-file":
+                raise ToolError(f"{input.target.ref} is not a file input.")
+            raise self._stale(input.target.ref)
+        self._cdp(tab).send(
+            "DOM.setFileInputFiles", {"files": paths, "objectId": element["objectId"]}
+        )
+        self._settle(tab)
+
+    def _resolve_in_sandbox(self, paths: list[str]) -> list[str]:
+        """Each path with symlinks resolved inside the sandbox, where the browser reads it, checked
+        again against the policy's upload roots (the SDK's check ran on the path as written)."""
+        quoted = " ".join(shlex.quote(p) for p in paths)
+        result = self.sandbox.process.exec(f"realpath -e -- {quoted}")
+        resolved = (result.result or "").splitlines()
+        if result.exit_code != 0 or len(resolved) != len(paths):
+            raise ToolError("An upload path does not exist in the sandbox.")
+        if self._file_policy is not None:
+            roots_result = self.sandbox.process.exec(
+                "realpath -m -- " + " ".join(shlex.quote(r) for r in self._file_policy.upload_roots)
+            )
+            roots = (roots_result.result or "").splitlines()
+            if not all(any(is_under(path, root) for root in roots) for path in resolved):
+                raise ToolError("An upload path is outside the upload directory.")
+        return resolved
+
+    # --- tabs ------------------------------------------------------------------------------------
+
+    @override
+    def new_tab(
+        self, context: BetaToolsetCallContext, input: BetaBrowserNewTabInput
+    ) -> BetaBrowserStateTabEntryParam:
+        if self._disconnected or self._context is None:
+            raise ToolError("The browser in the sandbox is no longer connected.")
+        if len(self._tabs) >= MAX_TABS:
+            raise ToolError(f"{MAX_TABS} tabs are open; close one first.")
+        page = self._context.new_page()
+        self._on_page(page)  # the context's page event may not have run yet
+        tab = self._tabs[self._by_page[page]]
+        self._activate(tab.id)
+        return {"tab_id": tab.id, "title": "", "url": page.url, "active": True}
+
+    @override
+    def list_tabs(
+        self, context: BetaToolsetCallContext, input: BetaBrowserListTabsInput
+    ) -> list[BetaBrowserStateTabEntryParam]:
+        return [
+            {
+                "tab_id": tab.id,
+                "title": tab.title,
+                "url": tab.page.url,
+                "active": tab.id == self._active,
+            }
+            for tab in self._tabs.values()
+        ]
+
+    @override
+    def switch_tab(
+        self, context: BetaToolsetCallContext, input: BetaBrowserSwitchTabInput
+    ) -> BetaBrowserStateTabEntryParam:
+        tab = self._tab(input.tab_id)
+        tab.page.bring_to_front()
+        self._activate(tab.id)
+        return {"tab_id": tab.id, "title": tab.title, "url": tab.page.url, "active": True}
+
+    @override
+    def close_tab(self, context: BetaToolsetCallContext, input: BetaBrowserCloseTabInput) -> None:
+        tab = self._tab(input.tab_id)
+        page = tab.page
+        page.close(run_before_unload=False)
+        self._forget(page)
+
+    # --- waiting ---------------------------------------------------------------------------------
+
+    @override
+    def wait(self, context: BetaToolsetCallContext, input: BetaBrowserWaitInput) -> None:
+        if not 0 <= input.duration <= MAX_DURATION:
+            raise ToolError(f"duration must be between 0 and {MAX_DURATION:g} seconds.")
+        if self._active is not None and self._active in self._tabs:
+            self._settle_for(self._tabs[self._active], input.duration)
+        else:
+            time.sleep(input.duration)
+
+    def _settle_for(self, tab: _Tab, seconds: float) -> None:
+        try:
+            tab.page.wait_for_timeout(seconds * 1000)
+        except PlaywrightError:
+            time.sleep(seconds)
+
+
+def safe_title(page: Page) -> str:
+    try:
+        return page.title()
+    except PlaywrightError:
+        return ""
+
+
+def format_remote(remote: dict[str, Any]) -> str:
+    """A CDP RemoteObject (returned by value) as the text the model reads."""
+    if remote.get("type") == "undefined":
+        return "undefined"
+    if "unserializableValue" in remote:
+        return str(remote["unserializableValue"])
+    if "value" in remote:
+        value = remote["value"]
+        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return str(remote.get("description", ""))
+
+
+STOPWORDS = frozenset(
+    "a an the to for of on in at with and or that this is it its me my please find element "
+    "elements".split()
+)
+ROLE_WORDS = {
+    "button": {"button"},
+    "btn": {"button"},
+    "link": {"link"},
+    "input": {"textbox", "searchbox", "combobox"},
+    "field": {"textbox", "searchbox", "combobox"},
+    "box": {"textbox", "searchbox", "checkbox"},
+    "textbox": {"textbox", "searchbox"},
+    "search": {"searchbox", "textbox", "combobox"},
+    "checkbox": {"checkbox"},
+    "radio": {"radio"},
+    "dropdown": {"combobox", "listbox"},
+    "select": {"combobox", "listbox"},
+    "menu": {"combobox", "menuitem"},
+    "image": {"img"},
+    "picture": {"img"},
+    "icon": {"img"},
+    "heading": {"heading"},
+    "title": {"heading"},
+    "tab": {"tab"},
+}
+
+
+def rank(query: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The candidates that share words with the query, best first: a word in the element's name
+    counts most, then its role, then its attributes; visible and interactive elements win ties."""
+    words = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if w not in STOPWORDS]
+    phrase = " ".join(words)
+    scored = []
+    for candidate in candidates:
+        name = str(candidate.get("name") or "").lower()
+        attrs = str(candidate.get("attrs") or "").lower()
+        role = str(candidate.get("role") or "")
+        if role == "text":
+            continue
+        score = 0.0
+        for word in words:
+            pattern = re.escape(word)
+            roles = ROLE_WORDS.get(word)
+            if roles is not None:
+                # a role word says what kind of element is wanted more than what it says
+                if role in roles:
+                    score += 3
+                elif re.search(rf"\b{pattern}", name) or re.search(rf"\b{pattern}", attrs):
+                    score += 1
+            elif re.search(rf"\b{pattern}\b", name):
+                score += 3
+            elif re.search(rf"\b{pattern}", name):
+                score += 2
+            elif re.search(rf"\b{pattern}", attrs):
+                score += 1
+        if phrase and phrase in name:
+            score += 5
+        if score > 0:
+            score += 0.5 * bool(candidate.get("interactive")) + 0.25 * bool(
+                candidate.get("visible")
+            )
+            scored.append((score, candidate))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [candidate for _, candidate in scored]
+
+
+__all__ = ["DaytonaBrowser", "DaytonaFilePolicy"]
