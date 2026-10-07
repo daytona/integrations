@@ -98,3 +98,47 @@ def test_desktop_key(token: str, expected: DesktopKey) -> None:
 )
 def test_playwright_chord(chord: str, expected: str) -> None:
     assert playwright_chord(chord) == expected
+
+
+def playwright_split(key: str) -> list[str]:
+    """Playwright's own chord splitter, from `packages/playwright-core/src/server/input.ts`:
+
+        function split(keyString) {
+          const keys = []; let building = '';
+          for (const char of keyString) {
+            if (char === '+' && building) { keys.push(building); building = ''; }
+            else { building += char; }
+          }
+          keys.push(building); return keys;
+        }
+
+    The `&& building` is what keeps a `+` that no token precedes: it is a key, not a separator.
+    """
+    keys: list[str] = []
+    building = ""
+    for char in key:
+        if char == "+" and building:
+            keys.append(building)
+            building = ""
+        else:
+            building += char
+    keys.append(building)
+    return keys
+
+
+@pytest.mark.parametrize(
+    ("chord", "pressed"),
+    [
+        ("+", ["+"]),
+        ("plus", ["+"]),
+        ("ctrl++", ["Control", "+"]),
+        ("shift++", ["Shift", "+"]),
+        ("ctrl+shift+t", ["Control", "Shift", "t"]),
+        ("ctrl+plus", ["Control", "+"]),
+    ],
+)
+def test_the_plus_key_survives_playwrights_chord_delimiter(chord: str, pressed: list[str]) -> None:
+    """`+` is both the plus key and Playwright's delimiter, but not ambiguously: Playwright only
+    treats one as a separator when a token precedes it, so the strings this module emits read
+    back as the keys they name. Pinned here because the round trip is the whole contract."""
+    assert playwright_split(playwright_chord(chord)) == pressed
