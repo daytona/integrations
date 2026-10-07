@@ -141,8 +141,6 @@ Upload paths are sandbox paths. The policy admits absolute paths under a root, w
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-# until a daytona release with mouse/keyboard down/up is on PyPI, overlay a local daytona-clients checkout:
-pip install --no-deps -e <daytona-clients checkout>/toolbox-api-client-python -e <daytona-clients checkout>/toolbox-api-client-python-async -e <daytona-clients checkout>/sdk-python
 pytest                               # unit tests (offline, Daytona and Playwright mocked)
 python examples/exercise_computer.py # live checks (need DAYTONA_API_KEY)
 python examples/exercise_browser.py
