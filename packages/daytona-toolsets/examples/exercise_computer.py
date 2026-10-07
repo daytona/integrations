@@ -26,7 +26,7 @@ from typing import Any
 
 from anthropic.tools.computer import BetaAbstractComputerToolset20260801
 from anthropic.types.beta import BetaToolResultBlockParam, BetaToolUseBlock
-from daytona import CreateSandboxFromSnapshotParams, Daytona, SessionExecuteRequest
+from daytona import CreateSandboxFromSnapshotParams, Daytona, DaytonaError, SessionExecuteRequest
 
 from daytona_toolsets import DaytonaComputer
 
@@ -311,11 +311,18 @@ def main() -> None:
 
 
 def _exists(sandbox_id: str) -> bool:
+    """Whether the sandbox is still there.
+
+    Only a not-found answer means gone. Reading every failure as "gone" would let a transient
+    API error or a bad credential satisfy the deletion check while the sandbox is still running.
+    """
     try:
         Daytona().get(sandbox_id)
-        return True
-    except Exception:
+    except DaytonaError as error:
+        if error.status_code != 404:
+            raise
         return False
+    return True
 
 
 if __name__ == "__main__":

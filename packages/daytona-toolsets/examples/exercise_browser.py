@@ -471,7 +471,11 @@ def main() -> None:
             answered(browser, "navigate", {"url": "about:blank"})
         borrowed.refresh_data()
         assert str(getattr(borrowed.state, "value", borrowed.state)) == "started"
-        running = borrowed.process.exec("pgrep -f daytona-toolsets- || true").result.strip()
+        # `[d]aytona-toolsets-`: the shell running this very command has the pattern in its own
+        # command line, and `pgrep -f` matches that too, so a plain pattern always finds itself
+        # and the check can never pass. The bracket matches the same literal text without
+        # matching the pattern as written.
+        running = borrowed.process.exec("pgrep -f '[d]aytona-toolsets-' || true").result.strip()
         assert not running, f"expected the driver's Chromium stopped: {running}"
     finally:
         borrowed.delete()
