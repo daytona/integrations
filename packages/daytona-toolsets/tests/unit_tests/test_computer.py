@@ -235,6 +235,23 @@ def test_successful_probe_releases_button_before_native_path(sandbox: MagicMock)
     )
 
 
+def test_probe_reports_a_release_it_could_not_make(sandbox: MagicMock) -> None:
+    # The probe's press was accepted, so the button is down; a release that fails leaves it held.
+    sandbox.computer_use.mouse.up.side_effect = DaytonaError("no route", status_code=500)
+    toolset = computer(sandbox)
+    result = call(toolset, "triple_click", {"coordinate": [3, 4]})
+    assert result.get("is_error") is True
+    assert text_of(result) == "The sandbox desktop could not release the mouse button."
+    sandbox.computer_use.mouse.click.assert_not_called()
+    # The capability is settled by the press, so the next member runs without probing again.
+    assert toolset._native_input_capability is True
+    call(toolset, "triple_click", {"coordinate": [3, 4]})
+    sandbox.computer_use.mouse.down.assert_called_once_with(x=0)
+    sandbox.computer_use.mouse.click.assert_called_once_with(
+        3, 4, "left", double=False, clicks=3, modifiers=[]
+    )
+
+
 def test_probe_404_blocks_every_gated_mouse_member_and_is_cached(sandbox: MagicMock) -> None:
     floor = (
         "This sandbox's platform does not support native held input; recreate the sandbox on a "

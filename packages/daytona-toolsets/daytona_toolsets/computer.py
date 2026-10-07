@@ -248,11 +248,12 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
                     case _:
                         raise
             else:
-                try:
-                    self.sandbox.computer_use.mouse.up()
-                except DaytonaError:
-                    pass
+                # The half-specified press was accepted, so the endpoint exists and the capability
+                # is settled either way. It also left the left button down: a release that fails
+                # would turn every later click into a drag, so it is reported, not swallowed.
                 self._native_input_capability = True
+                with self._desktop("release the mouse button"):
+                    self.sandbox.computer_use.mouse.up()
         return self._native_input_capability
 
     def _require_native_input(self) -> None:
