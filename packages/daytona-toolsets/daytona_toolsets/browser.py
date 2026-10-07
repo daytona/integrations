@@ -107,6 +107,7 @@ try:
         ConsoleMessage,
         Dialog,
         Error as PlaywrightError,
+        Frame,
         Page,
         Playwright,
         Request,
@@ -246,6 +247,8 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._next_tab = 1
         self._changes: list[Any] = []
         self._downloads: dict[str, str] = {}
+        self._refused_tabs: set[str] = set()
+        """Tabs a page-started navigation left on an address the url policy refuses."""
         self._navigating = False
         self._disconnected = False
         self._last_activity = time.monotonic()
@@ -408,6 +411,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._tabs[tab_id] = Tab(id=tab_id, page=page)
         self._by_page[page] = tab_id
         page.on("close", self._forget)
+        page.on("framenavigated", self._on_navigated)
         self._changes.append({"type": "tab_opened", "tab_id": tab_id})
         self._activate(tab_id)  # a new tab or popup takes focus, as in a desktop browser
 
@@ -479,6 +483,46 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         tab = self._request_tab(request)
         if tab is not None:
             tab.finish_request(request, failure)
+
+    def _on_navigated(self, frame: Frame) -> None:
+        """A navigation the page started itself, landing where the URL policy does not allow.
+
+        Interception sees first hops only, and `navigate`'s own check covers that member alone,
+        so a click or a script that reaches an allowed address which then redirects would
+        otherwise leave the model reading a page the policy bars. The tab is only marked here —
+        an event handler runs while Playwright is waiting and must not call back into it — and
+        is taken off the page before the next member runs."""
+        if self._navigating or not self._has_url_policy:
+            return
+        try:
+            if frame.parent_frame is not None:
+                return  # a sub-frame is not what the model reads as "the page"
+            tab, url = self._tab_of(frame.page), frame.url
+        except PlaywrightError:
+            return  # the page went away meanwhile
+        if tab is None or url in ("", "about:blank") or not self._refuses(url, tab.id):
+            return
+        self._refused_tabs.add(tab.id)
+        self._changes.append(BetaNavigationRefused())
+
+    def _leave_refused_pages(self) -> None:
+        """Take every tab `_on_navigated` marked back to a blank page. Never raises."""
+        while self._refused_tabs:
+            tab = self._tabs.get(self._refused_tabs.pop())
+            if tab is not None:
+                self._blank(tab)
+
+    def _blank(self, tab: Tab) -> None:
+        """Leave a page the URL policy refuses, without reporting a second refusal for it."""
+        self._navigating = True
+        try:
+            tab.page.goto("about:blank", wait_until="commit", timeout=self._navigation_ms)
+        except Exception as exc:
+            log.debug("could not leave a page the url policy refused: %s", type(exc).__name__)
+        finally:
+            self._navigating = False
+            self._refused_tabs.discard(tab.id)
+            tab.world = None
 
     def _install_interception(self, context: BrowserContext) -> None:
         """Apply the URL policy to everything a page reaches for, not only what `route` sees.
@@ -788,6 +832,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         longer than the sandbox's own auto-stop interval: a single navigation can then outlast it
         whatever this does."""
         self._keep_alive(reserve=self._member_bound())
+        self._leave_refused_pages()
         return super().execute(context, name, input)
 
     def _member_bound(self) -> float:
@@ -801,6 +846,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         """Every open tab, exactly one active, and the changes since the last report. Never raises:
         a browser that stopped answering is reported from what the driver last knew."""
         self._keep_alive()  # after the member, as `execute` did before it
+        self._leave_refused_pages()
         try:
             for tab in list(self._tabs.values()):
                 if tab.target_id is None and not self._disconnected:
@@ -877,14 +923,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             return
         if not self._refuses(landed, tab.id):
             return
-        self._navigating = True  # retreating is not a navigation the model should be told about
-        try:
-            tab.page.goto("about:blank", wait_until="commit", timeout=self._navigation_ms)
-        except PlaywrightError:
-            log.debug("could not leave a page the url policy refused")
-        finally:
-            self._navigating = False
-            tab.world = None
+        self._blank(tab)
         raise ToolError(
             "The navigation was refused: it redirected to an address that is not allowed."
         )

@@ -389,6 +389,50 @@ def test_a_navigation_that_stays_allowed_is_not_second_guessed(
     assert page.goto.call_count == 1
 
 
+def test_a_page_started_navigation_that_lands_somewhere_refused_is_left(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A click or a script can reach an allowed address that redirects; interception only saw
+    the first hop, and `navigate`'s own check does not cover a navigation the page started."""
+
+    def policy(context: BetaURLContext, url: str) -> None:
+        if "evil" in url:
+            raise ToolError("blocked")
+
+    browser = make_browser(monkeypatch, url_policy=policy)
+    page: Any = browser._tabs["tab_1"].page
+    page.goto = MagicMock()
+    frame = SimpleNamespace(parent_frame=None, page=page, url="https://evil.test/landed")
+    browser._on_navigated(frame)  # type: ignore[arg-type]
+    assert browser._refused_tabs == {"tab_1"}
+    page.goto.assert_not_called()  # an event handler must not call back into Playwright
+
+    result = call(browser, "wait", {"duration": 0})  # the next member leaves the page first
+    assert browser._refused_tabs == set()
+    assert page.goto.call_args_list[0].args[0] == "about:blank"
+    blocks = blocks_of(result)
+    assert {"type": "text", "text": "A navigation was refused."} in blocks
+    assert blocks[-1]["tabs"] == [
+        {"tab_id": "tab_1", "title": "", "url": "about:blank", "active": True}
+    ]
+
+
+def test_a_page_started_navigation_the_policy_allows_is_left_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    browser = make_browser(monkeypatch, url_policy=lambda context, url: None)
+    page: Any = browser._tabs["tab_1"].page
+    browser._on_navigated(
+        SimpleNamespace(parent_frame=None, page=page, url="https://good.test/")  # type: ignore[arg-type]
+    )
+    # A sub-frame and the driver's own navigation are not the model's page either.
+    browser._on_navigated(
+        SimpleNamespace(parent_frame=object(), page=page, url="https://evil.test/")  # type: ignore[arg-type]
+    )
+    assert browser._refused_tabs == set()
+    assert state(browser)["changes"] == []
+
+
 def test_state_never_raises(browser: DaytonaBrowser) -> None:
     cdp: Any = browser._browser_cdp
     cdp.send.side_effect = RuntimeError("connection lost")
