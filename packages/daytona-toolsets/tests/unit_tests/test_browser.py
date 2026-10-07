@@ -370,6 +370,24 @@ def test_interception_applies_the_url_policy(monkeypatch: pytest.MonkeyPatch) ->
     assert seen[0] == (None, "https://good.test/app.js")  # member=None for page requests
 
 
+def test_interception_follows_whether_a_url_policy_was_passed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The SDK's default is `NOT_GIVEN`, not `None`. No argument: navigate is unchecked and the
+    driver installs no interception, so pages load normally. An explicit `url_policy=None` is a
+    policy to the SDK, and one that refuses every navigation, so interception matches it."""
+    assert make_browser(monkeypatch)._has_url_policy is False
+    explicit = make_browser(monkeypatch, url_policy=None)
+    assert explicit._has_url_policy is True
+    refused = call(explicit, "navigate", {"url": "https://a.test"})
+    assert refused.get("is_error"), text_of(refused)  # the SDK refuses before the driver runs
+    assert explicit._tabs["tab_1"].page.goto.call_count == 0
+    route = MagicMock()
+    route.request.is_navigation_request.return_value = False
+    explicit._guard(route)
+    route.abort.assert_called_once_with("blockedbyclient")
+
+
 def test_interception_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     def broken(context: BetaURLContext, url: str) -> None:
         raise KeyError("bug")

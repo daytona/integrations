@@ -242,6 +242,11 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         if not (0 < width <= 1920 and 0 < height <= 1200):
             raise ValueError("viewport must be at most 1920x1200 (screenshots are the viewport)")
         # Kept for request interception, which applies the same policy to what pages request.
+        # Presence, not `is None`: the SDK's default is `NOT_GIVEN`, so leaving `url_policy` out
+        # means navigate is unchecked and nothing is intercepted — pages load as they would
+        # without a policy at all. Passing `url_policy=None` explicitly is a value the SDK does
+        # treat as a policy, and one that refuses every navigation it is asked about, so
+        # interception matches it by refusing every page request.
         self._url_policy = options.get("url_policy")
         self._has_url_policy = "url_policy" in options
         super().__init__(**options)
