@@ -153,6 +153,16 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
     Use it from one thread: Playwright's sync API is bound to the thread that started it, and cannot
     run inside an asyncio event loop.
 
+    It is one large class on purpose. The SDK dispatches every member of `browser_toolset_20260801`
+    to a method it looks up on this class (`anthropic.lib.tools._toolsets._base.overridden`: a
+    member it does not find here is sent to the model as `enabled: False`), and those methods share
+    one piece of mutable live state — the tab map, each tab's CDP session and isolated world, the
+    signed preview URL, and the changes queued for the next `browser_state` — which Playwright's
+    event handlers write to while a member is waiting on the network. Collaborators would have to
+    be handed that same state, so the class would be no smaller and the state no better isolated.
+    Everything that does not need it already lives in its own module; see the module docstring for
+    the list.
+
     Args:
         sandbox: A running Daytona sandbox with Chromium on `PATH` (Daytona's default snapshot).
         daytona: The client used to create a sandbox; `Daytona()` when omitted.
