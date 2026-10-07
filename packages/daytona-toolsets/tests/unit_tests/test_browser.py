@@ -238,6 +238,18 @@ def test_every_member_is_implemented(browser: DaytonaBrowser) -> None:
     assert [name for name, config in configs.items() if config.get("enabled") is False] == []
 
 
+def test_the_members_that_reach_past_the_url_policy_are_off_until_enabled(
+    browser: DaytonaBrowser,
+) -> None:
+    """`javascript_exec` runs in the page's own world, so it reads whatever the page can and the
+    URL policy does not contain it. The SDK keeps it, and the other reach-further members, off
+    until a caller enables them — and refuses to enable it without a `confirm`."""
+    options = browser._toolset_options
+    for member in ("javascript_exec", "file_upload", "read_console", "read_network"):
+        assert options.is_enabled(member) is False, member
+    assert options.is_enabled("navigate") is True
+
+
 def test_state_reports_one_active_tab_with_titles(browser: DaytonaBrowser) -> None:
     context: Any = browser._context
     context.pages[0].url, context.pages[0].title_ = "https://a.test/", "A"

@@ -999,7 +999,16 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
     def javascript_exec(
         self, context: BetaToolsetCallContext, input: BetaBrowserJavascriptExecInput
     ) -> str:
-        """Runs in the page's own world (its globals and variables), stopped after 10 seconds."""
+        """Runs in the page's own world (its globals and variables), stopped after 10 seconds.
+
+        Deliberately the page's own world and not the isolated one the read members use: a script
+        the model wrote is only useful if it sees what the page sees. That makes this member the
+        model acting *as* the page, so it can read whatever the page can — same-origin storage, a
+        logged-in session, the DOM — and `url_policy` does not contain it: that policy decides
+        which addresses may be opened and requested, not what a script may touch in a page already
+        open. Which is why the SDK leaves `javascript_exec` disabled unless you enable it in
+        `configs` and refuses to enable it without a `confirm`. Enable it for pages whose contents
+        you would hand the model anyway."""
         tab = self._tab(input.tab_id)
         result = self._cdp(tab).send(
             "Runtime.evaluate",
