@@ -198,9 +198,19 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         # interception matches it by refusing every page request.
         self._url_policy = options.get("url_policy")
         self._has_url_policy = "url_policy" in options
+        self._session_id = f"daytona-toolsets-{secrets.token_hex(4)}"
+        self._profile = f"/tmp/{self._session_id}-profile"
+        self._download_dir = f"/tmp/{self._session_id}-downloads"
+        policy = options.get("file_policy")
+        if isinstance(policy, DaytonaFilePolicy):
+            # Bind where this browser actually downloads to, so a policy that named no directory
+            # can still expose paths, and so the SDK's render-time check of the same hook is
+            # answered by the policy this driver asks. A copy, never this one: a caller may share
+            # a policy between browsers.
+            policy = options["file_policy"] = policy.for_download_dir(self._download_dir)
+            self._download_dir = policy.download_dir or self._download_dir
         super().__init__(**options)
 
-        policy = options.get("file_policy")
         self._policy: Any = policy
         """The file policy as configured, of whatever class, for the download-path check."""
         self._file_policy = policy if isinstance(policy, DaytonaFilePolicy) else None
@@ -213,13 +223,6 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._context: Optional[BrowserContext] = None
         self._browser_cdp: Optional[CDPSession] = None
         self._signed: Optional[tuple[int, str]] = None
-        self._session_id = f"daytona-toolsets-{secrets.token_hex(4)}"
-        self._profile = f"/tmp/{self._session_id}-profile"
-        self._download_dir = (
-            self._file_policy.download_dir
-            if self._file_policy is not None and self._file_policy.download_dir
-            else f"/tmp/{self._session_id}-downloads"
-        )
         self._tabs: dict[str, Tab] = {}
         self._by_page: dict[Page, str] = {}
         self._recent: list[str] = []

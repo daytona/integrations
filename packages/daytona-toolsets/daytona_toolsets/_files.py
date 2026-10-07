@@ -33,7 +33,9 @@ class DaytonaFilePolicy:
         upload_roots: Directories in the sandbox that `file_upload` may read from. Keep this to one
             dedicated directory holding only the task's files. Empty: path uploads are refused.
         download_dir: The sandbox directory downloads are saved to (created `0700`). Outside every
-            upload root. Default: a fresh directory under `/tmp` per browser.
+            upload root. Default: a fresh directory under `/tmp` per browser, which the driver
+            binds into its own copy of this policy (`for_download_dir`), so
+            `expose_download_paths` works without naming a directory.
         expose_download_paths: Show the model where a completed download was saved.
     """
 
@@ -64,6 +66,24 @@ class DaytonaFilePolicy:
         if not path or not path.startswith("/"):
             raise ValueError(f"{what} must be an absolute path in the sandbox")
         return posixpath.normpath(path)
+
+    def for_download_dir(self, download_dir: str) -> "DaytonaFilePolicy":
+        """This policy, bound to the directory a browser actually saves downloads to.
+
+        A policy that names no `download_dir` means "wherever the browser puts them", and only the
+        driver knows that: unbound, `is_path_visible` could never say `True` and
+        `expose_download_paths=True` would silently show nothing. The driver binds a copy at
+        construction rather than mutating this one, so one policy can be shared between browsers
+        and each still exposes its own directory. A policy that named a directory is returned
+        unchanged.
+        """
+        if self.download_dir is not None:
+            return self
+        return DaytonaFilePolicy(
+            upload_roots=self.upload_roots,
+            download_dir=download_dir,
+            expose_download_paths=self.expose_download_paths,
+        )
 
     def resolve_upload_paths(self, context: BetaURLContext, paths: Sequence[str]) -> list[str]:
         if not self.upload_roots:

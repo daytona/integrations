@@ -450,6 +450,42 @@ def test_download_paths_need_expose_download_paths(monkeypatch: pytest.MonkeyPat
     assert completed_download(shown)["path"] == "/dl/g1"
 
 
+def test_the_default_download_dir_is_exposed_when_asked(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No download_dir: the driver picks one, so expose_download_paths must still show it.
+    browser = make_browser(monkeypatch, file_policy=DaytonaFilePolicy(expose_download_paths=True))
+    assert browser.download_dir.startswith("/tmp/daytona-toolsets-")
+    assert completed_download(browser)["path"] == f"{browser.download_dir}/g1"
+
+
+def test_binding_the_download_dir_leaves_the_callers_policy_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shared = DaytonaFilePolicy(expose_download_paths=True)
+    first = make_browser(monkeypatch, file_policy=shared)
+    second = make_browser(monkeypatch, file_policy=shared)
+    assert shared.download_dir is None  # the caller's object is never bound
+    assert first.download_dir != second.download_dir
+    assert completed_download(first)["path"] == f"{first.download_dir}/g1"
+    assert completed_download(second)["path"] == f"{second.download_dir}/g1"
+
+
+def test_the_sdk_is_handed_the_same_bound_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The SDK checks is_path_visible again when it renders browser_state; both must agree.
+    browser = make_browser(monkeypatch, file_policy=DaytonaFilePolicy(expose_download_paths=True))
+    sdk_policy = browser._toolset_options.file_policy
+    assert sdk_policy is browser._policy
+    assert sdk_policy.is_path_visible(f"{browser.download_dir}/g1") is True
+
+
+def test_a_named_download_dir_is_kept_as_the_caller_gave_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    policy = DaytonaFilePolicy(download_dir="/dl", expose_download_paths=True)
+    browser = make_browser(monkeypatch, file_policy=policy)
+    assert browser.download_dir == "/dl"
+    assert browser._policy is policy  # nothing to bind, so no copy
+
+
 def test_a_file_policy_that_raises_hides_the_download_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
