@@ -1,0 +1,19 @@
+packages/daytona-toolsets/daytona_toolsets/browser.py
+  s_e36a18757b9fbd::t_3408ce5fe94353 156-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "648133e482e4e4589f1c5c60e7070cb9e0676576",
+  "prompts": {},
+  "sessions": {
+    "s_e36a18757b9fbd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee869d002ffe3W2nIZmXL9KOAC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
