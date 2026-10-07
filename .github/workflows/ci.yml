@@ -250,6 +250,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           # Pinned to 3.12 for the same reason as pydantic-ai (obstore wheels via the daytona SDK).
