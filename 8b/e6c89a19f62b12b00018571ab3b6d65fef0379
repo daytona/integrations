@@ -1,0 +1,19 @@
+packages/daytona-toolsets/README.md
+  s_fa08bc7b5382ac::t_3c1bb53f9f8d37 128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8be6c89a19f62b12b00018571ab3b6d65fef0379",
+  "prompts": {},
+  "sessions": {
+    "s_fa08bc7b5382ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee898e109ffeaMcn4qVJt1HpsH",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
