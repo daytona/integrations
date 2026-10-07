@@ -13,9 +13,10 @@ report — that the Playwright event handlers write to while a member is waiting
 Splitting the class across collaborators would mean threading that state between them for no
 isolation gained. What does not need it lives next door, each testable on its own: starting
 Chromium in the sandbox in `_chromium.py`, the sandbox lease in `_sandbox.py`, the file policy in
-`_files.py`, the URL, ranking and value-formatting vocabulary in `_text.py`, the key tables in
-`_keys.py`, the in-page JavaScript in `_page_js.py`. Read what is left by its section banners:
-setup, events, helpers, then the members in the toolset's own groups.
+`_files.py`, one tab's console and network records in `_tabs.py`, the URL, ranking and
+value-formatting vocabulary in `_text.py`, the key tables in `_keys.py`, the in-page JavaScript in
+`_page_js.py`. Read what is left by its section banners: setup, events, helpers, then the members
+in the toolset's own groups.
 """
 
 from __future__ import annotations
@@ -26,8 +27,6 @@ import posixpath
 import secrets
 import shlex
 import time
-from collections import deque
-from dataclasses import dataclass, field
 from typing import Any, Literal, Optional, Union
 from urllib.parse import urlsplit
 
@@ -91,7 +90,9 @@ from . import _chromium, _page_js
 from ._files import DaytonaFilePolicy as DaytonaFilePolicy, is_under
 from ._keys import parse_chord, playwright_chord, split_sequence, PLAYWRIGHT
 from ._sandbox import CreateParams, OnClose, SandboxLease
+from ._tabs import Tab
 from ._text import (
+    MAX_TEXT as MAX_TEXT,
     failure_phrase as failure_phrase,
     format_remote as format_remote,
     normalize_url as normalize_url,
@@ -124,11 +125,6 @@ log = logging.getLogger("daytona_toolsets")
 MAX_TABS = 100
 MAX_DURATION = 30.0
 MAX_REPEAT = 100
-MAX_ENTRIES = 1000
-"""Console and network entries kept per tab between reads; older ones are dropped."""
-MAX_TEXT = 2000
-"""Characters kept of one piece of page-supplied text — a console line, a script's error, a
-dialog's message. A page can make any of them arbitrarily long."""
 FIND_LIMIT = 20
 WHEEL_NOTCH = 100
 """Pixels one scroll-wheel notch moves."""
@@ -138,21 +134,6 @@ KEEP_ALIVE = 60.0
 PLAYWRIGHT_MODIFIERS = {"ctrl": "Control", "alt": "Alt", "shift": "Shift", "cmd": "Meta"}
 
 Button = Literal["left", "middle", "right"]
-
-
-@dataclass
-class _Tab:
-    id: str
-    page: Page
-    cdp: Optional[CDPSession] = None
-    target_id: Optional[str] = None
-    world: Optional[int] = None
-    """The execution context id of the driver's isolated world in the current document."""
-    title: str = ""
-    console: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_ENTRIES))
-    network: dict[Request, dict[str, Any]] = field(default_factory=dict)
-    dropped_console: int = 0
-    dropped_network: int = 0
 
 
 class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
@@ -239,7 +220,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             if self._file_policy is not None and self._file_policy.download_dir
             else f"/tmp/{self._session_id}-downloads"
         )
-        self._tabs: dict[str, _Tab] = {}
+        self._tabs: dict[str, Tab] = {}
         self._by_page: dict[Page, str] = {}
         self._recent: list[str] = []
         """Tab ids, most recently active last."""
@@ -407,7 +388,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             return
         tab_id = f"tab_{self._next_tab}"
         self._next_tab += 1
-        self._tabs[tab_id] = _Tab(id=tab_id, page=page)
+        self._tabs[tab_id] = Tab(id=tab_id, page=page)
         self._by_page[page] = tab_id
         page.on("close", self._forget)
         self._changes.append({"type": "tab_opened", "tab_id": tab_id})
@@ -449,22 +430,19 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         except PlaywrightError as exc:  # the page went away first
             log.debug("dialog handling failed: %s", type(exc).__name__)
 
-    def _tab_of(self, page: Optional[Page]) -> Optional[_Tab]:
+    def _tab_of(self, page: Optional[Page]) -> Optional[Tab]:
         tab_id = self._by_page.get(page) if page is not None else None
         return self._tabs.get(tab_id) if tab_id is not None else None
 
     def _log_console(self, page: Optional[Page], line: str) -> None:
         tab = self._tab_of(page)
-        if tab is None:
-            return
-        if len(tab.console) == tab.console.maxlen:
-            tab.dropped_console += 1
-        tab.console.append(line[:MAX_TEXT])
+        if tab is not None:
+            tab.log(line)
 
     def _on_console(self, message: ConsoleMessage) -> None:
         self._log_console(message.page, f"[{message.type}] {message.text}")
 
-    def _request_tab(self, request: Request) -> Optional[_Tab]:
+    def _request_tab(self, request: Request) -> Optional[Tab]:
         try:
             return self._tab_of(request.frame.page)
         except PlaywrightError:  # a service worker's request has no frame
@@ -472,30 +450,18 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
 
     def _on_request(self, request: Request) -> None:
         tab = self._request_tab(request)
-        if tab is None:
-            return
-        if len(tab.network) >= MAX_ENTRIES:
-            tab.network.pop(next(iter(tab.network)))
-            tab.dropped_network += 1
-        tab.network[request] = {"method": request.method, "url": request.url, "status": "pending"}
+        if tab is not None:
+            tab.start_request(request)
 
     def _on_response(self, response: Response) -> None:
         tab = self._request_tab(response.request)
-        entry = tab.network.get(response.request) if tab is not None else None
-        if entry is not None:
-            entry["status"] = str(response.status)
-            entry["type"] = response.headers.get("content-type", "").split(";")[0]
+        if tab is not None:
+            tab.answer_request(response)
 
     def _finish_request(self, request: Request, failure: Optional[str]) -> None:
         tab = self._request_tab(request)
-        entry = tab.network.get(request) if tab is not None else None
-        if entry is None:
-            return
-        if failure is not None:
-            entry["status"] = f"failed ({failure})"
-        end = request.timing.get("responseEnd", -1)
-        if end >= 0:
-            entry["ms"] = round(end)
+        if tab is not None:
+            tab.finish_request(request, failure)
 
     def _guard(self, route: Route) -> None:
         """Request interception: the URL policy applied to every request a page makes."""
@@ -578,7 +544,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
 
     # --- helpers ---------------------------------------------------------------------------------
 
-    def _tab(self, tab_id: Optional[str]) -> _Tab:
+    def _tab(self, tab_id: Optional[str]) -> Tab:
         if self._disconnected or self._context is None:
             raise ToolError("The browser in the sandbox is no longer connected.")
         if tab_id is None:
@@ -590,20 +556,20 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             raise TabMissingError()
         return tab
 
-    def _cdp(self, tab: _Tab) -> CDPSession:
+    def _cdp(self, tab: Tab) -> CDPSession:
         if tab.cdp is None:
             assert self._context is not None
             tab.cdp = self._context.new_cdp_session(tab.page)
         return tab.cdp
 
-    def _target_id(self, tab: _Tab) -> str:
+    def _target_id(self, tab: Tab) -> str:
         if tab.target_id is None:
             tab.target_id = str(
                 self._cdp(tab).send("Target.getTargetInfo")["targetInfo"]["targetId"]
             )
         return tab.target_id
 
-    def _in_world(self, tab: _Tab, function: str, *args: object, by_value: bool = True) -> Any:
+    def _in_world(self, tab: Tab, function: str, *args: object, by_value: bool = True) -> Any:
         """Call the driver's in-page toolkit in its isolated world, creating the world (and
         installing the toolkit) for a new document."""
         cdp = self._cdp(tab)
@@ -646,7 +612,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         return ToolError(f"Unknown or stale ref {ref}; call read_page or find for current refs.")
 
     def _point(
-        self, tab: _Tab, target: Union[BetaBrowserCoordinateTarget, BetaBrowserRefTarget]
+        self, tab: Tab, target: Union[BetaBrowserCoordinateTarget, BetaBrowserRefTarget]
     ) -> tuple[float, float]:
         """A target as a viewport point: a coordinate, checked against the viewport, or the centre
         of a referenced element, scrolled into view."""
@@ -670,7 +636,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             raise ToolError("modifiers takes modifier keys only, such as shift or ctrl+shift.")
         return [PLAYWRIGHT_MODIFIERS[modifier] for modifier in modifiers]
 
-    def _settle(self, tab: _Tab) -> None:
+    def _settle(self, tab: Tab) -> None:
         # Waited on the page, not with time.sleep, so dialogs and popups are handled meanwhile.
         try:
             tab.page.wait_for_timeout(self._settle_ms)
@@ -699,7 +665,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._settle(tab)
 
     def _screenshot(
-        self, tab: _Tab, clip: Optional[dict[str, float]] = None
+        self, tab: Tab, clip: Optional[dict[str, float]] = None
     ) -> BetaScreenshotResult:
         params: dict[str, Any] = {"format": "png"}
         if clip is not None:
@@ -707,9 +673,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         data = self._cdp(tab).send("Page.captureScreenshot", params)["data"]
         return BetaScreenshotResult(data=str(data), media_type="image/png")
 
-    def _entry(
-        self, tab: _Tab, titles: dict[str, tuple[str, str]]
-    ) -> BetaBrowserStateTabEntryParam:
+    def _entry(self, tab: Tab, titles: dict[str, tuple[str, str]]) -> BetaBrowserStateTabEntryParam:
         url = tab.page.url
         title = tab.title
         if tab.target_id is not None and tab.target_id in titles:
@@ -902,38 +866,13 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
     def read_console(
         self, context: BetaToolsetCallContext, input: BetaBrowserReadConsoleInput
     ) -> str:
-        tab = self._tab(input.tab_id)
-        lines = list(tab.console)
-        if tab.dropped_console:
-            lines.insert(0, f"[{tab.dropped_console} earlier entries were dropped]")
-        tab.console.clear()
-        tab.dropped_console = 0
-        return "\n".join(lines)
+        return self._tab(input.tab_id).take_console()
 
     @override
     def read_network(
         self, context: BetaToolsetCallContext, input: BetaBrowserReadNetworkInput
     ) -> str:
-        tab = self._tab(input.tab_id)
-        lines = [
-            " ".join(
-                part
-                for part in (
-                    entry["method"],
-                    entry["status"],
-                    entry.get("type", ""),
-                    f"{entry['ms']}ms" if "ms" in entry else "",
-                    entry["url"],
-                )
-                if part
-            )
-            for entry in tab.network.values()
-        ]
-        if tab.dropped_network:
-            lines.insert(0, f"[{tab.dropped_network} earlier requests were dropped]")
-        tab.network = {r: e for r, e in tab.network.items() if e["status"] == "pending"}
-        tab.dropped_network = 0
-        return "\n".join(lines)
+        return self._tab(input.tab_id).take_network()
 
     @override
     def javascript_exec(
@@ -1259,7 +1198,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         else:
             time.sleep(input.duration)
 
-    def _settle_for(self, tab: _Tab, seconds: float) -> None:
+    def _settle_for(self, tab: Tab, seconds: float) -> None:
         try:
             tab.page.wait_for_timeout(seconds * 1000)
         except PlaywrightError:

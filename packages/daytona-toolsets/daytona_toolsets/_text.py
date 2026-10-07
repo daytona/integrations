@@ -14,6 +14,10 @@ from typing import Any
 
 from anthropic.tools import ToolError
 
+MAX_TEXT = 2000
+"""Characters kept of one piece of page-supplied text — a console line, a script's error, a
+dialog's message. A page can make any of them arbitrarily long."""
+
 SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
 OPAQUE_SCHEMES = frozenset(
     {
