@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable, Iterator, Sequence
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call as mock_call
 
 import pytest
 from anthropic.tools import ToolError, ToolsetConfigError
@@ -441,6 +441,38 @@ def test_every_set_value_refusal_has_a_message() -> None:
     source = inspect.getsource(DaytonaBrowser.form_input)
     missing = sorted(code for code in codes if f'"{code}":' not in source)
     assert missing == []
+
+
+def test_interception_covers_websocket_handshakes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`context.route` never sees a handshake, so a page could otherwise hold a socket open to an
+    address every ordinary request to it is refused."""
+
+    def policy(context: BetaURLContext, url: str) -> None:
+        if "evil" in url:
+            raise ToolError("blocked")
+
+    browser = make_browser(monkeypatch, url_policy=policy)
+    context = MagicMock()
+    browser._install_interception(context)
+    assert context.route.call_args_list == [mock_call("**/*", browser._guard)]
+    assert context.route_web_socket.call_args_list == [mock_call("**/*", browser._guard_websocket)]
+
+    allowed = MagicMock(url="wss://good.test/live")
+    browser._guard_websocket(allowed)
+    allowed.connect_to_server.assert_called_once_with()
+    allowed.close.assert_not_called()
+
+    refused = MagicMock(url="wss://evil.test/live")
+    browser._guard_websocket(refused)
+    refused.connect_to_server.assert_not_called()
+    refused.close.assert_called_once_with(code=1008, reason="Policy violation")
+
+
+def test_no_url_policy_installs_neither_interception(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = MagicMock()
+    make_browser(monkeypatch)._install_interception(context)
+    context.route.assert_not_called()
+    context.route_web_socket.assert_not_called()
 
 
 def test_interception_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:

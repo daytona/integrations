@@ -113,6 +113,7 @@ try:
         Response,
         Route,
         TimeoutError as PlaywrightTimeoutError,
+        WebSocketRoute,
         sync_playwright,
     )
 except ImportError as exc:  # pragma: no cover - depends on the environment
@@ -365,8 +366,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         context.on("response", self._on_response)
         context.on("requestfinished", lambda request: self._finish_request(request, None))
         context.on("requestfailed", lambda request: self._finish_request(request, request.failure))
-        if self._has_url_policy:
-            context.route("**/*", self._guard)
+        self._install_interception(context)
         page = context.new_page()
         self._on_page(page)
         tab = self._tabs[self._by_page[page]]
@@ -476,22 +476,50 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         if tab is not None:
             tab.finish_request(request, failure)
 
+    def _install_interception(self, context: BrowserContext) -> None:
+        """Apply the URL policy to everything a page reaches for, not only what `route` sees.
+
+        Ordinary requests and WebSocket handshakes are two separate Playwright hooks, so both are
+        registered; with no `url_policy` neither is, and pages load as they would without one."""
+        if not self._has_url_policy:
+            return
+        context.route("**/*", self._guard)
+        context.route_web_socket("**/*", self._guard_websocket)
+
+    def _refuses(self, url: str, tab_id: Optional[str]) -> bool:
+        """Whether the URL policy refuses an address a page reached for, failing closed."""
+        policy = self._url_policy
+        if policy is None:
+            return True  # url_policy=None refuses everything, as the SDK treats navigate
+        try:
+            policy(BetaURLContext(member=None, tab_id=tab_id), url)
+        except ToolError:
+            return True
+        except Exception as exc:  # the policy failed: fail closed
+            log.warning("url_policy raised %s on a page request; refused it", type(exc).__name__)
+            return True
+        return False
+
+    def _guard_websocket(self, route: WebSocketRoute) -> None:
+        """The URL policy applied to a WebSocket a page opens.
+
+        Playwright's request interception never sees a handshake, so without this a page could
+        hold a socket open to an address every ordinary request to it is refused. An allowed one
+        is connected straight through, with messages forwarded in both directions as if the route
+        were not there; a refused one is closed with the WebSocket policy-violation code and never
+        reaches the network. Sockets opened by a shared worker are still outside this, as are the
+        redirect hops of an ordinary request; the sandbox's network tier is the backstop."""
+        if not self._refuses(route.url, None):
+            route.connect_to_server()
+            return
+        log.debug("url_policy refused a WebSocket a page opened")
+        route.close(code=1008, reason="Policy violation")
+
     def _guard(self, route: Route) -> None:
         """Request interception: the URL policy applied to every request a page makes."""
         request = route.request
         tab = self._request_tab(request)
-        refused = False
-        try:
-            policy = self._url_policy
-            if policy is None:
-                refused = True  # url_policy=None refuses everything, as the SDK treats navigate
-            else:
-                policy(BetaURLContext(member=None, tab_id=tab.id if tab else None), request.url)
-        except ToolError:
-            refused = True
-        except Exception as exc:  # the policy failed: fail closed
-            log.warning("url_policy raised %s on a page request; refused it", type(exc).__name__)
-            refused = True
+        refused = self._refuses(request.url, tab.id if tab else None)
         try:
             if not refused:
                 route.continue_()
