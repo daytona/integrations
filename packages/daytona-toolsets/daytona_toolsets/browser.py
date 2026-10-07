@@ -1090,6 +1090,10 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
                 "stale": f"Unknown or stale ref {ref}; call read_page or find for current refs.",
                 "no-option": f"The select {ref} has no option with that value or text.",
                 "want-boolean": f"{ref} is a checkbox or radio button; set it to true or false.",
+                "radio-off": (
+                    f"{ref} is a radio button and cannot be cleared; set the one you want in "
+                    "its group to true instead."
+                ),
                 "not-checkable": f"{ref} is not a checkbox; give it a text or number value.",
                 "file-input": f"{ref} is a file input; use file_upload.",
                 "not-a-field": f"{ref} is not a form field.",

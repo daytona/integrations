@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+import re
 from collections.abc import Callable, Iterator, Sequence
 from types import SimpleNamespace
 from typing import Any
@@ -409,6 +411,36 @@ def test_interception_follows_whether_a_url_policy_was_passed(
     route.request.is_navigation_request.return_value = False
     explicit._guard(route)
     route.abort.assert_called_once_with("blockedbyclient")
+
+
+def test_a_radio_button_cannot_be_cleared(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clicking a selected radio leaves it selected, so `false` must not report a change that
+    did not happen."""
+    browser = make_browser(monkeypatch)
+    monkeypatch.setattr(
+        DaytonaBrowser,
+        "_in_world",
+        lambda self, tab, function, *args, **kwargs: {"error": "radio-off"},
+    )
+    refused = call(
+        browser, "form_input", {"target": {"type": "ref", "ref": "ref_3"}, "value": False}
+    )
+    assert refused.get("is_error")
+    assert "cannot be cleared" in text_of(refused)
+
+
+def test_every_set_value_refusal_has_a_message() -> None:
+    """The in-page `setValue` and the member's message table are one contract; a code added to
+    the script with no message would reach the model as "The value could not be set."."""
+    from daytona_toolsets import _page_js
+
+    script = _page_js.TOOLKIT
+    body = script.split("setValue(ref, value) {", 1)[1].split("\n    fileInput(", 1)[0]
+    codes = set(re.findall(r"error: '([a-z-]+)'", body))
+    assert "radio-off" in codes
+    source = inspect.getsource(DaytonaBrowser.form_input)
+    missing = sorted(code for code in codes if f'"{code}":' not in source)
+    assert missing == []
 
 
 def test_interception_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:

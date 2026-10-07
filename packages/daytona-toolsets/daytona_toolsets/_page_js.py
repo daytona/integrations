@@ -273,6 +273,9 @@ TOOLKIT = r"""
       }
       if (tag === 'INPUT' && (type === 'checkbox' || type === 'radio')) {
         if (typeof value !== 'boolean') return { error: 'want-boolean' };
+        // Clicking a selected radio leaves it selected, so `false` would report a change that did
+        // not happen. Only choosing another button in the group clears this one.
+        if (type === 'radio' && value === false) return { error: 'radio-off' };
         if (el.checked !== value) el.click();
         return {};
       }
