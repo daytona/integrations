@@ -1231,7 +1231,12 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
 
     def _resolve_in_sandbox(self, paths: list[str]) -> list[str]:
         """Each path with symlinks resolved inside the sandbox, where the browser reads it, checked
-        again against the policy's upload roots (the SDK's check ran on the path as written)."""
+        again now that it is resolved — the policy's check ran on the path as written.
+
+        A `DaytonaFilePolicy` declares upload roots the driver can re-check the resolved path
+        against (the roots are resolved too, so a root that is itself a link still matches). A
+        policy of another class declares nothing the driver can re-check, so a path that resolved
+        to somewhere else is refused outright."""
         quoted = " ".join(shlex.quote(p) for p in paths)
         result = self.sandbox.process.exec(f"realpath -e -- {quoted}")
         resolved = (result.result or "").splitlines()
@@ -1244,6 +1249,12 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             roots = (roots_result.result or "").splitlines()
             if not all(any(is_under(path, root) for root in roots) for path in resolved):
                 raise ToolError("An upload path is outside the upload directory.")
+        elif resolved != [posixpath.normpath(path) for path in paths]:
+            # A policy of another class has no roots the driver can re-check, and it judged these
+            # paths before the sandbox resolved them. Anything that resolves elsewhere is refused
+            # rather than read from wherever the link points: a link planted in an upload
+            # directory must not carry the upload out of it.
+            raise ToolError("An upload path is a link to another path; upload the file itself.")
         return resolved
 
     # --- tabs ------------------------------------------------------------------------------------

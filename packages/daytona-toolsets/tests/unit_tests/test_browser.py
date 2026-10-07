@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -492,6 +492,37 @@ def test_owned_sandbox_is_deleted_even_if_launch_fails(monkeypatch: pytest.Monke
     with pytest.raises(RuntimeError):
         DaytonaBrowser(daytona=client)
     sandbox.delete.assert_called_once_with()
+
+
+class OwnPolicy:
+    """A `BetaFilePolicy` of the caller's own, judging sandbox paths it knows by name."""
+
+    def resolve_upload_paths(self, context: BetaURLContext, paths: Sequence[str]) -> list[str]:
+        return [path for path in paths if path.startswith("/task/uploads/")]
+
+    def resolve_upload_documents(
+        self, context: BetaURLContext, document_ids: Sequence[str]
+    ) -> list[str]:
+        raise ToolError("no documents")
+
+    def is_path_visible(self, path: str) -> bool:
+        return False
+
+
+def test_a_custom_policy_does_not_let_a_link_carry_an_upload_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A custom policy judges the path as written; only the sandbox knows where it resolves to.
+    Without roots to re-check against, a path that moved is refused rather than read."""
+    browser = make_browser(monkeypatch, file_policy=OwnPolicy())
+    sandbox: Any = browser.sandbox
+    sandbox.process.exec.return_value = SimpleNamespace(exit_code=0, result="/etc/shadow\n")
+    with pytest.raises(ToolError, match="link to another path"):
+        browser._resolve_in_sandbox(["/task/uploads/notes.txt"])
+    sandbox.process.exec.return_value = SimpleNamespace(
+        exit_code=0, result="/task/uploads/notes.txt\n"
+    )
+    assert browser._resolve_in_sandbox(["/task/uploads/./notes.txt"]) == ["/task/uploads/notes.txt"]
 
 
 def test_a_browsing_session_keeps_the_sandbox_from_auto_stopping(
