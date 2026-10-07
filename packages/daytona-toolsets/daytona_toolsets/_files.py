@@ -65,6 +65,11 @@ class DaytonaFilePolicy:
     def _absolute(path: str, what: str) -> str:
         if not path or not path.startswith("/"):
             raise ValueError(f"{what} must be an absolute path in the sandbox")
+        if ".." in path.split("/"):
+            # Normalizing one away would authorize a directory the caller did not write down:
+            # `/safe/../private` would quietly become `/private`. An upload path is refused for
+            # the same reason, so a root is refused too rather than rewritten.
+            raise ValueError(f"{what} must not contain '..'")
         return posixpath.normpath(path)
 
     def for_download_dir(self, download_dir: str) -> "DaytonaFilePolicy":

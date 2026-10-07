@@ -115,6 +115,17 @@ def test_file_policy_checks_its_arguments() -> None:
         DaytonaFilePolicy(upload_roots="/task")
 
 
+def test_a_configured_path_with_a_parent_step_is_refused_not_normalized() -> None:
+    """Normalizing `..` away would authorize a directory the caller never wrote down:
+    `/safe/../private` would quietly become `/private`."""
+    with pytest.raises(ValueError, match=r"must not contain"):
+        DaytonaFilePolicy(upload_roots=["/safe/../private"])
+    with pytest.raises(ValueError, match=r"must not contain"):
+        DaytonaFilePolicy(download_dir="/safe/../private")
+    # A root that only looks like one is still fine.
+    assert DaytonaFilePolicy(upload_roots=["/safe/..private"]).upload_roots == ("/safe/..private",)
+
+
 def test_file_policy_download_path_visibility() -> None:
     hidden = DaytonaFilePolicy(download_dir="/dl")
     shown = DaytonaFilePolicy(download_dir="/dl", expose_download_paths=True)
