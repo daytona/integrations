@@ -72,6 +72,18 @@ def test_normalize_url_refuses_other_schemes(url: str) -> None:
         normalize_url(url)
 
 
+def test_normalize_url_refuses_a_control_character_it_cannot_drop() -> None:
+    """Only tab, LF and CR are dropped by a URL parser. Anything else C0 survives, re-spelled —
+    percent-encoded in a path, rejected in a host — so the policy would judge one address and
+    Chromium would open another."""
+    for url in ("https://ex\x00ample.com", "https://a.test/\x0bx", "https://a.test/\x7f"):
+        with pytest.raises(ToolError, match="control characters"):
+            normalize_url(url)
+    # The ones a parser really does drop or trim are still handled, not refused.
+    assert normalize_url("https://a.te\tst.com/\r\n") == "https://a.test.com/"
+    assert normalize_url("\x01\x02 https://a.test ") == "https://a.test"
+
+
 def test_failure_phrase_keeps_urls_out() -> None:
     error = Exception(
         "net::ERR_NAME_NOT_RESOLVED at https://secret.example/?token=abc\nCall log: ..."

@@ -19,6 +19,9 @@ MAX_TEXT = 2000
 dialog's message. A page can make any of them arbitrarily long."""
 
 SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+"""C0 controls and DEL. Only tab, LF and CR are dropped by a URL parser; the rest survive into
+the address Chromium opens, re-spelled."""
 OPAQUE_SCHEMES = frozenset(
     {
         "about", "blob", "chrome", "chrome-extension", "chrome-untrusted", "data", "devtools",
@@ -37,6 +40,11 @@ def normalize_url(url: str) -> str:
     text = re.sub(r"^[\x00-\x20]+|[\x00-\x20]+$", "", text)
     if not text:
         raise ToolError("navigate needs a URL, or back, forward or reload.")
+    if CONTROL.search(text):
+        # A control left in the middle is not dropped: a URL parser percent-encodes it in a path
+        # or query and rejects it in a host, so the address a URL policy would be shown is not
+        # the one Chromium would open. No real address carries one; refuse rather than guess.
+        raise ToolError("navigate does not open a URL containing control characters.")
     if text.lower() == "about:blank":
         return "about:blank"
     match = SCHEME.match(text)
