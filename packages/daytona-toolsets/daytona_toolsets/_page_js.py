@@ -5,6 +5,19 @@ but not its globals), so a page can neither see nor rewrite the element referenc
 scripts that replace built-ins do not change what the driver reads.
 
 `TOOLKIT` installs `globalThis.__dt` once per document; the other snippets call it.
+
+Why it is JavaScript and not Python. Every entry point here answers a question only the live
+document can answer, and each is one CDP round trip rather than thousands. A role, an accessible
+name and whether an element is visible come from computed style, layout boxes and the live
+accessibility-relevant attributes of a node that scripts keep changing; `ref_N` is an identity
+handle into that same live tree, and it has to stay valid between the read and the click, which
+means it cannot be a snapshot shipped to Python. `center`, `scrollTo`, `setValue` and `fileInput`
+each need the element itself — its box after layout, its native value setter, its file-input
+node. Parsing an HTML copy in Python would answer about a document that no longer exists and
+would be wrong for exactly the pages a model gets stuck on. What does not need the page is not
+here: ranking the candidates `candidates()` returns, URL handling and all the text bounding live
+in `_text.py`, and the refusal codes this file returns are turned into the model's wording in
+`browser.py` (a test pins the two lists against each other).
 """
 
 from __future__ import annotations
