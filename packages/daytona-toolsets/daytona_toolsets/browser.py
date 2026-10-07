@@ -5,6 +5,18 @@ Chromium runs in the sandbox; the model loop, the API key and the toolset stay i
 drive it over the Chrome DevTools Protocol (CDP) with Playwright's `connect_over_cdp`, through a
 signed Daytona preview URL for the debugging port. The signed URL is bound to that one port, lives
 only long enough to connect (an established connection outlives it), and is revoked on `close()`.
+
+Layout, deliberately one module. The SDK dispatches every browser member to a method on one
+subclass of `BetaAbstractBrowserToolset20260801`, and those methods share mutable live state — the
+tab map, the per-tab CDP sessions and isolated worlds, and the state changes queued for the next
+report — that the Playwright event handlers write to while a member is waiting on the network.
+Splitting the class across collaborators would mean threading that state between them for no
+isolation gained. What does not need it already lives next door: the sandbox lease in
+`_sandbox.py`, the key tables in `_keys.py`, the in-page JavaScript in `_page_js.py`.
+`DaytonaFilePolicy` and the pure helpers (`normalize_url`, `failure_phrase`, `rank`,
+`format_remote`) stay here because they are this toolset's own public surface, and they are
+unit-tested directly. Read the file by its section banners: setup, events, helpers, then the
+members in the toolset's own groups.
 """
 
 from __future__ import annotations
