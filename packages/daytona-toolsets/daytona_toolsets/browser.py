@@ -1224,6 +1224,12 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
     def file_upload(
         self, context: BetaToolsetCallContext, input: BetaBrowserFileUploadInput
     ) -> None:
+        """Hand the sandbox's own files to a file input on the page.
+
+        The approval this member needs has already happened: the SDK asks `confirm` before it
+        dispatches any member and refuses to construct a toolset that enables `file_upload` (or
+        `javascript_exec`) without one, so asking again here would only prompt twice for one call.
+        The file policy has likewise already ruled on `input.paths`."""
         tab = self._tab(input.tab_id)
         if input.document_ids:
             raise ToolError(
@@ -1251,7 +1257,14 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         A `DaytonaFilePolicy` declares upload roots the driver can re-check the resolved path
         against (the roots are resolved too, so a root that is itself a link still matches). A
         policy of another class declares nothing the driver can re-check, so a path that resolved
-        to somewhere else is refused outright."""
+        to somewhere else is refused outright.
+
+        The check and the upload are two steps against a filesystem, not one atomic operation:
+        the toolbox API resolves a path, it does not hand back a handle the driver could hold, so
+        anything else running in the sandbox that can write to the upload directory can swap a
+        checked file for a link between the two. The sandbox is the trust boundary — the model
+        drives the browser and has no shell in it — so keep the upload directory writable only by
+        you, and hold it to the task's own files, as the README says."""
         quoted = " ".join(shlex.quote(p) for p in paths)
         result = self.sandbox.process.exec(f"realpath -e -- {quoted}")
         resolved = (result.result or "").splitlines()

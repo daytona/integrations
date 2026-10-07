@@ -270,6 +270,34 @@ def test_the_members_that_reach_past_the_url_policy_are_off_until_enabled(
     assert options.is_enabled("navigate") is True
 
 
+def test_the_sdk_gates_file_upload_and_javascript_exec_on_confirm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The driver deliberately does not call `confirm` itself: the SDK asks before it dispatches
+    any member, and refuses to build a toolset that enables either of these without one. Calling
+    it again in the member would prompt twice for one call."""
+    for member in ("file_upload", "javascript_exec"):
+        with pytest.raises(ToolsetConfigError, match="requires a confirm callable"):
+            make_browser(monkeypatch, configs={member: {"enabled": True}})
+
+    asked: list[str] = []
+    browser = make_browser(
+        monkeypatch,
+        configs={"file_upload": {"enabled": True}},
+        confirm=lambda context: asked.append(context.member) is None and False,
+        file_policy=DaytonaFilePolicy(upload_roots=["/up"]),
+    )
+    sandbox: Any = browser.sandbox
+    refused = call(
+        browser,
+        "file_upload",
+        {"target": {"type": "ref", "ref": "ref_1"}, "paths": ["/up/a.txt"]},
+    )
+    assert asked == ["file_upload"]  # asked once, by the SDK, before the driver ran
+    assert refused.get("is_error")
+    sandbox.process.exec.assert_not_called()  # nothing was resolved, let alone uploaded
+
+
 def test_state_reports_one_active_tab_with_titles(browser: DaytonaBrowser) -> None:
     context: Any = browser._context
     context.pages[0].url, context.pages[0].title_ = "https://a.test/", "A"
