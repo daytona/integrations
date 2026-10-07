@@ -1,0 +1,25 @@
+packages/daytona-toolsets/tests/unit_tests/test_browser.py
+  s_e36a18757b9fbd::t_d9391dd7f4d155 453-488
+packages/daytona-toolsets/daytona_toolsets/_files.py
+  s_e36a18757b9fbd::t_702433cadf8e30 70-87
+  s_e36a18757b9fbd::t_04ae38b78f1b95 36-38
+packages/daytona-toolsets/daytona_toolsets/browser.py
+  s_e36a18757b9fbd::t_b65c5363411ae2 203,206-211
+  s_e36a18757b9fbd::t_37bb3e798b2e62 201-202,204-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d2ecda6d7648dbdc402417212b684fde0d54bba5",
+  "prompts": {},
+  "sessions": {
+    "s_e36a18757b9fbd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee869d002ffe3W2nIZmXL9KOAC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
