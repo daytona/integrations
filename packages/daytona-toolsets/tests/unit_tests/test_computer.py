@@ -98,12 +98,29 @@ def test_key_sequence_and_repeat(sandbox: MagicMock) -> None:
     assert presses == [("a", ["ctrl"]), ("backspace", []), ("a", ["ctrl"]), ("backspace", [])]
 
 
-def test_numpad_key_uses_probe_gated_native_press(sandbox: MagicMock) -> None:
+def test_verified_numpad_key_uses_probe_gated_native_press(sandbox: MagicMock) -> None:
     sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
-    call(computer(sandbox), "key", {"text": "KP_Add"})
+    call(computer(sandbox), "key", {"text": "KP_Decimal"})
     sandbox.computer_use.mouse.down.assert_called_once_with(x=0)
-    sandbox.computer_use.keyboard.press.assert_called_once_with("num_plus", [])
+    sandbox.computer_use.keyboard.press.assert_called_once_with("num_decimal", [])
     sandbox.process.exec.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("text", "keysym"),
+    [
+        ("KP_Enter", "KP_Enter"),
+        ("KP_Add", "KP_Add"),
+        ("KP_Subtract", "KP_Subtract"),
+        ("KP_Multiply", "KP_Multiply"),
+        ("KP_Divide", "KP_Divide"),
+    ],
+)
+def test_incorrect_native_numpad_keys_use_xtest(sandbox: MagicMock, text: str, keysym: str) -> None:
+    call(computer(sandbox), "key", {"text": text})
+    sandbox.computer_use.keyboard.press.assert_not_called()
+    sandbox.computer_use.mouse.down.assert_not_called()
+    assert xtest_actions(sandbox) == [["keydown", keysym], ["keyup", keysym]]
 
 
 def test_unsupported_keysym_goes_through_xtest(sandbox: MagicMock) -> None:
@@ -290,15 +307,16 @@ def test_hold_modifier_chord_uses_native_down_and_reverse_up(sandbox: MagicMock)
     sandbox.process.exec.assert_not_called()
 
 
-def test_hold_numpad_key_uses_native_name(sandbox: MagicMock) -> None:
-    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+def test_hold_incorrect_native_numpad_key_uses_xtest(sandbox: MagicMock) -> None:
     with patch("daytona_toolsets.computer.time.sleep"):
         call(computer(sandbox), "hold_key", {"text": "KP_Add", "duration": 0})
-    assert sandbox.computer_use.keyboard.mock_calls == [
-        mock_call.down("num_plus"),
-        mock_call.up("num_plus"),
+    assert xtest_actions(sandbox) == [
+        ["keydown", "KP_Add"],
+        ["sleep", 0],
+        ["keyup", "KP_Add"],
     ]
-    sandbox.process.exec.assert_not_called()
+    sandbox.computer_use.mouse.down.assert_not_called()
+    sandbox.computer_use.keyboard.down.assert_not_called()
 
 
 @pytest.mark.parametrize("text", ["A", "exclam", "shift+exclam"])
@@ -351,7 +369,7 @@ def test_probe_404_blocks_keyboard_migrations_and_is_cached(sandbox: MagicMock) 
     cases: list[tuple[str, dict[str, object]]] = [
         ("hold_key", {"text": "ctrl", "duration": 0}),
         ("type", {"text": "a\tb"}),
-        ("key", {"text": "KP_Add"}),
+        ("key", {"text": "KP_Decimal"}),
     ]
     for name, input in cases:
         result = call(toolset, name, input)

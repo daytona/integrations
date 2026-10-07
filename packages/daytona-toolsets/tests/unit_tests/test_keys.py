@@ -61,8 +61,15 @@ def test_split_sequence() -> None:
         ("minus", DesktopKey("-", "minus", char="-")),
         ("/", DesktopKey("/", "slash", char="/")),
         (" ", DesktopKey("space", "space", char=" ")),
-        # the native daemon accepts grammar-safe numpad names
-        ("KP_Enter", DesktopKey("num_enter", "KP_Enter")),
+        # verified-correct native numpad keys stay native
+        ("KP_1", DesktopKey("num1", "KP_1")),
+        ("KP_Decimal", DesktopKey("num_decimal", "KP_Decimal")),
+        # daemon 0.222.1 mis-types these native names, so they stay on XTest
+        ("KP_Enter", DesktopKey(None, "KP_Enter")),
+        ("KP_Add", DesktopKey(None, "KP_Add")),
+        ("KP_Subtract", DesktopKey(None, "KP_Subtract")),
+        ("KP_Multiply", DesktopKey(None, "KP_Multiply")),
+        ("KP_Divide", DesktopKey(None, "KP_Divide")),
         ("é", DesktopKey(None, "U00E9", char="é")),
         # not in the tables: an X keysym name, sent as written
         ("XF86AudioMute", DesktopKey(None, "XF86AudioMute")),

@@ -138,6 +138,11 @@ XKEYSYMS = {
 """Canonical names → X keysym names, for the input Daytona's API cannot send (held keys, chords
 held during a click)."""
 
+# Live production evidence (daemon 0.222.1, 2026-10-07): native press emits the wrong bytes for
+# these names (`num_enter` emits backtick; operators emit unrelated characters). Their KP_* X
+# keysyms emit the expected bytes. Digits, decimal, equal and lock remain correct natively.
+XTEST_NUMPAD = frozenset({"num_asterisk", "num_enter", "num_minus", "num_plus", "num_slash"})
+
 PLAYWRIGHT = {
     "enter": "Enter",
     "num_enter": "NumpadEnter",
@@ -246,6 +251,8 @@ def desktop_key(token: str) -> DesktopKey:
         canonical = NAMED[lower]
         if len(canonical) == 1:
             return desktop_key(canonical)
+        if canonical in XTEST_NUMPAD:
+            return DesktopKey(None, XKEYSYMS[canonical])
         return DesktopKey(canonical, XKEYSYMS[canonical])
     if lower in SHIFTED_NAMES:
         return desktop_key(SHIFTED_NAMES[lower])
