@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import subprocess
 from collections.abc import Callable, Iterator, Sequence
 from types import SimpleNamespace
 from typing import Any
@@ -1031,6 +1032,32 @@ def test_launch_waits_instead_of_probing_a_port_it_does_not_own(
     assert not any(
         "/json/version" in c.args[0] for c in sandbox.process.exec.call_args_list
     )  # never probed a port it had no proof of
+
+
+def test_launch_does_not_need_curl_in_the_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The documented contract for a borrowed sandbox is Chromium on `PATH`. `curl` confirms the
+    endpoint answers where it exists, but a sandbox without it must still come up: Chromium
+    writes DevToolsActivePort only once the DevTools server is listening."""
+    browser = make_browser(monkeypatch)
+    sandbox: Any = browser.sandbox
+    monkeypatch.setattr("daytona_toolsets._chromium.START_TIMEOUT", 0.5)
+    monkeypatch.setattr("daytona_toolsets._chromium.POLL", 0.01)
+
+    def run(command: str, *args: Any, **kwargs: Any) -> SimpleNamespace:
+        if "head -n 1" in command:
+            return SimpleNamespace(exit_code=0, result="45725\n/devtools/browser/abc\n")
+        if "127.0.0.1:45725" in command:
+            # The probe is a shell command; run this one for real, with nothing on PATH.
+            done = subprocess.run(  # noqa: S603
+                ["/bin/sh", "-c", command],
+                env={"PATH": "/nonexistent"},
+                capture_output=True,
+            )
+            return SimpleNamespace(exit_code=done.returncode, result=done.stdout.decode())
+        return SimpleNamespace(exit_code=0, result="")
+
+    sandbox.process.exec.side_effect = run
+    assert REAL_LAUNCH(browser, "chromium", True) == 45725
 
 
 def test_rank_prefers_elements_of_the_named_role() -> None:

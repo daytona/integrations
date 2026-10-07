@@ -89,10 +89,17 @@ def bound_port(sandbox: Sandbox, active: str) -> Optional[int]:
     """The debugging port Chromium bound, once it answers there, or `None` while it is starting.
 
     Chromium writes the port it chose, with the browser's websocket path, into
-    `DevToolsActivePort` in its user-data-dir. That directory is the driver's own fresh profile, so
-    reading the port back from it is what proves the endpoint answering belongs to the Chromium
-    this launch started — on a borrowed sandbox another browser may already be listening, and
-    probing a port the driver merely guessed would otherwise hand the model someone else's pages.
+    `DevToolsActivePort` in its user-data-dir, and only once the DevTools HTTP server is
+    listening on it. That directory is the driver's own fresh profile, so reading the port back
+    from it is what proves the endpoint answering belongs to the Chromium this launch started —
+    on a borrowed sandbox another browser may already be listening, and probing a port the driver
+    merely guessed would otherwise hand the model someone else's pages.
+
+    The file is therefore the readiness signal on its own. Where the sandbox has `curl`, the
+    endpoint is asked as well, which catches a browser that wrote the file and then died. Where
+    it does not, the file stands alone rather than the launch failing on a binary the package
+    never asked for: the borrowed-sandbox contract is Chromium on `PATH`, nothing more, and the
+    driver's own `GET /json/version` over the preview URL is what reports a dead endpoint.
 
     Args:
         active: The shell-quoted path of the profile's `DevToolsActivePort`.
@@ -102,5 +109,8 @@ def bound_port(sandbox: Sandbox, active: str) -> Optional[int]:
     if read.exit_code != 0 or not line.isdigit():
         return None
     port = int(line)
-    probe = f"curl -sf -o /dev/null http://127.0.0.1:{port}/json/version"
+    probe = (
+        "command -v curl >/dev/null 2>&1 || exit 0; "
+        f"curl -sf -o /dev/null http://127.0.0.1:{port}/json/version"
+    )
     return port if sandbox.process.exec(probe).exit_code == 0 else None
