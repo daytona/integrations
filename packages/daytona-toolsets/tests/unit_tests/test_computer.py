@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import inspect
 import io
 from types import SimpleNamespace
 from typing import Any
@@ -452,6 +453,25 @@ def test_partial_construction_failure_cleans_up() -> None:
 def test_sandbox_and_create_params_are_exclusive(sandbox: MagicMock) -> None:
     with pytest.raises(ValueError):
         DaytonaComputer(sandbox, create_params=MagicMock(), confirm=approve)
+
+
+def test_the_async_toolset_mirrors_every_computer_member() -> None:
+    """The async adapter must carry one `async def` per member: the SDK decides what a toolset
+    serves by looking each member name up on the class itself, so anything it does not find there
+    reaches the model as `enabled: False`. This pins both classes to the SDK's own member list, so
+    a member added, renamed or dropped on one side cannot quietly skip the other."""
+    from typing import get_args
+
+    from anthropic.types.beta import BetaComputerMemberName
+
+    from daytona_toolsets import AsyncDaytonaComputer
+
+    members = set(get_args(BetaComputerMemberName))
+    assert members, "the SDK's member list must not be empty"
+    assert {name for name in members if name in vars(DaytonaComputer)} == members
+    assert {name for name in members if name in vars(AsyncDaytonaComputer)} == members
+    # `check_flavour` rejects a plain `def` member on an async toolset at construction.
+    assert all(inspect.iscoroutinefunction(vars(AsyncDaytonaComputer)[name]) for name in members)
 
 
 async def test_async_computer_delegates_mouse_down_to_the_sync_driver(sandbox: MagicMock) -> None:

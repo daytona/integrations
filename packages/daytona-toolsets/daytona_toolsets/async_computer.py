@@ -51,6 +51,18 @@ class AsyncDaytonaComputer(BetaAsyncAbstractComputerToolset20260801):
     Build it with `await AsyncDaytonaComputer.create(...)`, which takes the same arguments as
     `DaytonaComputer` (creating a sandbox blocks, so it runs in a worker thread). The SDK's toolset
     options (`confirm`, `configs`, `tool_configs`) apply here; `confirm` may be async.
+
+    One `async def` per member, forwarding to the same member on `DaytonaComputer`, is what the SDK
+    requires — not a style choice. It decides which members a toolset serves by looking the name up
+    on the *class* and comparing it with the abstract base's own method, calling nothing
+    (`anthropic.lib.tools._toolsets._base.overridden`); a member it does not find there is sent to
+    the model as `enabled: False` and never dispatched. So `__getattr__`, `getattr`-based dispatch
+    or a shared generic forwarder would silently disable all seventeen members. The SDK then checks
+    each one it did find is an `async def` on an async toolset (`check_flavour`), and each takes its
+    own input type, which is what keeps the forwarding type-checked. The drift this inventory could
+    cause is held shut by a test: `test_the_async_toolset_mirrors_every_computer_member` compares
+    both classes against the SDK's own `BetaComputerMemberName`, so a member added, renamed or
+    dropped on either side fails the suite.
     """
 
     def __init__(self, **options: Any) -> None:
