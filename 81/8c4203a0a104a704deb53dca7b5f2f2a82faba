@@ -1,0 +1,29 @@
+packages/daytona-toolsets/daytona_toolsets/browser.py
+  s_e36a18757b9fbd::t_fd6043443caf5b 132-137
+  s_e36a18757b9fbd::t_37226adfa0183e 742,750-755,760
+  s_e36a18757b9fbd::t_2b9d9e4d6c56b2 776-785,788-790
+  s_e36a18757b9fbd::t_21df0c513a0bef 791-793
+packages/daytona-toolsets/tests/unit_tests/test_browser.py
+  s_e36a18757b9fbd::t_85b64c179c6794 723
+  s_e36a18757b9fbd::t_acec42eb832e10 714-722,724-729
+  s_e36a18757b9fbd::t_9f22da6aff36bf 16-23
+  s_e36a18757b9fbd::t_1530ceee69f67e 730-731
+packages/daytona-toolsets/README.md
+  s_e36a18757b9fbd::t_b2d773e32cb787 59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "818c4203a0a104a704deb53dca7b5f2f2a82faba",
+  "prompts": {},
+  "sessions": {
+    "s_e36a18757b9fbd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee869d002ffe3W2nIZmXL9KOAC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
