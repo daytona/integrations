@@ -235,13 +235,26 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
             self._xtest.run(actions)
 
     def _native_input_supported(self) -> bool:
-        """Whether the sandbox daemon has the native held-input endpoints."""
+        """Whether the sandbox daemon has the native held-input endpoints.
+
+        The probe is a deliberately half-specified press: `x` without `y`. A daemon that has the
+        endpoint rejects it while validating the request — before it touches the pointer — so the
+        404/400 answer separates "no such endpoint" from "endpoint, bad arguments" without
+        injecting any input. Live, on daemon 0.222.1: `POST /computeruse/mouse/down` answers
+        `400 bad request: x and y must be provided together`, and the screen is untouched.
+
+        A daemon that accepts it anyway is handled too; see the `else` branch.
+        """
         if self._native_input_capability is None:
             try:
+                # Not a press: `x` alone is incomplete, and the coordinate pair is validated
+                # before any pointer event is sent. Asking for a capability must not move or
+                # click anything, because the very next call is the member the model asked for.
                 self.sandbox.computer_use.mouse.down(x=0)
             except DaytonaError as exc:
                 match exc.status_code:
                     case 400:
+                        # The arguments were refused, so the endpoint exists: nothing was pressed.
                         self._native_input_capability = True
                     case 404:
                         self._native_input_capability = False
