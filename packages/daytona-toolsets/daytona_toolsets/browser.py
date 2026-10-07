@@ -35,6 +35,7 @@ import httpx
 from anthropic.tools import ToolError, ToolsetConfigError
 from anthropic.tools.browser import (
     BetaAbstractBrowserToolset20260801,
+    BetaBrowserMemberResult,
     BetaBrowserNavigateResult,
     BetaBrowserState,
     BetaDialogDismissed,
@@ -47,6 +48,8 @@ from anthropic.tools.browser import (
 )
 from anthropic.types.beta import (
     BetaBrowserCloseTabInput,
+    BetaBrowserMemberInput,
+    BetaBrowserMemberName,
     BetaBrowserCoordinateTarget,
     BetaBrowserDoubleClickInput,
     BetaBrowserFileUploadInput,
@@ -808,10 +811,25 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             log.debug("could not refresh the sandbox activity: %s", type(exc).__name__)
 
     @override
+    def execute(
+        self,
+        context: BetaToolsetCallContext,
+        name: BetaBrowserMemberName,
+        input: BetaBrowserMemberInput,
+    ) -> BetaBrowserMemberResult:
+        """Every member, with the sandbox told it is in use before the member runs as well as
+        after it (`_browser_state`). A member is itself bounded — `navigation_timeout` for a
+        navigation, `MAX_DURATION` for `wait` and `hold_key`, ten seconds for a script — so the
+        sandbox is never left unheard from for longer than `KEEP_ALIVE` plus one member, however
+        long the browsing session runs."""
+        self._keep_alive()
+        return super().execute(context, name, input)
+
+    @override
     def _browser_state(self, context: BetaToolsetCallContext) -> BetaBrowserState:
         """Every open tab, exactly one active, and the changes since the last report. Never raises:
         a browser that stopped answering is reported from what the driver last knew."""
-        self._keep_alive()  # runs after every call, which is where a browsing session shows itself
+        self._keep_alive()  # after the member, as `execute` did before it
         try:
             for tab in list(self._tabs.values()):
                 if tab.target_id is None and not self._disconnected:

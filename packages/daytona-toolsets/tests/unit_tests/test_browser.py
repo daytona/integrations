@@ -566,6 +566,21 @@ def test_a_symlinked_upload_root_is_resolved_before_the_containment_check(
         browser._resolve_in_sandbox(["/link/a.txt"])
 
 
+def test_every_member_tells_the_sandbox_it_is_in_use_before_it_runs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A member is bounded, but it can take seconds; the refresh after it is not the only one."""
+    browser = make_browser(monkeypatch)
+    sandbox: Any = browser.sandbox
+    browser._last_activity -= 61
+    seen: list[bool] = []
+    browser._tabs["tab_1"].page.wait_for_timeout = lambda ms: seen.append(  # type: ignore[method-assign]
+        bool(sandbox.refresh_activity.call_args_list)
+    )
+    call(browser, "wait", {"duration": 0})
+    assert seen == [True]  # refreshed before the member, not only in the report after it
+
+
 def test_a_browsing_session_keeps_the_sandbox_from_auto_stopping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
