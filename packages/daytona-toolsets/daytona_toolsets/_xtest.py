@@ -1,6 +1,9 @@
-"""XTest fallback for input the Daytona Computer Use API does not represent natively: exotic
-keysyms without a Daytona key name, and mouse click, drag or scroll chords holding a non-modifier
-key token.
+"""XTest fallback for input the Daytona Computer Use API does not represent correctly or natively:
+keysyms with no Daytona key name (for example ``XF86…`` media keys) in ``key``/``hold_key``;
+mouse click, drag or scroll chords holding a non-modifier key token (for example ``a`` + click);
+modifier-only ``key`` chords (for example ``super`` or ``ctrl+alt``); and numpad Enter/operators
+(``KP_Enter``, ``KP_Add``, ``KP_Subtract``, ``KP_Multiply``, ``KP_Divide``), whose API names exist
+but whose native press emits the wrong characters on daemon 0.222.1.
 
 A small Python script is uploaded into the sandbox once and replays a list of XTest events on the
 sandbox's X display (libX11 and libXtst through ctypes: nothing to install). It uses the same
