@@ -119,10 +119,10 @@ try:
     )
 except ImportError as exc:  # pragma: no cover - depends on the environment
     raise ImportError(
-        "DaytonaBrowser needs Playwright: pip install 'daytona-toolsets[browser]'"
+        "DaytonaBrowser needs Playwright: pip install 'daytona-claude-toolsets[browser]'"
     ) from exc
 
-log = logging.getLogger("daytona_toolsets")
+log = logging.getLogger("daytona_claude_toolsets")
 
 MAX_TABS = 100
 MAX_DURATION = 30.0
@@ -214,7 +214,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         # interception matches it by refusing every page request.
         self._url_policy = options.get("url_policy")
         self._has_url_policy = "url_policy" in options
-        self._session_id = f"daytona-toolsets-{secrets.token_hex(4)}"
+        self._session_id = f"daytona-claude-toolsets-{secrets.token_hex(4)}"
         self._profile = f"/tmp/{self._session_id}-profile"
         self._download_dir = f"/tmp/{self._session_id}-downloads"
         policy = options.get("file_policy")
@@ -673,7 +673,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
                 tab.world = int(
                     cdp.send(
                         "Page.createIsolatedWorld",
-                        {"frameId": frame_id, "worldName": "daytona-toolsets"},
+                        {"frameId": frame_id, "worldName": "daytona-claude-toolsets"},
                     )["executionContextId"]
                 )
                 cdp.send(

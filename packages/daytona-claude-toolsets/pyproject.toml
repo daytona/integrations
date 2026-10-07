@@ -3,7 +3,7 @@ requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "daytona-toolsets"
+name = "daytona-claude-toolsets"
 version = "0.0.0"
 description = "Daytona sandbox drivers for the Anthropic SDK's computer and browser toolsets"
 readme = "README.md"
@@ -13,7 +13,16 @@ license-files = ["LICENSE"]
 authors = [
     {name = "Daytona Platforms Inc.", email = "support@daytona.io"}
 ]
-keywords = ["daytona", "sandbox", "computer-use", "browser", "toolset", "agent"]
+keywords = [
+    "daytona",
+    "sandbox",
+    "computer-use",
+    "browser",
+    "toolset",
+    "agent",
+    "anthropic",
+    "claude",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -47,16 +56,16 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/daytona/integrations/tree/main/packages/daytona-toolsets#readme"
+Homepage = "https://github.com/daytona/integrations/tree/main/packages/daytona-claude-toolsets#readme"
 Repository = "https://github.com/daytona/integrations"
-Documentation = "https://github.com/daytona/integrations/tree/main/packages/daytona-toolsets#readme"
+Documentation = "https://github.com/daytona/integrations/tree/main/packages/daytona-claude-toolsets#readme"
 Issues = "https://github.com/daytona/integrations/issues"
 
 [tool.setuptools]
-packages = ["daytona_toolsets"]
+packages = ["daytona_claude_toolsets"]
 
 [tool.setuptools.package-data]
-daytona_toolsets = ["py.typed"]
+daytona_claude_toolsets = ["py.typed"]
 
 [tool.pytest.ini_options]
 # Unit tests only (offline, Daytona mocked). The live checks are examples/exercise_*.py.

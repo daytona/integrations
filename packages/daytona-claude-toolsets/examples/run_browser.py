@@ -28,7 +28,7 @@ from anthropic import Anthropic
 from anthropic.tools import ToolError
 from anthropic.tools.browser import BetaURLContext, BetaURLPolicy
 
-from daytona_toolsets import DaytonaBrowser
+from daytona_claude_toolsets import DaytonaBrowser
 
 TASK = "Open example.com and tell me the page heading."
 

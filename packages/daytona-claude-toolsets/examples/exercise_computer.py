@@ -28,7 +28,7 @@ from anthropic.tools.computer import BetaAbstractComputerToolset20260801
 from anthropic.types.beta import BetaToolResultBlockParam, BetaToolUseBlock
 from daytona import CreateSandboxFromSnapshotParams, Daytona, DaytonaError, SessionExecuteRequest
 
-from daytona_toolsets import DaytonaComputer
+from daytona_claude_toolsets import DaytonaComputer
 
 
 def call(
@@ -296,7 +296,7 @@ def main() -> None:
     # A sandbox the caller passes in is not the driver's to delete.
     daytona = Daytona()
     borrowed = daytona.create(
-        CreateSandboxFromSnapshotParams(labels={"created-by": "daytona-toolsets"})
+        CreateSandboxFromSnapshotParams(labels={"created-by": "daytona-claude-toolsets"})
     )
     try:
         with DaytonaComputer(borrowed, confirm=lambda context: True) as computer:

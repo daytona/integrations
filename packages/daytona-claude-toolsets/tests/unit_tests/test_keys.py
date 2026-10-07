@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from anthropic.tools import ToolError
 
-from daytona_toolsets._keys import (
+from daytona_claude_toolsets._keys import (
     DesktopKey,
     desktop_key,
     parse_chord,

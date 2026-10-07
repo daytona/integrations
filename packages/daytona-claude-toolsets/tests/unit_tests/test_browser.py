@@ -13,9 +13,9 @@ from anthropic.tools import ToolError, ToolsetConfigError
 from anthropic.tools.browser import BetaDialogDismissed, BetaLocalFilePolicy, BetaNavigationRefused
 from anthropic.tools.browser import BetaURLContext
 
-from daytona_toolsets import DaytonaBrowser, DaytonaFilePolicy
-from daytona_toolsets._files import is_under
-from daytona_toolsets.browser import (
+from daytona_claude_toolsets import DaytonaBrowser, DaytonaFilePolicy
+from daytona_claude_toolsets._files import is_under
+from daytona_claude_toolsets.browser import (
     KEEP_ALIVE,
     MAX_TEXT,
     failure_phrase,
@@ -629,7 +629,7 @@ def test_a_radio_button_cannot_be_cleared(monkeypatch: pytest.MonkeyPatch) -> No
 
 def set_value_body() -> str:
     """The `setValue` entry point of the in-page toolkit, as source."""
-    from daytona_toolsets import _page_js
+    from daytona_claude_toolsets import _page_js
 
     return _page_js.TOOLKIT.split("setValue(ref, value) {", 1)[1].split("\n    fileInput(", 1)[0]
 
@@ -747,7 +747,7 @@ def test_download_paths_need_expose_download_paths(monkeypatch: pytest.MonkeyPat
 def test_the_default_download_dir_is_exposed_when_asked(monkeypatch: pytest.MonkeyPatch) -> None:
     # No download_dir: the driver picks one, so expose_download_paths must still show it.
     browser = make_browser(monkeypatch, file_policy=DaytonaFilePolicy(expose_download_paths=True))
-    assert browser.download_dir.startswith("/tmp/daytona-toolsets-")
+    assert browser.download_dir.startswith("/tmp/daytona-claude-toolsets-")
     assert completed_download(browser)["path"] == f"{browser.download_dir}/g1"
 
 
@@ -1024,9 +1024,9 @@ def test_launch_waits_instead_of_probing_a_port_it_does_not_own(
     browser = make_browser(monkeypatch)
     sandbox: Any = browser.sandbox
     sandbox.process.exec.side_effect = exec_script({"head -n 1": (1, "")})
-    monkeypatch.setattr("daytona_toolsets._chromium.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("daytona_claude_toolsets._chromium.time.sleep", lambda seconds: None)
     clock = iter([0.0, 0.0, 1.0, 100.0, 100.0])
-    monkeypatch.setattr("daytona_toolsets._chromium.time.monotonic", lambda: next(clock))
+    monkeypatch.setattr("daytona_claude_toolsets._chromium.time.monotonic", lambda: next(clock))
     with pytest.raises(RuntimeError, match="Chromium did not start"):
         REAL_LAUNCH(browser, "chromium", True)
     assert not any(
@@ -1040,8 +1040,8 @@ def test_launch_does_not_need_curl_in_the_sandbox(monkeypatch: pytest.MonkeyPatc
     writes DevToolsActivePort only once the DevTools server is listening."""
     browser = make_browser(monkeypatch)
     sandbox: Any = browser.sandbox
-    monkeypatch.setattr("daytona_toolsets._chromium.START_TIMEOUT", 0.5)
-    monkeypatch.setattr("daytona_toolsets._chromium.POLL", 0.01)
+    monkeypatch.setattr("daytona_claude_toolsets._chromium.START_TIMEOUT", 0.5)
+    monkeypatch.setattr("daytona_claude_toolsets._chromium.POLL", 0.01)
 
     def run(command: str, *args: Any, **kwargs: Any) -> SimpleNamespace:
         if "head -n 1" in command:

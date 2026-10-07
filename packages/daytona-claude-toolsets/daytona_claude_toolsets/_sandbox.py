@@ -7,12 +7,12 @@ from typing import Literal, Optional, Union
 
 from daytona import CreateSandboxFromImageParams, CreateSandboxFromSnapshotParams, Daytona, Sandbox
 
-log = logging.getLogger("daytona_toolsets")
+log = logging.getLogger("daytona_claude_toolsets")
 
 CreateParams = Union[CreateSandboxFromSnapshotParams, CreateSandboxFromImageParams]
 OnClose = Literal["delete", "stop"]
 
-LABELS = {"created-by": "daytona-toolsets"}
+LABELS = {"created-by": "daytona-claude-toolsets"}
 """Labels put on every sandbox this package creates, so a leftover one can be found and removed.
 
 Reserved: a caller's `create_params.labels` cannot change them. Taking a sandbox off this list
@@ -66,7 +66,8 @@ class SandboxLease:
                 self.sandbox.stop()
         except Exception as exc:
             log.warning(
-                "could not %s sandbox %s (%s); remove it by its label created-by=daytona-toolsets",
+                "could not %s sandbox %s (%s); remove it by its label "
+                "created-by=daytona-claude-toolsets",
                 self.on_close,
                 self.sandbox.id,
                 type(exc).__name__,

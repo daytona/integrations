@@ -50,7 +50,7 @@ jobs:
             convex:
               - 'packages/convex/**'
             toolsets:
-              - 'packages/daytona-toolsets/**'
+              - 'packages/daytona-claude-toolsets/**'
 
   adk:
     needs: changes
@@ -261,22 +261,22 @@ jobs:
       - name: Detect package
         id: guard
         run: |
-          test -f packages/daytona-toolsets/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+          test -f packages/daytona-claude-toolsets/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
       - name: Install
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-toolsets
+        working-directory: packages/daytona-claude-toolsets
         run: python -m pip install -e ".[dev]"
       - name: Lint (ruff)
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-toolsets
+        working-directory: packages/daytona-claude-toolsets
         run: ruff check .
       - name: Type check (mypy)
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-toolsets
-        run: mypy daytona_toolsets
+        working-directory: packages/daytona-claude-toolsets
+        run: mypy daytona_claude_toolsets
       - name: Unit tests (offline, Daytona and Playwright mocked)
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-toolsets
+        working-directory: packages/daytona-claude-toolsets
         run: pytest
       # NOTE: live checks (examples/exercise_*.py, real Daytona sandboxes) are not in per-PR CI.
 

@@ -12,7 +12,7 @@ from anthropic.tools import ToolsetClosedError, ToolsetConfigError
 from daytona import DaytonaError
 from PIL import Image
 
-from daytona_toolsets import DaytonaComputer
+from daytona_claude_toolsets import DaytonaComputer
 
 from .conftest import blocks_of, call, fake_sandbox, png, text_of, xtest_actions
 
@@ -86,7 +86,7 @@ def test_a_screenshot_waits_out_the_settle_delay_after_an_input(
     )
     toolset = DaytonaComputer(sandbox, confirm=approve, settle_delay=0.3)
     call(toolset, "left_click", {"coordinate": [10, 10]})
-    with patch("daytona_toolsets.computer.time.sleep") as sleep:
+    with patch("daytona_claude_toolsets.computer.time.sleep") as sleep:
         call(toolset, member, {"region": [10, 20, 210, 120]} if member == "zoom" else {})
     waited = [c.args[0] for c in sleep.call_args_list]
     assert waited and 0 < waited[0] <= 0.3, f"{member} did not wait for the screen to settle"
@@ -326,7 +326,7 @@ def test_durations_are_bounded(sandbox: MagicMock) -> None:
 
 def test_hold_modifier_chord_uses_native_down_and_reverse_up(sandbox: MagicMock) -> None:
     sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
-    with patch("daytona_toolsets.computer.time.sleep") as sleep:
+    with patch("daytona_claude_toolsets.computer.time.sleep") as sleep:
         events = MagicMock()
         events.attach_mock(sandbox.computer_use.keyboard.down, "down")
         events.attach_mock(sleep, "sleep")
@@ -343,7 +343,7 @@ def test_hold_modifier_chord_uses_native_down_and_reverse_up(sandbox: MagicMock)
 
 
 def test_hold_incorrect_native_numpad_key_uses_xtest(sandbox: MagicMock) -> None:
-    with patch("daytona_toolsets.computer.time.sleep"):
+    with patch("daytona_claude_toolsets.computer.time.sleep"):
         call(computer(sandbox), "hold_key", {"text": "KP_Add", "duration": 0})
     assert xtest_actions(sandbox) == [
         ["keydown", "KP_Add"],
@@ -357,7 +357,7 @@ def test_hold_incorrect_native_numpad_key_uses_xtest(sandbox: MagicMock) -> None
 @pytest.mark.parametrize("text", ["A", "exclam", "shift+exclam"])
 def test_hold_shifted_key_uses_implicit_deduplicated_shift(sandbox: MagicMock, text: str) -> None:
     sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
-    with patch("daytona_toolsets.computer.time.sleep"):
+    with patch("daytona_claude_toolsets.computer.time.sleep"):
         call(computer(sandbox), "hold_key", {"text": text, "duration": 0})
     assert sandbox.computer_use.keyboard.mock_calls == [
         mock_call.down("shift"),
@@ -440,7 +440,7 @@ def test_owned_sandbox_is_deleted_once() -> None:
     toolset = DaytonaComputer(daytona=client, confirm=approve, resolution=(1024, 768))
     params = client.create.call_args.args[0]
     assert params.env_vars["VNC_RESOLUTION"] == "1024x768"
-    assert params.labels["created-by"] == "daytona-toolsets"
+    assert params.labels["created-by"] == "daytona-claude-toolsets"
     with toolset:
         pass
     toolset.close()
@@ -448,7 +448,7 @@ def test_owned_sandbox_is_deleted_once() -> None:
 
 
 def test_the_packages_marker_label_cannot_be_overridden() -> None:
-    """`created-by=daytona-toolsets` is how a leftover sandbox is found and removed, as the
+    """`created-by=daytona-claude-toolsets` is how a leftover sandbox is found and removed, as the
     README tells people to. A caller's own label must not take a sandbox off that list, while
     every other label the caller sets is kept."""
     from daytona import CreateSandboxFromSnapshotParams
@@ -464,7 +464,7 @@ def test_the_packages_marker_label_cannot_be_overridden() -> None:
         ),
     ).close()
     params = client.create.call_args.args[0]
-    assert params.labels == {"created-by": "daytona-toolsets", "purpose": "demo"}
+    assert params.labels == {"created-by": "daytona-claude-toolsets", "purpose": "demo"}
 
 
 def test_owned_sandbox_can_be_stopped_instead() -> None:
@@ -501,7 +501,7 @@ def test_the_async_toolset_mirrors_every_computer_member() -> None:
 
     from anthropic.types.beta import BetaComputerMemberName
 
-    from daytona_toolsets import AsyncDaytonaComputer
+    from daytona_claude_toolsets import AsyncDaytonaComputer
 
     members = set(get_args(BetaComputerMemberName))
     assert members, "the SDK's member list must not be empty"
@@ -514,7 +514,7 @@ def test_the_async_toolset_mirrors_every_computer_member() -> None:
 async def test_async_computer_delegates_mouse_down_to_the_sync_driver(sandbox: MagicMock) -> None:
     from anthropic.types.beta import BetaToolUseBlock
 
-    from daytona_toolsets import AsyncDaytonaComputer
+    from daytona_claude_toolsets import AsyncDaytonaComputer
 
     with pytest.raises(ToolsetConfigError):  # options are checked before a sandbox is touched
         await AsyncDaytonaComputer.create(sandbox)
@@ -547,7 +547,7 @@ async def test_async_computer_delegates_mouse_down_to_the_sync_driver(sandbox: M
 async def test_async_computer_delegates_native_hold_to_the_sync_driver(sandbox: MagicMock) -> None:
     from anthropic.types.beta import BetaToolUseBlock
 
-    from daytona_toolsets import AsyncDaytonaComputer
+    from daytona_claude_toolsets import AsyncDaytonaComputer
 
     async def confirm(_context: object) -> bool:
         return True
@@ -562,7 +562,7 @@ async def test_async_computer_delegates_native_hold_to_the_sync_driver(sandbox: 
             input={"text": "ctrl+a", "duration": 2},
             toolset_name="computer",
         )
-        with patch("daytona_toolsets.computer.time.sleep") as sleep:
+        with patch("daytona_claude_toolsets.computer.time.sleep") as sleep:
             events = MagicMock()
             events.attach_mock(sandbox.computer_use.keyboard.down, "down")
             events.attach_mock(sleep, "sleep")

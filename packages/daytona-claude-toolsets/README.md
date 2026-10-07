@@ -1,4 +1,4 @@
-# daytona-toolsets
+# daytona-claude-toolsets
 
 [Daytona](https://www.daytona.io) sandbox drivers for the Anthropic SDK's **computer** and **browser** toolsets (`computer_toolset_20260801`, `browser_toolset_20260801`). Hand one to `client.beta.messages.tool_runner` and Claude drives a desktop or a Chromium that runs in an isolated Daytona sandbox, while your API keys, the model loop and the toolset stay in your process.
 
@@ -10,8 +10,8 @@ Every member of both toolsets is implemented, including the browser members that
 ## Installation
 
 ```bash
-pip install daytona-toolsets             # DaytonaComputer
-pip install 'daytona-toolsets[browser]'  # + DaytonaBrowser (Playwright client only; no local browser)
+pip install daytona-claude-toolsets             # DaytonaComputer
+pip install 'daytona-claude-toolsets[browser]'  # + DaytonaBrowser (Playwright client only; no local browser)
 ```
 
 Set your keys in the environment:
@@ -27,7 +27,7 @@ export ANTHROPIC_API_KEY="..."
 
 ```python
 from anthropic import Anthropic
-from daytona_toolsets import DaytonaComputer
+from daytona_claude_toolsets import DaytonaComputer
 
 with DaytonaComputer(confirm=lambda context: True) as computer:
     for message in Anthropic().beta.messages.tool_runner(model="claude-sonnet-5-5", max_tokens=4096, tools=[computer], messages=[{"role": "user", "content": "Open a terminal, run date, and tell me the output."}]):
@@ -38,7 +38,7 @@ with DaytonaComputer(confirm=lambda context: True) as computer:
 
 ```python
 from anthropic import Anthropic
-from daytona_toolsets import DaytonaBrowser
+from daytona_claude_toolsets import DaytonaBrowser
 
 with DaytonaBrowser(url_policy=my_policy) as browser:
     for message in Anthropic().beta.messages.tool_runner(model="claude-sonnet-5-5", max_tokens=4096, tools=[browser], messages=[{"role": "user", "content": "Open example.com and tell me the page heading."}]):
@@ -54,7 +54,7 @@ With no `sandbox` argument, each driver creates a sandbox from Daytona's default
 | **Owned** (default) | `DaytonaComputer(create_params=CreateSandboxFromSnapshotParams(...))`, or no arguments | deleted (`on_close="stop"` stops it instead) |
 | **Borrowed** | `DaytonaComputer(sandbox)` with a running `Sandbox` | left running; `DaytonaBrowser` stops the Chromium it started |
 
-`close()` is idempotent and safe after a failed construction: a sandbox created before the failure is still removed. Sandboxes the drivers create always carry the label `created-by=daytona-toolsets`, so a leftover one can be found and removed by it; `create_params.labels` adds your own labels but cannot change that one. Keyword arguments the drivers don't define (`confirm`, `configs`, `url_policy`, `file_policy`, `tool_configs`) go to the SDK unchanged.
+`close()` is idempotent and safe after a failed construction: a sandbox created before the failure is still removed. Sandboxes the drivers create always carry the label `created-by=daytona-claude-toolsets`, so a leftover one can be found and removed by it; `create_params.labels` adds your own labels but cannot change that one. Keyword arguments the drivers don't define (`confirm`, `configs`, `url_policy`, `file_policy`, `tool_configs`) go to the SDK unchanged.
 
 Daytona auto-stops an idle sandbox, and counts only interactions made through the SDK — not traffic through a preview URL, which is how `DaytonaBrowser` reaches Chromium. It therefore refreshes the sandbox's activity itself while the browser is in use, so a long browsing session is not stopped underneath it. The refresh counts the waiting a member is about to do, not only the gap between calls, so the sandbox is never left unheard from for more than 45 seconds and one on Daytona's shortest auto-stop interval (one minute) stays up — unless you raise `navigation_timeout` past that interval, when a single navigation can outlast it. It never changes the sandbox's auto-stop interval, so a borrowed sandbox keeps the lifecycle you configured.
 
@@ -111,7 +111,7 @@ How the browser is reached: the driver connects through a **signed preview URL f
 ### Files
 
 ```python
-from daytona_toolsets import DaytonaBrowser, DaytonaFilePolicy
+from daytona_claude_toolsets import DaytonaBrowser, DaytonaFilePolicy
 
 browser = DaytonaBrowser(
     configs={"file_upload": {"enabled": True}},
@@ -147,7 +147,7 @@ pip install -e ".[dev]"
 pytest                               # unit tests (offline, Daytona and Playwright mocked)
 python examples/exercise_computer.py # live checks (need DAYTONA_API_KEY)
 python examples/exercise_browser.py
-ruff check . && black --check . && mypy daytona_toolsets
+ruff check . && black --check . && mypy daytona_claude_toolsets
 ```
 
 ## License

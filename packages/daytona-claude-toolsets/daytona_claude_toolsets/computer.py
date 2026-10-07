@@ -45,7 +45,7 @@ from ._keys import XKEYSYMS, desktop_key, parse_chord, split_sequence
 from ._sandbox import CreateParams, OnClose, SandboxLease
 from ._xtest import BUTTONS, Action, XTest
 
-log = logging.getLogger("daytona_toolsets")
+log = logging.getLogger("daytona_claude_toolsets")
 
 MAX_DURATION = 30
 """Longest `wait` or `hold_key` the driver runs, in seconds. The SDK does not bound either."""

@@ -22,7 +22,7 @@ from typing import Union
 from anthropic.tools import ToolError
 from daytona import Sandbox
 
-log = logging.getLogger("daytona_toolsets")
+log = logging.getLogger("daytona_claude_toolsets")
 
 Action = list[Union[str, int, float]]
 
@@ -122,7 +122,7 @@ class XTest:
 
     def _script(self) -> str:
         if self._path is None:
-            path = f"/tmp/daytona-toolsets-xtest-{secrets.token_hex(4)}.py"
+            path = f"/tmp/daytona-claude-toolsets-xtest-{secrets.token_hex(4)}.py"
             self._sandbox.fs.upload_file(SCRIPT.encode(), path)
             self._path = path
         return self._path

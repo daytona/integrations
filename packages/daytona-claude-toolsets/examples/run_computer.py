@@ -22,7 +22,7 @@ import os
 from anthropic import Anthropic
 from anthropic.tools.computer import BetaComputerConfirmContext
 
-from daytona_toolsets import DaytonaComputer
+from daytona_claude_toolsets import DaytonaComputer
 
 TASK = "Open a terminal, run `date`, and tell me exactly what it printed."
 

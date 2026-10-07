@@ -33,7 +33,7 @@ from anthropic.types.beta import BetaToolResultBlockParam, BetaToolUseBlock
 from daytona import CreateSandboxFromSnapshotParams, Daytona, Sandbox, SessionExecuteRequest
 from PIL import Image
 
-from daytona_toolsets import DaytonaBrowser, DaytonaFilePolicy
+from daytona_claude_toolsets import DaytonaBrowser, DaytonaFilePolicy
 
 ORIGIN = "http://localhost:8000"
 UPLOADS = "/tmp/exercise-uploads"
@@ -464,18 +464,19 @@ def main() -> None:
 
     # A sandbox the caller passes in survives close(); the driver's Chromium does not.
     borrowed = Daytona().create(
-        CreateSandboxFromSnapshotParams(labels={"created-by": "daytona-toolsets"})
+        CreateSandboxFromSnapshotParams(labels={"created-by": "daytona-claude-toolsets"})
     )
     try:
         with DaytonaBrowser(borrowed, url_policy=policy) as browser:
             answered(browser, "navigate", {"url": "about:blank"})
         borrowed.refresh_data()
         assert str(getattr(borrowed.state, "value", borrowed.state)) == "started"
-        # `[d]aytona-toolsets-`: the shell running this very command has the pattern in its own
-        # command line, and `pgrep -f` matches that too, so a plain pattern always finds itself
-        # and the check can never pass. The bracket matches the same literal text without
+        # `[d]aytona-claude-toolsets-`: the shell running this very command has the pattern in
+        # its own command line, and `pgrep -f` matches that too, so a plain pattern always finds
+        # itself and the check can never pass. The bracket matches the same literal text without
         # matching the pattern as written.
-        running = borrowed.process.exec("pgrep -f '[d]aytona-toolsets-' || true").result.strip()
+        pattern = "pgrep -f '[d]aytona-claude-toolsets-' || true"
+        running = borrowed.process.exec(pattern).result.strip()
         assert not running, f"expected the driver's Chromium stopped: {running}"
     finally:
         borrowed.delete()
