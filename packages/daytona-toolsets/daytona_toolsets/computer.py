@@ -288,10 +288,15 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         presses: list[Action] = [["down", number], ["up", number]] * count
         self._run_xtest([["move", x, y], *self._with_keys_held(held, presses)])
 
-    def _screenshot_png(self) -> tuple[bytes, Image.Image]:
+    def _settle(self) -> None:
+        """Wait out what is left of `settle_delay` since the last input, so the next frame shows
+        what that input did rather than the screen just before it."""
         wait = self._last_input + self._settle_delay - time.monotonic()
         if wait > 0:
             time.sleep(wait)
+
+    def _screenshot_png(self) -> tuple[bytes, Image.Image]:
+        self._settle()
         with self._desktop("take a screenshot", is_input=False):
             response = self.sandbox.computer_use.screenshot.take_full_screen()
         png = base64.b64decode(response.screenshot or "")
@@ -325,6 +330,7 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         right = min(self._screen[0], max(left + 1, round(x1 / self._scale)))
         bottom = min(self._screen[1], max(top + 1, round(y1 / self._scale)))
         region = ScreenshotRegion(x=left, y=top, width=right - left, height=bottom - top)
+        self._settle()  # a region is still a screenshot: it must not show the pre-input frame
         with self._desktop("take a screenshot", is_input=False):
             response = self.sandbox.computer_use.screenshot.take_region(region)
         crop = Image.open(io.BytesIO(base64.b64decode(response.screenshot or "")))

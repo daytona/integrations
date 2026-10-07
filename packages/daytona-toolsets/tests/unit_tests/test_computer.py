@@ -75,6 +75,23 @@ def test_zoom_crops_and_scales_up(sandbox: MagicMock) -> None:
     assert refused.get("is_error") is True
 
 
+@pytest.mark.parametrize("member", ["screenshot", "zoom"])
+def test_a_screenshot_waits_out_the_settle_delay_after_an_input(
+    sandbox: MagicMock, member: str
+) -> None:
+    """Both members return a frame, and a frame taken straight after a click shows the screen
+    before the click landed. `zoom` is a screenshot of a region, so it waits like the full one."""
+    sandbox.computer_use.screenshot.take_region.return_value = SimpleNamespace(
+        screenshot=png(200, 100)
+    )
+    toolset = DaytonaComputer(sandbox, confirm=approve, settle_delay=0.3)
+    call(toolset, "left_click", {"coordinate": [10, 10]})
+    with patch("daytona_toolsets.computer.time.sleep") as sleep:
+        call(toolset, member, {"region": [10, 20, 210, 120]} if member == "zoom" else {})
+    waited = [c.args[0] for c in sleep.call_args_list]
+    assert waited and 0 < waited[0] <= 0.3, f"{member} did not wait for the screen to settle"
+
+
 @pytest.mark.parametrize(
     ("text", "key", "modifiers"),
     [
