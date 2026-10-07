@@ -13,7 +13,14 @@ from anthropic.tools.browser import BetaDialogDismissed, BetaLocalFilePolicy, Be
 from anthropic.tools.browser import BetaURLContext
 
 from daytona_toolsets import DaytonaBrowser, DaytonaFilePolicy
-from daytona_toolsets.browser import MAX_TEXT, failure_phrase, format_remote, normalize_url, rank
+from daytona_toolsets.browser import (
+    KEEP_ALIVE,
+    MAX_TEXT,
+    failure_phrase,
+    format_remote,
+    normalize_url,
+    rank,
+)
 
 from .conftest import blocks_of, call, fake_sandbox, text_of
 
@@ -702,6 +709,24 @@ def test_every_member_tells_the_sandbox_it_is_in_use_before_it_runs(
     )
     call(browser, "wait", {"duration": 0})
     assert seen == [True]  # refreshed before the member, not only in the report after it
+
+
+def test_a_member_that_could_outlast_the_quiet_budget_refreshes_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The throttle counts the member's own bound, so the sandbox is never unheard from for
+    `KEEP_ALIVE` plus a whole navigation — only `KEEP_ALIVE`."""
+    browser = make_browser(monkeypatch)
+    sandbox: Any = browser.sandbox
+    bound = browser._member_bound()
+    assert bound >= 30  # navigation_timeout dominates at the defaults
+    # Too recent to refresh on its own, but not with a whole member still to come.
+    browser._last_activity -= KEEP_ALIVE - bound + 1
+    browser._keep_alive()
+    sandbox.refresh_activity.assert_not_called()
+    browser._keep_alive(reserve=bound)
+    sandbox.refresh_activity.assert_called_once_with()
+    assert KEEP_ALIVE < 60  # a sandbox on Daytona's shortest auto-stop interval stays up
 
 
 def test_a_browsing_session_keeps_the_sandbox_from_auto_stopping(

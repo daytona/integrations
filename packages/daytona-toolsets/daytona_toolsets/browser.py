@@ -129,8 +129,12 @@ MAX_REPEAT = 100
 FIND_LIMIT = 20
 WHEEL_NOTCH = 100
 """Pixels one scroll-wheel notch moves."""
-KEEP_ALIVE = 60.0
-"""Seconds between the calls that tell Daytona the sandbox is still in use."""
+SCRIPT_TIMEOUT = 10.0
+"""Seconds a `javascript_exec` script may run before the page terminates it."""
+KEEP_ALIVE = 45.0
+"""The longest the sandbox may go unheard from while the browser is in use. Under Daytona's
+shortest auto-stop interval (one minute) with room for the round trip, and counted across a
+member's own wait, not just between calls."""
 
 PLAYWRIGHT_MODIFIERS = {"ctrl": "Control", "alt": "Alt", "shift": "Shift", "cmd": "Meta"}
 
@@ -735,7 +739,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
 
     # --- browser state ---------------------------------------------------------------------------
 
-    def _keep_alive(self) -> None:
+    def _keep_alive(self, reserve: float = 0.0) -> None:
         """Tell Daytona the sandbox is in use, at most once every `KEEP_ALIVE` seconds.
 
         Daytona's auto-stop (and auto-pause) counts interactions made through the SDK and
@@ -743,11 +747,17 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         this driver sends: clicks, screenshots and page reads all ride the CDP connection. A long
         browsing session would look idle and the sandbox would be stopped underneath it.
 
+        `reserve` is how long the caller is about to be busy without being able to say anything.
+        Counting it in is what keeps the quiet window at `KEEP_ALIVE` rather than `KEEP_ALIVE`
+        plus a whole member: a refresh that would otherwise be skipped as too recent happens now,
+        before the wait, so a sandbox on Daytona's shortest auto-stop interval (one minute) is not
+        stopped in the middle of a navigation.
+
         Refreshing the activity timestamp is all this does, so a borrowed sandbox keeps whatever
         auto-stop interval its owner chose, and an owned one keeps Daytona's default as the
         backstop against a leaked sandbox. A failure here is never worth failing a call for."""
         now = time.monotonic()
-        if now - self._last_activity < KEEP_ALIVE:
+        if now - self._last_activity + reserve < KEEP_ALIVE:
             return
         self._last_activity = now
         try:
@@ -763,12 +773,23 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         input: BetaBrowserMemberInput,
     ) -> BetaBrowserMemberResult:
         """Every member, with the sandbox told it is in use before the member runs as well as
-        after it (`_browser_state`). A member is itself bounded — `navigation_timeout` for a
-        navigation, `MAX_DURATION` for `wait` and `hold_key`, ten seconds for a script — so the
-        sandbox is never left unheard from for longer than `KEEP_ALIVE` plus one member, however
-        long the browsing session runs."""
-        self._keep_alive()
+        after it (`_browser_state`).
+
+        A member is itself bounded — `navigation_timeout` for a navigation, `MAX_DURATION` for
+        `wait` and `hold_key`, ten seconds for a script — and that bound is reserved here, so the
+        refresh happens before a member that could outlast the remaining quiet budget rather than
+        after it. The sandbox is therefore never left unheard from for longer than `KEEP_ALIVE`,
+        however long the browsing session runs. The one case left is a `navigation_timeout` set
+        longer than the sandbox's own auto-stop interval: a single navigation can then outlast it
+        whatever this does."""
+        self._keep_alive(reserve=self._member_bound())
         return super().execute(context, name, input)
+
+    def _member_bound(self) -> float:
+        """The longest any one member can keep the driver busy before it can speak again."""
+        return (
+            max(self._navigation_ms / 1000, MAX_DURATION, SCRIPT_TIMEOUT) + self._settle_ms / 1000
+        )
 
     @override
     def _browser_state(self, context: BetaToolsetCallContext) -> BetaBrowserState:
@@ -938,7 +959,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
                 "awaitPromise": True,
                 "userGesture": True,
                 "replMode": True,
-                "timeout": 10000,
+                "timeout": SCRIPT_TIMEOUT * 1000,
             },
         )
         details = result.get("exceptionDetails")
