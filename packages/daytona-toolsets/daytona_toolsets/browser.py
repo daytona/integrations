@@ -11,12 +11,11 @@ subclass of `BetaAbstractBrowserToolset20260801`, and those methods share mutabl
 tab map, the per-tab CDP sessions and isolated worlds, and the state changes queued for the next
 report — that the Playwright event handlers write to while a member is waiting on the network.
 Splitting the class across collaborators would mean threading that state between them for no
-isolation gained. What does not need it already lives next door: the sandbox lease in
-`_sandbox.py`, the key tables in `_keys.py`, the in-page JavaScript in `_page_js.py`.
-`DaytonaFilePolicy` and the pure helpers (`normalize_url`, `failure_phrase`, `rank`,
-`format_remote`) stay here because they are this toolset's own public surface, and they are
-unit-tested directly. Read the file by its section banners: setup, events, helpers, then the
-members in the toolset's own groups.
+isolation gained. What does not need it lives next door: the file policy in `_files.py`, the
+sandbox lease in `_sandbox.py`, the key tables in `_keys.py`, the in-page JavaScript in
+`_page_js.py`. The pure helpers left here (`normalize_url`, `failure_phrase`, `rank`,
+`format_remote`) are the driver's own vocabulary and are unit-tested directly. Read the file by
+its section banners: setup, events, helpers, then the members in the toolset's own groups.
 """
 
 from __future__ import annotations
@@ -29,7 +28,6 @@ import secrets
 import shlex
 import time
 from collections import deque
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional, Union
 from urllib.parse import urlsplit
@@ -47,7 +45,6 @@ from anthropic.tools.browser import (
     BetaToolsetCallContext,
     BetaURLContext,
     TabMissingError,
-    UploadRefusedError,
 )
 from anthropic.types.beta import (
     BetaBrowserCloseTabInput,
@@ -89,6 +86,7 @@ from daytona import Daytona, Sandbox, SessionExecuteRequest
 from typing_extensions import override
 
 from . import _page_js
+from ._files import DaytonaFilePolicy as DaytonaFilePolicy, is_under
 from ._keys import parse_chord, playwright_chord, split_sequence, PLAYWRIGHT
 from ._sandbox import CreateParams, OnClose, SandboxLease
 
@@ -172,87 +170,6 @@ def failure_phrase(exc: Exception) -> str:
     if code and code.group() == "net::ERR_BLOCKED_BY_CLIENT":
         return "The navigation was refused."
     return f"The navigation failed ({code.group()})." if code else "The navigation failed."
-
-
-def is_under(path: str, root: str) -> bool:
-    return path == root or path.startswith(root.rstrip("/") + "/")
-
-
-class DaytonaFilePolicy:
-    """A `BetaFilePolicy` for a browser in a Daytona sandbox: upload paths are paths inside the
-    sandbox, and so is the download directory.
-
-    `BetaLocalFilePolicy` judges paths on the machine running the SDK, which is not where this
-    browser reads files, so `DaytonaBrowser` refuses it. This policy admits an upload path only when
-    it is absolute and lies under one of `upload_roots` (whole components, `..` refused). The driver
-    then resolves each admitted path inside the sandbox, symlinks followed, and checks it again
-    against the roots before the browser sees it.
-
-    Args:
-        upload_roots: Directories in the sandbox that `file_upload` may read from. Keep this to one
-            dedicated directory holding only the task's files. Empty: path uploads are refused.
-        download_dir: The sandbox directory downloads are saved to (created `0700`). Outside every
-            upload root. Default: a fresh directory under `/tmp` per browser.
-        expose_download_paths: Show the model where a completed download was saved.
-    """
-
-    def __init__(
-        self,
-        *,
-        upload_roots: Sequence[str] = (),
-        download_dir: Optional[str] = None,
-        expose_download_paths: bool = False,
-    ) -> None:
-        if isinstance(upload_roots, str):
-            raise TypeError("upload_roots is a sequence of directories, not one path")
-        roots = [self._absolute(root, "upload root") for root in upload_roots]
-        if any(root == "/" for root in roots):
-            raise ValueError("an upload root cannot be the filesystem root")
-        self.upload_roots: tuple[str, ...] = tuple(roots)
-        self.download_dir = (
-            None if download_dir is None else self._absolute(download_dir, "download_dir")
-        )
-        if self.download_dir is not None and any(
-            is_under(self.download_dir, root) or is_under(root, self.download_dir) for root in roots
-        ):
-            raise ValueError("download_dir must be outside every upload root")
-        self.expose_download_paths = expose_download_paths
-
-    @staticmethod
-    def _absolute(path: str, what: str) -> str:
-        if not path or not path.startswith("/"):
-            raise ValueError(f"{what} must be an absolute path in the sandbox")
-        return posixpath.normpath(path)
-
-    def resolve_upload_paths(self, context: BetaURLContext, paths: Sequence[str]) -> list[str]:
-        if not self.upload_roots:
-            raise UploadRefusedError("File uploads by path are not enabled for this browser.")
-        resolved = []
-        for path in paths:
-            if not path.startswith("/") or ".." in path.split("/"):
-                raise UploadRefusedError(
-                    "An upload path must be an absolute path in the upload directory."
-                )
-            normal = posixpath.normpath(path)
-            if not any(is_under(normal, root) for root in self.upload_roots):
-                raise UploadRefusedError("An upload path is outside the upload directory.")
-            resolved.append(normal)
-        return resolved
-
-    def resolve_upload_documents(
-        self, context: BetaURLContext, document_ids: Sequence[str]
-    ) -> list[str]:
-        raise UploadRefusedError(
-            "This browser runs in a Daytona sandbox and cannot upload Files API documents; put the "
-            "file in the upload directory and upload it by path."
-        )
-
-    def is_path_visible(self, path: str) -> bool:
-        return bool(
-            self.expose_download_paths
-            and self.download_dir is not None
-            and is_under(posixpath.normpath(path), self.download_dir)
-        )
 
 
 @dataclass

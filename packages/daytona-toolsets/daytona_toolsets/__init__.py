@@ -14,15 +14,20 @@ from .async_computer import AsyncDaytonaComputer
 from .computer import DaytonaComputer
 
 if TYPE_CHECKING:
-    from .browser import DaytonaBrowser, DaytonaFilePolicy
+    from ._files import DaytonaFilePolicy
+    from .browser import DaytonaBrowser
 
 __all__ = ["DaytonaComputer", "AsyncDaytonaComputer", "DaytonaBrowser", "DaytonaFilePolicy"]
 
 
 def __getattr__(name: str) -> Any:
-    # The browser driver imports Playwright, an optional dependency, so it loads on first use.
-    if name in ("DaytonaBrowser", "DaytonaFilePolicy"):
-        from . import browser
+    if name == "DaytonaFilePolicy":  # no Playwright needed to configure one
+        from ._files import DaytonaFilePolicy
 
-        return getattr(browser, name)
+        return DaytonaFilePolicy
+    # The browser driver imports Playwright, an optional dependency, so it loads on first use.
+    if name == "DaytonaBrowser":
+        from .browser import DaytonaBrowser
+
+        return DaytonaBrowser
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
