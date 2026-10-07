@@ -4,7 +4,7 @@ import base64
 import io
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call as mock_call
 
 import pytest
 from anthropic.tools import ToolsetClosedError, ToolsetConfigError
@@ -110,39 +110,133 @@ def test_keys_daytona_cannot_send_go_through_xtest(sandbox: MagicMock) -> None:
 
 
 def test_modifiers_are_held_during_a_click(sandbox: MagicMock) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
     call(computer(sandbox), "left_click", {"coordinate": [100, 200], "text": "ctrl+shift"})
-    sandbox.computer_use.mouse.click.assert_not_called()
-    assert xtest_actions(sandbox) == [
-        ["move", 100, 200],
-        ["keydown", "Control_L"],
-        ["keydown", "Shift_L"],
-        ["down", 1],
-        ["up", 1],
-        ["keyup", "Shift_L"],
-        ["keyup", "Control_L"],
-    ]
+    sandbox.computer_use.mouse.click.assert_called_once_with(
+        100,
+        200,
+        "left",
+        double=False,
+        clicks=1,
+        modifiers=["ctrl", "shift"],
+    )
+    sandbox.process.exec.assert_not_called()
 
 
 def test_plain_clicks_use_the_computer_use_api(sandbox: MagicMock) -> None:
     toolset = computer(sandbox)
     call(toolset, "right_click", {"coordinate": [1, 2]})
     call(toolset, "double_click", {})
-    assert [
-        c.args + (c.kwargs["double"],) for c in sandbox.computer_use.mouse.click.call_args_list
-    ] == [
-        (1, 2, "right", False),
-        (5, 6, "left", True),  # no coordinate: at the pointer
+    assert sandbox.computer_use.mouse.click.call_args_list == [
+        mock_call(1, 2, "right", double=False, clicks=1, modifiers=[]),
+        mock_call(5, 6, "left", double=True, clicks=2, modifiers=[]),
+    ]
+    sandbox.computer_use.mouse.down.assert_not_called()
+
+
+def test_triple_click_and_horizontal_scroll_use_native_api(sandbox: MagicMock) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    toolset = computer(sandbox)
+    call(toolset, "triple_click", {"coordinate": [3, 4]})
+    sandbox.computer_use.mouse.click.assert_called_once_with(
+        3, 4, "left", double=False, clicks=3, modifiers=[]
+    )
+    call(toolset, "scroll", {"coordinate": [3, 4], "scroll_direction": "left", "scroll_amount": 2})
+    sandbox.computer_use.mouse.scroll.assert_called_once_with(3, 4, "left", 2, modifiers=[])
+    call(toolset, "scroll", {"scroll_direction": "down", "scroll_amount": 3})
+    assert sandbox.computer_use.mouse.scroll.call_args_list[-1] == mock_call(
+        5, 6, "down", 3, modifiers=[]
+    )
+    sandbox.process.exec.assert_not_called()
+
+
+def test_click_with_non_modifier_token_uses_xtest(sandbox: MagicMock) -> None:
+    call(computer(sandbox), "left_click", {"coordinate": [3, 4], "text": "ctrl+a"})
+    sandbox.computer_use.mouse.click.assert_not_called()
+    sandbox.computer_use.mouse.down.assert_not_called()
+    assert xtest_actions(sandbox) == [
+        ["move", 3, 4],
+        ["keydown", "Control_L"],
+        ["keydown", "a"],
+        ["down", 1],
+        ["up", 1],
+        ["keyup", "a"],
+        ["keyup", "Control_L"],
     ]
 
 
-def test_triple_click_and_horizontal_scroll_use_xtest(sandbox: MagicMock) -> None:
+def test_native_mouse_down_up_and_modifier_drag(sandbox: MagicMock) -> None:
+    def down(*_args: object, **kwargs: object) -> SimpleNamespace:
+        if kwargs == {"x": 0}:
+            raise DaytonaError("probe", status_code=400)
+        return SimpleNamespace(x=5, y=6)
+
+    sandbox.computer_use.mouse.down.side_effect = down
+    toolset = computer(sandbox)
+    call(toolset, "left_mouse_down", {})
+    call(toolset, "left_mouse_up", {})
+    call(
+        toolset,
+        "left_click_drag",
+        {"start_coordinate": [1, 2], "coordinate": [3, 4], "text": "shift"},
+    )
+    assert sandbox.computer_use.mouse.down.call_args_list == [mock_call(x=0), mock_call()]
+    sandbox.computer_use.mouse.up.assert_called_once_with()
+    sandbox.computer_use.mouse.drag.assert_called_once_with(1, 2, 3, 4, modifiers=["shift"])
+    sandbox.process.exec.assert_not_called()
+
+
+def test_successful_probe_releases_button_before_native_path(sandbox: MagicMock) -> None:
     toolset = computer(sandbox)
     call(toolset, "triple_click", {"coordinate": [3, 4]})
-    assert xtest_actions(sandbox) == [["move", 3, 4]] + [["down", 1], ["up", 1]] * 3
-    call(toolset, "scroll", {"coordinate": [3, 4], "scroll_direction": "left", "scroll_amount": 2})
-    assert xtest_actions(sandbox) == [["move", 3, 4]] + [["down", 6], ["up", 6]] * 2
-    call(toolset, "scroll", {"scroll_direction": "down", "scroll_amount": 3})
-    sandbox.computer_use.mouse.scroll.assert_called_once_with(5, 6, "down", 3)
+    sandbox.computer_use.mouse.down.assert_called_once_with(x=0)
+    sandbox.computer_use.mouse.up.assert_called_once_with()
+    assert toolset._native_input_capability is True
+    sandbox.computer_use.mouse.click.assert_called_once_with(
+        3, 4, "left", double=False, clicks=3, modifiers=[]
+    )
+
+
+def test_probe_404_blocks_every_gated_mouse_member_and_is_cached(sandbox: MagicMock) -> None:
+    floor = (
+        "This sandbox's platform does not support native held input; recreate the sandbox on a "
+        "current Daytona version."
+    )
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("missing route", status_code=404)
+    toolset = computer(sandbox)
+    cases: list[tuple[str, dict[str, object]]] = [
+        ("triple_click", {"coordinate": [3, 4]}),
+        ("left_click", {"coordinate": [3, 4], "text": "ctrl"}),
+        ("left_mouse_down", {}),
+        ("left_mouse_up", {}),
+        (
+            "left_click_drag",
+            {"start_coordinate": [1, 2], "coordinate": [3, 4], "text": "shift"},
+        ),
+        ("scroll", {"scroll_direction": "left", "scroll_amount": 2}),
+        ("scroll", {"scroll_direction": "up", "scroll_amount": 2, "text": "ctrl"}),
+    ]
+    for name, input in cases:
+        result = call(toolset, name, input)
+        assert result.get("is_error") is True
+        assert text_of(result) == floor
+    sandbox.computer_use.mouse.down.assert_called_once_with(x=0)
+    sandbox.computer_use.mouse.click.assert_not_called()
+    sandbox.computer_use.mouse.up.assert_not_called()
+    sandbox.computer_use.mouse.drag.assert_not_called()
+    sandbox.computer_use.mouse.scroll.assert_not_called()
+
+
+def test_cached_unsupported_capability_does_not_gate_plain_clicks(sandbox: MagicMock) -> None:
+    toolset = computer(sandbox)
+    toolset._native_input_capability = False
+    call(toolset, "left_click", {"coordinate": [3, 4]})
+    call(toolset, "double_click", {"coordinate": [5, 6]})
+    assert sandbox.computer_use.mouse.click.call_args_list == [
+        mock_call(3, 4, "left", double=False, clicks=1, modifiers=[]),
+        mock_call(5, 6, "left", double=True, clicks=2, modifiers=[]),
+    ]
+    sandbox.computer_use.mouse.down.assert_not_called()
 
 
 def test_durations_are_bounded(sandbox: MagicMock) -> None:
@@ -224,7 +318,7 @@ def test_sandbox_and_create_params_are_exclusive(sandbox: MagicMock) -> None:
         DaytonaComputer(sandbox, create_params=MagicMock(), confirm=approve)
 
 
-async def test_async_computer_delegates_to_the_sync_driver(sandbox: MagicMock) -> None:
+async def test_async_computer_delegates_mouse_down_to_the_sync_driver(sandbox: MagicMock) -> None:
     from anthropic.types.beta import BetaToolUseBlock
 
     from daytona_toolsets import AsyncDaytonaComputer
@@ -236,16 +330,22 @@ async def test_async_computer_delegates_to_the_sync_driver(sandbox: MagicMock) -
     async def confirm(_context: object) -> bool:
         return True
 
+    def down(*_args: object, **kwargs: object) -> SimpleNamespace:
+        if kwargs == {"x": 0}:
+            raise DaytonaError("probe", status_code=400)
+        return SimpleNamespace(x=5, y=6)
+
+    sandbox.computer_use.mouse.down.side_effect = down
     toolset = await AsyncDaytonaComputer.create(sandbox, confirm=confirm, settle_delay=0)
     async with toolset:
         tool_use = BetaToolUseBlock(
             type="tool_use",
             id="toolu_1",
-            name="left_click",
-            input={"coordinate": [3, 4]},
+            name="left_mouse_down",
+            input={},
             toolset_name="computer",
         )
         result = await toolset.tool_result(tool_use)
-        assert text_of(result) == "Clicked."
-    sandbox.computer_use.mouse.click.assert_called_once_with(3, 4, "left", double=False)
+        assert result.get("is_error") is not True
+    assert sandbox.computer_use.mouse.down.call_args_list == [mock_call(x=0), mock_call()]
     sandbox.delete.assert_not_called()

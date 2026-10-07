@@ -51,6 +51,10 @@ MAX_DURATION = 30
 MAX_REPEAT = 100
 MAX_SCROLL = 50
 WHEEL = {"up": "up", "down": "down", "left": "wheel_left", "right": "wheel_right"}
+NATIVE_INPUT_FLOOR_ERROR = (
+    "This sandbox's platform does not support native held input; recreate the sandbox on a current "
+    "Daytona version."
+)
 
 
 class DaytonaComputer(BetaAbstractComputerToolset20260801):
@@ -99,6 +103,7 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         self._last_input = 0.0
         self._screen = (0, 0)
         self._scale = 1.0
+        self._native_input_capability: Optional[bool] = None
         try:
             self._lease = SandboxLease.acquire(
                 sandbox,
@@ -228,6 +233,31 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         with self._desktop("send the input"):
             self._xtest.run(actions)
 
+    def _native_input_supported(self) -> bool:
+        """Whether the sandbox daemon has the native held-input endpoints."""
+        if self._native_input_capability is None:
+            try:
+                self.sandbox.computer_use.mouse.down(x=0)
+            except DaytonaError as exc:
+                match exc.status_code:
+                    case 400:
+                        self._native_input_capability = True
+                    case 404:
+                        self._native_input_capability = False
+                    case _:
+                        raise
+            else:
+                try:
+                    self.sandbox.computer_use.mouse.up()
+                except DaytonaError:
+                    pass
+                self._native_input_capability = True
+        return self._native_input_capability
+
+    def _require_native_input(self) -> None:
+        if not self._native_input_supported():
+            raise ToolError(NATIVE_INPUT_FLOOR_ERROR)
+
     def _with_keys_held(self, keysyms: list[str], actions: list[Action]) -> list[Action]:
         downs: list[Action] = [["keydown", k] for k in keysyms]
         ups: list[Action] = [["keyup", k] for k in reversed(keysyms)]
@@ -237,11 +267,21 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         self, coordinate: Optional[list[int]], text: Optional[str], button: str, count: int = 1
     ) -> None:
         x, y = self._point(coordinate)
-        held = self._held_keysyms(text)
-        if not held and count <= 2:
+        modifiers, token = parse_chord(text.strip()) if text else ([], None)
+        if token is None:
+            if count > 2 or modifiers:
+                self._require_native_input()
             with self._desktop("click"):
-                self.sandbox.computer_use.mouse.click(x, y, button, double=count == 2)
+                self.sandbox.computer_use.mouse.click(
+                    x,
+                    y,
+                    button,
+                    double=count == 2,
+                    clicks=count,
+                    modifiers=modifiers,
+                )
             return
+        held = self._held_keysyms(text)
         number = BUTTONS[button]
         presses: list[Action] = [["down", number], ["up", number]] * count
         self._run_xtest([["move", x, y], *self._with_keys_held(held, presses)])
@@ -346,11 +386,16 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
     ) -> None:
         start = self._point(input.start_coordinate)
         end = self._point(input.coordinate)
-        held = self._held_keysyms(input.text)
-        if not held:
+        modifiers, token = parse_chord(input.text.strip()) if input.text else ([], None)
+        if token is None:
+            if modifiers:
+                self._require_native_input()
             with self._desktop("drag"):
-                self.sandbox.computer_use.mouse.drag(start[0], start[1], end[0], end[1])
+                self.sandbox.computer_use.mouse.drag(
+                    start[0], start[1], end[0], end[1], modifiers=modifiers
+                )
             return
+        held = self._held_keysyms(input.text)
         drag: list[Action] = [["down", 1], ["move", end[0], end[1]], ["up", 1]]
         self._run_xtest([["move", start[0], start[1]], *self._with_keys_held(held, drag)])
 
@@ -358,25 +403,34 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
     def left_mouse_down(
         self, context: BetaToolsetCallContext, input: BetaComputerLeftMouseDownInput
     ) -> None:
-        self._run_xtest([["down", 1]])
+        self._require_native_input()
+        with self._desktop("press the mouse button"):
+            self.sandbox.computer_use.mouse.down()
 
     @override
     def left_mouse_up(
         self, context: BetaToolsetCallContext, input: BetaComputerLeftMouseUpInput
     ) -> None:
-        self._run_xtest([["up", 1]])
+        self._require_native_input()
+        with self._desktop("release the mouse button"):
+            self.sandbox.computer_use.mouse.up()
 
     @override
     def scroll(self, context: BetaToolsetCallContext, input: BetaComputerScrollInput) -> None:
         if not 1 <= input.scroll_amount <= MAX_SCROLL:
             raise ToolError(f"scroll_amount must be between 1 and {MAX_SCROLL}.")
         x, y = self._point(input.coordinate)
-        held = self._held_keysyms(input.text)
+        modifiers, token = parse_chord(input.text.strip()) if input.text else ([], None)
         direction = input.scroll_direction
-        if not held and direction in ("up", "down"):
+        if token is None:
+            if direction in ("left", "right") or modifiers:
+                self._require_native_input()
             with self._desktop("scroll"):
-                self.sandbox.computer_use.mouse.scroll(x, y, direction, input.scroll_amount)
+                self.sandbox.computer_use.mouse.scroll(
+                    x, y, direction, input.scroll_amount, modifiers=modifiers
+                )
             return
+        held = self._held_keysyms(input.text)
         number = BUTTONS[WHEEL[direction]]
         notches: list[Action] = [["down", number], ["up", number]] * input.scroll_amount
         self._run_xtest([["move", x, y], *self._with_keys_held(held, notches)])
