@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import inspect
 import io
+import logging
+import struct
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, call as mock_call, patch
@@ -16,6 +18,9 @@ from daytona_claude_toolsets import DaytonaComputer
 
 from .conftest import blocks_of, call, fake_sandbox, png, text_of, xtest_actions
 
+INVALID_SCREENSHOT_ERROR = "The sandbox desktop returned an invalid screenshot."
+MAX_SCREENSHOT_BYTES = 64 * 1024 * 1024
+
 
 def approve(_context: object) -> bool:
     return True
@@ -23,6 +28,20 @@ def approve(_context: object) -> bool:
 
 def computer(sandbox: MagicMock, **kwargs: Any) -> DaytonaComputer:
     return DaytonaComputer(sandbox, confirm=approve, settle_delay=0, **kwargs)
+
+
+def png_header(
+    width: int,
+    height: int,
+    *,
+    compression: int = 0,
+    filter_method: int = 0,
+    interlace: int = 0,
+) -> str:
+    """Enough of a PNG for the driver to reject its IHDR without asking Pillow to decode it."""
+    data = bytearray(b"\x89PNG\r\n\x1a\n" + struct.pack(">I4sII", 13, b"IHDR", width, height))
+    data.extend((8, 6, compression, filter_method, interlace))
+    return base64.b64encode(data).decode()
 
 
 def test_keyboard_members_require_confirm(sandbox: MagicMock) -> None:
@@ -63,16 +82,76 @@ def test_coordinates_are_scaled_to_the_real_screen() -> None:
 
 
 def test_zoom_crops_and_scales_up(sandbox: MagicMock) -> None:
-    sandbox.computer_use.screenshot.take_region.return_value = SimpleNamespace(
-        screenshot=png(200, 100)
-    )
     result = call(computer(sandbox), "zoom", {"region": [10, 20, 210, 120]})
-    region = sandbox.computer_use.screenshot.take_region.call_args.args[0]
-    assert (region.x, region.y, region.width, region.height) == (10, 20, 200, 100)
+    sandbox.computer_use.screenshot.take_full_screen.assert_called_once_with()
+    sandbox.computer_use.screenshot.take_region.assert_not_called()
     data = blocks_of(result)[0]["source"]["data"]
     assert Image.open(io.BytesIO(base64.b64decode(data))).size == (1280, 640)
     refused = call(computer(sandbox), "zoom", {"region": [0, 0, 1281, 10]})
     assert refused.get("is_error") is True
+
+
+@pytest.mark.parametrize(
+    "screenshot",
+    [
+        png_header(100_000, 100_000),
+        png_header(8193, 10),
+        png_header(10, 8193),
+        png_header(8192, 8192),
+        png_header(1280, 800, compression=1),
+        png_header(1280, 800, filter_method=1),
+        png_header(1280, 800, interlace=1),
+    ],
+)
+@pytest.mark.parametrize("member", ["screenshot", "zoom"])
+def test_screenshot_headers_are_bounded_before_pillow_decodes(
+    sandbox: MagicMock, screenshot: str, member: str
+) -> None:
+    sandbox.computer_use.screenshot.take_full_screen.return_value = SimpleNamespace(
+        screenshot=screenshot
+    )
+    with patch("daytona_claude_toolsets.computer.Image.open") as image_open:
+        result = call(
+            computer(sandbox),
+            member,
+            {"region": [10, 20, 210, 120]} if member == "zoom" else {},
+        )
+    assert result.get("is_error") is True
+    assert text_of(result) == INVALID_SCREENSHOT_ERROR
+    image_open.assert_not_called()
+
+
+def test_screenshot_base64_size_is_bounded_before_decoding(sandbox: MagicMock) -> None:
+    sandbox.computer_use.screenshot.take_full_screen.return_value = SimpleNamespace(
+        screenshot="A" * ((MAX_SCREENSHOT_BYTES * 4 + 2) // 3 + 1)
+    )
+    with patch("daytona_claude_toolsets.computer.base64.b64decode") as decode:
+        result = call(computer(sandbox), "screenshot", {})
+    assert text_of(result) == INVALID_SCREENSHOT_ERROR
+    decode.assert_not_called()
+
+
+@pytest.mark.parametrize("screenshot", ["", "not base64!", base64.b64encode(b"not png").decode()])
+def test_invalid_screenshot_bytes_use_the_fixed_phrase(
+    sandbox: MagicMock, screenshot: str
+) -> None:
+    sandbox.computer_use.screenshot.take_full_screen.return_value = SimpleNamespace(
+        screenshot=screenshot
+    )
+    result = call(computer(sandbox), "screenshot", {})
+    assert text_of(result) == INVALID_SCREENSHOT_ERROR
+
+
+def test_zoom_rechecks_a_region_after_the_desktop_shrinks(sandbox: MagicMock) -> None:
+    sandbox.computer_use.screenshot.take_full_screen.return_value = SimpleNamespace(
+        screenshot=png(100, 100)
+    )
+    result = call(computer(sandbox), "zoom", {"region": [10, 20, 210, 120]})
+    assert result.get("is_error") is True
+    assert text_of(result) == (
+        "The desktop changed size; region must satisfy 0 <= x0 < x1 <= 100 and "
+        "0 <= y0 < y1 <= 100 (the screen in screenshot pixels)."
+    )
 
 
 @pytest.mark.parametrize("member", ["screenshot", "zoom"])
@@ -378,6 +457,26 @@ def test_hold_runtime_failure_releases_held_keys_and_uses_desktop_error(
     assert text_of(result) == "The sandbox desktop could not hold the key."
     sandbox.computer_use.keyboard.up.assert_called_once_with("ctrl")
     assert "native held input" not in text_of(result)
+
+
+def test_hold_release_attempts_every_key_after_a_non_daytona_failure(sandbox: MagicMock) -> None:
+    sandbox.computer_use.mouse.down.side_effect = DaytonaError("probe", status_code=400)
+    sandbox.computer_use.keyboard.up.side_effect = [RuntimeError("first release failed"), None]
+    result = call(computer(sandbox), "hold_key", {"text": "ctrl+a", "duration": 0})
+    assert result.get("is_error") is True
+    assert sandbox.computer_use.keyboard.up.call_args_list == [mock_call("a"), mock_call("ctrl")]
+
+
+def test_public_computer_warning_uses_the_package_logger(
+    sandbox: MagicMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.WARNING, logger="daytona_claude_toolsets")
+    sandbox.public = True
+    computer(sandbox)
+    assert [record.message for record in caplog.records] == [
+        "the sandbox is public, so its preview URLs need no authentication: the desktop's noVNC "
+        "port is reachable by anyone who knows the sandbox id. Use a private sandbox."
+    ]
 
 
 def test_type_sends_tab_in_one_native_call(sandbox: MagicMock) -> None:
