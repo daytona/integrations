@@ -1,0 +1,19 @@
+packages/claude-toolsets/src/logging.ts
+  s_d2821d2dfb09d3::t_4d25aec14f2684 11-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "526307483a84313f25bb1a45073ed066f86f7a22",
+  "prompts": {},
+  "sessions": {
+    "s_d2821d2dfb09d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee309d1adffehUHlFJWM1gmZ2A",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
