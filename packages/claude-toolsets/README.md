@@ -70,7 +70,7 @@ try {
 
 `try`/`finally` is the portable shape and the one these examples use. On a runtime and TypeScript target with [explicit resource management](https://github.com/tc39/proposal-explicit-resource-management), `await using computer = await DaytonaComputer.create(...)` works too — the SDK's toolset base class is async-disposable and disposal calls the same `close()`.
 
-With no `sandbox` option, each driver creates a sandbox from Daytona's default snapshot, which ships the desktop and Chromium, and deletes it on `close()`.
+With no `sandbox` option and no custom snapshot or image in `createParams`, each driver creates a sandbox from Daytona's default snapshot, which ships the desktop and Chromium, and deletes it on `close()`.
 
 ## Requirements
 
@@ -87,7 +87,7 @@ With no `sandbox` option, each driver creates a sandbox from Daytona's default s
 
 `close()` is idempotent and safe after a failed construction: `create()` closes the half-built driver itself before rethrowing, so a sandbox created before the failure is still removed. Sandboxes the drivers create always carry the label `created-by=daytona-claude-toolsets`, so a leftover one can be found and removed by it; `createParams.labels` adds your own labels but cannot change that one. Options the drivers don't define (`confirm`, `configs`, `urlPolicy`, `filePolicy`, `toolConfigs`) go to the SDK unchanged.
 
-Daytona auto-stops an idle sandbox, and counts only interactions made through the SDK — not traffic through a preview URL, which is how `DaytonaBrowser` reaches Chromium. It therefore refreshes the sandbox's activity itself while the browser is in use, so a long browsing session is not stopped underneath it. The refresh counts the waiting a member is about to do, not only the gap between calls, so the sandbox is never left unheard from for more than 45 seconds and one on Daytona's shortest auto-stop interval (one minute) stays up — unless you raise `navigationTimeout` past that interval, when a single navigation can outlast it. It never changes the sandbox's auto-stop interval, so a borrowed sandbox keeps the lifecycle you configured.
+Daytona auto-stops an idle sandbox, and counts only interactions made through the SDK — not traffic through a preview URL, which is how `DaytonaBrowser` reaches Chromium. It therefore refreshes the sandbox's activity itself **around each browser member call**, counting the waiting that member is about to do rather than only the gap since the last one, so no single call leaves the sandbox unheard from for more than 45 seconds. That covers a busy tool-calling loop, not an idle one: the driver refreshes nothing between calls, so a pause in the model loop (or in your own code) that is longer than the auto-stop interval can still stop the sandbox underneath you, and so can a single navigation if you raise `navigationTimeout` past that interval. It never changes the sandbox's auto-stop interval, so a borrowed sandbox keeps the lifecycle you configured.
 
 ## What's implemented
 
