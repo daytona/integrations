@@ -1,0 +1,19 @@
+packages/claude-toolsets/src/computer.ts
+  s_47fc6999bc13b6::t_0436e9ed749d01 79-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "38c90bab9b06891ccc1276b418f2aaaabe87d269",
+  "prompts": {},
+  "sessions": {
+    "s_47fc6999bc13b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee6e91673ffeIQqPmluQI2Tb7h",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
