@@ -81,7 +81,9 @@ const STOPWORDS = new Set(
     " ",
   ),
 );
-const ROLE_WORDS: Readonly<Record<string, readonly string[]>> = {
+// A Map, not an object literal: a query word like `constructor`, `toString` or `hasOwnProperty`
+// would otherwise read straight off `Object.prototype` and hand `roles.includes(...)` a function.
+const ROLE_WORDS: ReadonlyMap<string, readonly string[]> = new Map(Object.entries({
   button: ["button"],
   btn: ["button"],
   link: ["link"],
@@ -101,7 +103,7 @@ const ROLE_WORDS: Readonly<Record<string, readonly string[]>> = {
   heading: ["heading"],
   title: ["heading"],
   tab: ["tab"],
-};
+}));
 
 export type RankCandidate = Readonly<Record<string, unknown>>;
 
@@ -121,7 +123,7 @@ export const rank = (query: string, candidates: readonly RankCandidate[]): RankC
     let score = 0;
     for (const word of words) {
       const pattern = escaped(word);
-      const roles = ROLE_WORDS[word];
+      const roles = ROLE_WORDS.get(word);
       if (roles !== undefined) {
         if (roles.includes(role)) score += 3;
         else if (new RegExp(`\\b${pattern}`).test(name) || new RegExp(`\\b${pattern}`).test(attrs)) score += 1;

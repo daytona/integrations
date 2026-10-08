@@ -76,6 +76,16 @@ describe("text utilities", () => {
     expect(MAX_TEXT).toBe(2000);
   });
 
+  it("ranks a query word that names an Object prototype member", () => {
+    // `ROLE_WORDS["constructor"]` on a plain object literal returns Object itself, and the
+    // following `roles.includes(role)` then throws, failing `find` on an ordinary page.
+    const candidate = { name: "constructor docs", role: "link" };
+    for (const query of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+      expect(() => rank(query, [candidate])).not.toThrow();
+    }
+    expect(rank("constructor", [candidate])).toEqual([candidate]);
+  });
+
   it("drops trailing slashes exactly as the replaced regex did", () => {
     for (const text of ["", "/", "//", "///", "a", "a/", "a//", "/a", "/a/", "/a//b///", "https://h", "https://h/"]) {
       expect(trimTrailingSlashes(text)).toBe(text.replace(/\/+$/u, ""));
