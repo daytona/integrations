@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DaytonaBrowser, KEEP_ALIVE } from "../src/browser.js";
 import { DaytonaFilePolicy } from "../src/files.js";
 import { BROWSER_MEMBERS, COMPUTER_MEMBERS } from "../src/members.js";
+import { MAX_TEXT } from "../src/text.js";
 import { callMember, mockSandbox, resultText, type MockSandbox } from "./helpers.js";
 
 const mocks = vi.hoisted(() => ({
@@ -201,6 +202,41 @@ describe("members and bounds", () => {
   it("refuses unknown tabs", async () => { const { browser } = await makeBrowser(); const result = await callMember(browser, "switch_tab", { tab_id: "tab_9" }); expect(resultText(result)).toContain("not open"); await browser.close(); });
   it("drains console reads", async () => { const { browser } = await makeBrowser({ configs: { read_console: { enabled: true } } }); const first = await callMember(browser, "read_console", {}); const second = await callMember(browser, "read_console", {}); expect(resultText(first)).toContain("(empty)"); expect(resultText(second)).toContain("(empty)"); await browser.close(); });
   it("refuses upload without paths", async () => { const policy = new DaytonaFilePolicy({ uploadRoots: ["/up"] }); const { browser } = await makeBrowser({ configs: { file_upload: { enabled: true } }, confirm: () => true, filePolicy: policy }); const result = await callMember(browser, "file_upload", { target: { type: "ref", ref: "ref_1" } }); expect(resultText(result)).toContain("at least one path"); await browser.close(); });
+  it("caps page-controlled titles and URLs in the browser state", async () => {
+    // Given: a page reporting a title and URL far longer than the text limit.
+    const { browser, browserCdp } = await makeBrowser();
+    const title = "T".repeat(MAX_TEXT * 2);
+    const url = `https://evil.test/${"u".repeat(MAX_TEXT * 2)}`;
+    browserCdp.send.mockImplementation(async (method: string) => method === "Target.getTargets"
+      ? { targetInfos: [{ type: "page", targetId: "target-1", title, url }] }
+      : {});
+
+    // When: a member reports the browser state.
+    const state = JSON.stringify((await callMember(browser, "list_tabs", {})).content);
+
+    // Then: both are truncated to the limit, not copied whole.
+    expect(state).toContain("T".repeat(MAX_TEXT));
+    expect(state).not.toContain("T".repeat(MAX_TEXT + 1));
+    expect(state).not.toContain("u".repeat(MAX_TEXT + 1));
+    await browser.close();
+  });
+
+  it("caps a page-controlled download URL in the browser state", async () => {
+    // Given: a download whose source URL is far longer than the text limit.
+    const { browser, browserCdp } = await makeBrowser();
+    const begin = browserCdp.on.mock.calls.find(([event]) => event === "Browser.downloadWillBegin")?.[1];
+    if (begin === undefined) throw new Error("no downloadWillBegin listener was registered");
+    begin({ guid: "dl-1", url: `https://evil.test/${"d".repeat(MAX_TEXT * 2)}` });
+
+    // When: the next member reports the browser state.
+    const state = JSON.stringify((await callMember(browser, "list_tabs", {})).content);
+
+    // Then: the stored URL is truncated to the limit.
+    expect(state).toContain("d".repeat(MAX_TEXT - "https://evil.test/".length));
+    expect(state).not.toContain("d".repeat(MAX_TEXT + 1));
+    await browser.close();
+  });
+
   it("refuses Files API documents", async () => { const policy = new DaytonaFilePolicy({ uploadRoots: ["/up"] }); const { browser } = await makeBrowser({ configs: { file_upload: { enabled: true } }, confirm: () => true, filePolicy: policy }); const result = await callMember(browser, "file_upload", { target: { type: "ref", ref: "ref_1" }, document_ids: ["doc_1"] }); expect(resultText(result)).toContain("cannot upload Files API documents"); await browser.close(); });
 });
 

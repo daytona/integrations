@@ -380,6 +380,18 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     if (!(await this.refuses(route.url()))) { route.connectToServer(); return; }
     await route.close({ code: 1008, reason: "Policy violation" });
   }
+  /**
+   * Playwright follows a redirect without routing it again, so this guard sees first hops only.
+   * For a MAIN-FRAME navigation that gap is closed downstream: `navigate()` re-asks the policy about
+   * the address the page actually landed on ({@link checkLanded}) and refuses the call, and a
+   * navigation a click or a script started is caught by {@link onNavigated} and the tab is blanked
+   * before the next member runs. For a SUB-RESOURCE redirect chain there is no such second look —
+   * a permitted URL can redirect a subresource to a refused one. That residual is deliberate and is
+   * stated in the README's Safety section, alongside shared workers, because closing it would mean
+   * proxying every request through this process with `maxRedirects: 0`, which is a far larger
+   * change and attack surface than the one it removes. The sandbox's egress rules
+   * (`domainAllowList`/`networkAllowList`) are the backstop for it.
+   */
   private async guard(route: Route): Promise<void> {
     const request = route.request(); const tab = this.requestTab(request);
     if (!(await this.refuses(request.url(), tab?.id))) { await route.continue(); return; }
@@ -390,8 +402,9 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   }
 
   private onDownloadBegin(event: { readonly guid: string; readonly url: string }): void {
-    this.downloads.set(event.guid, event.url);
-    this.changes.push({ type: "download_started", download_id: event.guid, url: event.url });
+    const url = event.url.slice(0, MAX_TEXT);
+    this.downloads.set(event.guid, url);
+    this.changes.push({ type: "download_started", download_id: event.guid, url });
   }
   private async onDownloadProgress(event: { readonly guid: string; readonly state: string; readonly receivedBytes: number }): Promise<void> {
     const url = this.downloads.get(event.guid); if (url === undefined || event.state === "inProgress") return;
@@ -472,10 +485,15 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     const result = await (await this.cdp(tab)).send("Page.captureScreenshot", { format: "png", ...(clip === undefined ? {} : { clip }) });
     return { data: result.data, mediaType: "image/png" };
   }
+  /** Titles and URLs are page-controlled, so they are capped like every other page-authored string. */
   private entry(tab: Tab, titles: ReadonlyMap<string, readonly [string, string]>): BetaBrowserStateTabEntry {
     const known = tab.targetId === null ? undefined : titles.get(tab.targetId);
-    if (known !== undefined) tab.title = known[0];
-    return { tab_id: tab.id, title: tab.title, url: known?.[1] ?? tab.page.url(), active: tab.id === this.active };
+    if (known !== undefined) tab.title = known[0].slice(0, MAX_TEXT);
+    return {
+      tab_id: tab.id, title: tab.title,
+      url: (known?.[1] ?? tab.page.url()).slice(0, MAX_TEXT),
+      active: tab.id === this.active,
+    };
   }
   private async targets(): Promise<ReadonlyMap<string, readonly [string, string]>> {
     if (this.browserCdp === undefined || this.disconnected) return new Map();
