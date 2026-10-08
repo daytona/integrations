@@ -1,0 +1,29 @@
+packages/claude-toolsets/src/computer.ts
+  s_47fc6999bc13b6::t_06a7e9d56ed983 335-341
+  s_47fc6999bc13b6::t_7041fda9d7a0e0 205-211
+packages/claude-toolsets/src/browser.ts
+  s_47fc6999bc13b6::t_94b73405061c59 532-536
+  s_47fc6999bc13b6::t_969a913ca0ccf4 301
+  s_47fc6999bc13b6::t_9e2b7b86f503fb 335-340,347-358,360
+  s_47fc6999bc13b6::t_54508415210193 554-558
+  s_47fc6999bc13b6::t_ddbf2ca20074af 138
+packages/claude-toolsets/tests/browser.test.ts
+  s_47fc6999bc13b6::t_b9c13f4bdd8368 151-178
+  s_47fc6999bc13b6::t_5b9f24cd8223f2 95-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e6f636b0b441f7d1d28c666b2f4781aef0517cd4",
+  "prompts": {},
+  "sessions": {
+    "s_47fc6999bc13b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee6e91673ffeIQqPmluQI2Tb7h",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
