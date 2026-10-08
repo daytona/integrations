@@ -1,0 +1,19 @@
+packages/claude-toolsets/src/computer.ts
+  s_5b42ced7b28270::t_cec5dba2c0abc0 184,197,481-485,490,493
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b0ccdc9da6005f922843ad6957e0fa9adc15b000",
+  "prompts": {},
+  "sessions": {
+    "s_5b42ced7b28270": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee6ccea94ffe3UOzC3lSIrAtTa",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
