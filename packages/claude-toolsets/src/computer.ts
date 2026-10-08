@@ -30,6 +30,7 @@ import { DaytonaError } from "@daytona/sdk";
 import type { Daytona, Sandbox } from "@daytona/sdk";
 
 import { XKEYSYMS, desktopKey, parseChord, splitSequence } from "./keys.js";
+import { debug, errorName } from "./logging.js";
 import { decodePng, encodePng, resizePng, type PngImage } from "./png.js";
 import {
   SandboxLease,
@@ -210,6 +211,7 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
       return await call();
     } catch (error: unknown) {
       if (error instanceof DaytonaError) {
+        debug(`computer use call failed: ${errorName(error)}`);
         throw new ToolError(`The sandbox desktop could not ${action}.`);
       }
       throw error;

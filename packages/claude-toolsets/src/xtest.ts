@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 
 import { ToolError } from "@anthropic-ai/sdk/helpers/beta/toolsets";
 
+import { debug, errorName } from "./logging.js";
+
 export type ActionValue = string | number;
 export type Action = readonly ActionValue[];
 
@@ -124,8 +126,8 @@ export class XTest {
     try {
       await this.sandbox.fs.deleteFile(path);
     } catch (error: unknown) {
-      const errorName = error instanceof Error ? error.name : "UnknownError";
-      console.debug(`could not remove the XTest helper: ${errorName}`);
+      // no-excuse-ok: catch — best effort: a leftover file in /tmp is harmless.
+      debug(`could not remove the XTest helper: ${errorName(error)}`);
     }
   }
 

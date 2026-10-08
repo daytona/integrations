@@ -5,6 +5,8 @@ import type {
   Sandbox,
 } from "@daytona/sdk";
 
+import { errorName, warn } from "./logging.js";
+
 export type CreateParams = CreateSandboxFromSnapshotParams | CreateSandboxFromImageParams;
 export type OnClose = "delete" | "stop";
 
@@ -131,9 +133,8 @@ export class SandboxLease<TSandbox extends SandboxTarget = SandboxTarget> {
         await this.sandbox.stop();
       }
     } catch (error: unknown) {
-      const errorName = error instanceof Error ? error.name : "UnknownError";
-      console.warn(
-        `could not ${this.onClose} sandbox ${this.sandbox.id} (${errorName}); remove it by its label created-by=daytona-claude-toolsets`,
+      warn(
+        `could not ${this.onClose} sandbox ${this.sandbox.id} (${errorName(error)}); remove it by its label created-by=daytona-claude-toolsets`,
       );
     }
   }

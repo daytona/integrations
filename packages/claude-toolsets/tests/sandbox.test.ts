@@ -128,7 +128,7 @@ describe("sandbox lease", () => {
 
     // Then: cleanup failure is logged without escaping the close path.
     expect(warn).toHaveBeenCalledWith(
-      "could not delete sandbox sbx-test (Error); remove it by its label created-by=daytona-claude-toolsets",
+      "[daytona-claude-toolsets] could not delete sandbox sbx-test (Error); remove it by its label created-by=daytona-claude-toolsets",
     );
     warn.mockRestore();
   });

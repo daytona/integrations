@@ -52,6 +52,7 @@ import {
 import { createChromiumPaths, launch, shellQuote, type ChromiumPaths } from "./chromium.js";
 import { DaytonaFilePolicy, isUnder } from "./files.js";
 import { PLAYWRIGHT, parseChord, playwrightChord, splitSequence } from "./keys.js";
+import { debug, errorName, warn } from "./logging.js";
 import { PAGE_JS } from "./pageJs.js";
 import { SandboxLease, type CreateParams, type OnClose, type SandboxCreator } from "./sandbox.js";
 import { Tab } from "./tabs.js";
@@ -216,12 +217,14 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     this.browser = undefined; this.context = undefined; this.browserCdp = undefined;
     this.lease = undefined; this.signed = undefined;
     if (browser !== undefined) {
-      try { await browser.close(); } catch { /* no-excuse-ok: catch — best-effort teardown of a dead CDP connection. */ }
+      // no-excuse-ok: catch — best-effort teardown of a dead CDP connection.
+      try { await browser.close(); } catch (error: unknown) { debug(`browser close step failed: ${errorName(error)}`); }
     }
     if (lease === undefined) return;
     if (signed !== undefined) {
+      // no-excuse-ok: catch — expiring an already-expired credential is best effort.
       try { await lease.sandbox.expireSignedPreviewUrl(signed.port, signed.token); }
-      catch { /* no-excuse-ok: catch — expiring an already-expired credential is best effort. */ }
+      catch (error: unknown) { debug(`could not revoke the preview URL: ${errorName(error)}`); }
     }
     if (!lease.owned) {
       try {
@@ -230,7 +233,10 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
           `pids=$(pgrep -f ${shellQuote(profilePattern)} || true); [ -z "$pids" ] || kill $pids; rm -rf -- ${shellQuote(this.paths.profile)}`,
         );
         await lease.sandbox.process.deleteSession(this.paths.sessionId);
-      } catch { /* no-excuse-ok: catch — borrowed-sandbox cleanup must not hide release. */ }
+      } catch (error: unknown) {
+        // no-excuse-ok: catch — borrowed-sandbox cleanup must not hide release.
+        debug(`could not stop Chromium in the sandbox: ${errorName(error)}`);
+      }
     }
     await lease.release();
   }
@@ -317,7 +323,10 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
       if (dialog.type() === "beforeunload") { await dialog.accept(); return; }
       this.changes.push({ type: "dialog_dismissed", kind: dialog.type(), message: dialog.message().slice(0, MAX_TEXT) });
       await dialog.dismiss();
-    } catch { /* no-excuse-ok: catch — the page may close before dialog handling finishes. */ }
+    } catch (error: unknown) {
+      // no-excuse-ok: catch — the page may close before dialog handling finishes.
+      debug(`dialog handling failed: ${errorName(error)}`);
+    }
   }
   private tabOf(page: Page | null | undefined): Tab | undefined {
     if (page === null || page === undefined) return undefined;
@@ -365,8 +374,9 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   }
   private async blank(tab: Tab): Promise<void> {
     this.navigatingTabs.add(tab.id);
+    // no-excuse-ok: catch — leaving a refused page never masks the original refusal.
     try { await tab.page.goto("about:blank", { waitUntil: "commit", timeout: this.navigationMs }); }
-    catch { /* no-excuse-ok: catch — leaving a refused page never masks the original refusal. */ }
+    catch (error: unknown) { debug(`could not leave a page the url policy refused: ${errorName(error)}`); }
     finally { this.navigatingTabs.delete(tab.id); this.refusedTabs.delete(tab.id); tab.world = null; }
   }
   private async installInterception(context: BrowserContext): Promise<void> {
@@ -377,10 +387,17 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   private async refuses(url: string, tabId?: string): Promise<boolean> {
     if (this.urlPolicy === undefined) return false;
     try { await this.urlPolicy(tabId === undefined ? {} : { tabId }, url); return false; }
-    catch { return true; }
+    catch (error: unknown) {
+      // A `ToolError` (which `URLRefusedError` is) is the policy answering "no" — the expected
+      // path, and not worth a line. Anything else is the policy itself failing: the request is
+      // still refused, but silently failing closed would hide a broken policy from its author.
+      if (!(error instanceof ToolError)) warn(`url_policy raised ${errorName(error)} on a page request; refused it`);
+      return true;
+    }
   }
   private async guardWebSocket(route: WebSocketRoute): Promise<void> {
     if (!(await this.refuses(route.url()))) { route.connectToServer(); return; }
+    debug("url_policy refused a WebSocket a page opened");
     await route.close({ code: 1008, reason: "Policy violation" });
   }
   /**
@@ -417,8 +434,9 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     }
     const path = posix.join(this.downloadPath, event.guid);
     const change: BetaBrowserStateChange = { type: "download_completed", download_id: event.guid, url, size_bytes: event.receivedBytes };
+    // no-excuse-ok: catch — file-policy failure hides the sensitive path.
     try { if (await this.policy?.isPathVisible(path)) change.path = path; }
-    catch { /* no-excuse-ok: catch — file-policy failure hides the sensitive path. */ }
+    catch (error: unknown) { debug(`the file policy could not judge a download path: ${errorName(error)}`); }
     this.changes.push(change);
   }
 
@@ -505,7 +523,9 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   }
   private async keepAlive(reserve = 0): Promise<void> {
     const now = performance.now() / 1000; if (now - this.lastActivity + reserve < KEEP_ALIVE) return;
-    this.lastActivity = now; try { await this.sandbox.refreshActivity(); } catch { /* keep-alive cannot fail a call */ }
+    this.lastActivity = now;
+    // no-excuse-ok: catch — a keep-alive failure is never worth failing a call for.
+    try { await this.sandbox.refreshActivity(); } catch (error: unknown) { debug(`could not refresh the sandbox activity: ${errorName(error)}`); }
   }
   private memberBound(): number { return Math.max(this.navigationMs / 1000, MAX_DURATION, SCRIPT_TIMEOUT_MS / 1000) + this.settleMs / 1000; }
 
@@ -514,7 +534,9 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   }
   private async reportState(_ctx: BetaToolsetCallContext): Promise<BetaBrowserState> {
     await this.keepAlive(); await this.leaveRefusedPages(); let titles: ReadonlyMap<string, readonly [string, string]> = new Map();
-    try { for (const tab of this.tabs.values()) await this.targetId(tab); titles = await this.targets(); } catch { /* report last-known state */ }
+    // no-excuse-ok: catch — a browser that stopped answering is reported from what was last known.
+    try { for (const tab of this.tabs.values()) await this.targetId(tab); titles = await this.targets(); }
+    catch (error: unknown) { debug(`could not read the tab titles: ${errorName(error)}`); }
     if (this.active === undefined || !this.tabs.has(this.active)) this.active = this.recent.at(-1) ?? this.tabs.keys().next().value;
     const tabs = [...this.tabs.values()].slice(0, MAX_TABS).map((tab) => this.entry(tab, titles));
     const state_changes = this.changes; this.changes = [];
