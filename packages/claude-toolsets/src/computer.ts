@@ -202,6 +202,13 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
     ];
   }
 
+  /**
+   * The point in NATIVE screen pixels. A supplied model coordinate is bounds-checked and converted
+   * by {@link toScreen}; with no coordinate the live pointer position is already native, so it is
+   * returned as-is. Every caller but {@link cursor_position} wants native pixels because that is
+   * what the desktop API takes — `cursor_position` is the one that reports back to the model, and
+   * it does the inverse scaling and the clamp into the advertised screenshot bounds itself.
+   */
   private async point(coordinate: number[] | null | undefined): Promise<Point> {
     if (coordinate !== null && coordinate !== undefined) {
       const [x, y] = coordinate;
@@ -325,6 +332,13 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
     return { data: encodePng(output).toString("base64"), mediaType: "image/png" };
   }
 
+  /**
+   * The screen geometry and `scale` are read once, at construction, on purpose: the SDK advertises
+   * `display_width_px`/`display_height_px` to the model a single time, so re-reading a display that
+   * changed mid-session would make the driver's reports disagree with the size the model was told.
+   * The result is clamped into those advertised bounds regardless, so it can never name a pixel
+   * outside the screenshots the model has seen.
+   */
   protected override async cursor_position(_context: BetaToolsetCallContext, _input: BetaComputerCursorPositionInput): Promise<BetaComputerCursorPositionResult> {
     const [x, y] = await this.point(undefined);
     return { x: Math.min(this.width - 1, Math.trunc(x * this.scale)), y: Math.min(this.height - 1, Math.trunc(y * this.scale)) };

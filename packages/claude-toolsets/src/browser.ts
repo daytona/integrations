@@ -135,6 +135,7 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   private changes: BrowserChange[] = [];
   private readonly downloads = new Map<string, string>();
   private readonly refusedTabs = new Set<string>();
+  private readonly navigationChecks = new Set<Promise<void>>();
   private navigating = false;
   private disconnected = false;
   private lastActivity = performance.now() / 1000;
@@ -297,7 +298,7 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     const id = `tab_${this.nextTab}`; this.nextTab += 1;
     this.tabs.set(id, new Tab(id, page)); this.byPage.set(page, id);
     page.on("close", () => { this.forget(page); });
-    page.on("framenavigated", (frame) => { void this.onNavigated(frame); });
+    page.on("framenavigated", (frame) => { this.trackNavigated(frame); });
     this.changes.push({ type: "tab_opened", tab_id: id }); this.activate(id);
   }
 
@@ -331,13 +332,32 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   private onResponse(response: Response): void { this.requestTab(response.request())?.answerRequest(response); }
   private finishRequest(request: Request, failure: string | undefined): void { this.requestTab(request)?.finishRequest(request, failure); }
 
+  /**
+   * Every main-frame navigation is policy-checked here, whichever way it was triggered — a link
+   * click, a script assignment to `location`, a meta refresh, or a server redirect the route
+   * interception did not see. `navigate()` is the one exception, and only because it suppresses this
+   * observer (`navigating`) and runs {@link checkLanded} instead, which refuses the call outright.
+   */
   private async onNavigated(frame: Frame): Promise<void> {
     if (this.navigating || this.urlPolicy === undefined || frame.parentFrame() !== null) return;
     const tab = this.tabOf(frame.page()); const url = frame.url();
     if (tab === undefined || url === "" || url === "about:blank" || !(await this.refuses(url, tab.id))) return;
     this.refusedTabs.add(tab.id); this.changes.push({ type: "navigation_refused" });
   }
+  /**
+   * `urlPolicy` may be asynchronous, so the check {@link onNavigated} starts is kept here and
+   * settled before anything observes the tab. Without that, a page-triggered navigation to a refused
+   * address could still be the live page — and its URL still in the reported browser state — while
+   * the policy was being consulted.
+   */
+  private trackNavigated(frame: Frame): void {
+    const check: Promise<void> = this.onNavigated(frame)
+      .catch(() => { /* no-excuse-ok: catch — observing a navigation never fails the navigation. */ })
+      .then(() => { this.navigationChecks.delete(check); });
+    this.navigationChecks.add(check);
+  }
   private async leaveRefusedPages(): Promise<void> {
+    if (this.navigationChecks.size > 0) await Promise.all([...this.navigationChecks]);
     for (const id of [...this.refusedTabs]) { const tab = this.tabs.get(id); if (tab !== undefined) await this.blank(tab); }
   }
   private async blank(tab: Tab): Promise<void> {
@@ -509,6 +529,11 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     const [x0, y0, x1, y1] = input.region; const [width, height] = this.viewport;
     if (x0 === undefined || y0 === undefined || x1 === undefined || y1 === undefined || !(0 <= x0 && x0 < x1 && x1 <= width && 0 <= y0 && y0 < y1 && y1 <= height)) throw new ToolError(`region must satisfy 0 <= x0 < x1 <= ${width} and 0 <= y0 < y1 <= ${height} (viewport pixels).`);
     const tab = this.tab(input.tab_id); const scroll = await tab.page.evaluate(() => [window.scrollX, window.scrollY]);
+    // Rendered at a higher scale rather than upscaled, so the detail is real. `Page.captureScreenshot`
+    // clips in DOCUMENT coordinates, not viewport ones, so the scroll offset is added — the same
+    // conversion Playwright itself performs (`documentRect.x = visualViewport.pageX + viewportRect.x`).
+    // A clip below the fold is therefore correct, not out of bounds; the region input stays in
+    // viewport pixels because that is the coordinate space of the screenshots the model is looking at.
     return this.capture(tab, { x: x0 + (scroll[0] ?? 0), y: y0 + (scroll[1] ?? 0), width: x1 - x0, height: y1 - y0, scale: Math.min(width / (x1 - x0), height / (y1 - y0), 8) });
   }
   protected override async read_page(_ctx: BetaToolsetCallContext, input: BetaBrowserReadPageInput): Promise<string> {
@@ -526,6 +551,11 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   protected override async read_console(_ctx: BetaToolsetCallContext, input: BetaBrowserReadConsoleInput): Promise<string> { return this.tab(input.tab_id).takeConsole(); }
   protected override async read_network(_ctx: BetaToolsetCallContext, input: BetaBrowserReadNetworkInput): Promise<string> { return this.tab(input.tab_id).takeNetwork(); }
   protected override async javascript_exec(_ctx: BetaToolsetCallContext, input: BetaBrowserJavascriptExecInput): Promise<string> {
+    // `timeout` is a documented optional parameter of the CDP `Runtime.evaluate` command
+    // ("Terminate execution after timing out (number of milliseconds)") and is what enforces the
+    // advertised 10-second limit: V8 terminates the script and reports it through
+    // `exceptionDetails`, which is why the "terminated" description below maps to the timeout
+    // phrase. There is no `Runtime.setTimeout` command in the protocol.
     const result = await (await this.cdp(this.tab(input.tab_id))).send("Runtime.evaluate", { expression: input.text, returnByValue: true, awaitPromise: true, userGesture: true, replMode: true, timeout: SCRIPT_TIMEOUT_MS });
     if (result.exceptionDetails !== undefined) {
       const description = result.exceptionDetails.exception?.description ?? result.exceptionDetails.text;

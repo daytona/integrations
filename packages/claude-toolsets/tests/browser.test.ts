@@ -92,6 +92,20 @@ const makeBrowser = async (options: Parameters<typeof DaytonaBrowser.create>[0] 
   return { browser, sandbox, ...h };
 };
 
+/** Fires the page's `framenavigated` listener as Playwright would for a main-frame navigation. */
+const navigate = (page: PageDouble, url: string): void => {
+  const on = page.on as unknown as ReturnType<typeof vi.fn<(name: string, handler: EventHandler) => void>>;
+  const handler = on.mock.calls.find(([name]) => name === "framenavigated")?.[1];
+  if (handler === undefined) throw new Error("no framenavigated listener was registered");
+  handler({ parentFrame: () => null, page: () => page, url: () => url });
+};
+
+/** Runs every pending microtask and immediate, so a settled promise cannot be mistaken for a pending one. */
+const drain = (): Promise<void> => new Promise((resolve) => { setImmediate(resolve); });
+
+const blanked = (page: PageDouble): boolean =>
+  page.gotoMock.mock.calls.some(([url]) => url === "about:blank");
+
 const routeDouble = (url: string, navigation = false) => {
   const route = {
     request: () => ({
@@ -134,6 +148,34 @@ describe("urlPolicy tri-state and interception", () => {
   it("fails closed when a callable policy throws unexpectedly", async () => { const { browser } = await makeBrowser({ urlPolicy: () => { throw new TypeError("bug"); } }); const route = routeDouble("https://evil.test"); await mocks.routes[0]?.(route); expect(route.abort).toHaveBeenCalledWith("blockedbyclient"); expect(route.continue).not.toHaveBeenCalled(); await browser.close(); });
   it("blocks refused websocket handshakes", async () => { const { browser } = await makeBrowser({ urlPolicy: () => { throw new URLRefusedError("blocked"); } }); const socket = { url: () => "wss://evil.test", connectToServer: vi.fn(), close: vi.fn(async () => undefined) }; await mocks.sockets[0]?.(socket as unknown as WebSocketRoute); expect(socket.close).toHaveBeenCalledWith({ code: 1008, reason: "Policy violation" }); await browser.close(); });
   it("connects allowed websocket handshakes", async () => { const { browser } = await makeBrowser({ urlPolicy: () => undefined }); const socket = { url: () => "wss://good.test", connectToServer: vi.fn(), close: vi.fn() }; await mocks.sockets[0]?.(socket as unknown as WebSocketRoute); expect(socket.connectToServer).toHaveBeenCalledOnce(); await browser.close(); });
+
+  it("leaves a page-triggered refused navigation before the next member observes it", async () => {
+    let admit = (): void => undefined;
+    const consulted = new Promise<void>((resolve) => { admit = resolve; });
+    const { browser, pages } = await makeBrowser({
+      urlPolicy: async (_context: unknown, url: string): Promise<void> => {
+        if (!url.includes("evil.test")) return;
+        await consulted;
+        throw new URLRefusedError("blocked");
+      },
+    });
+    const page = pages[0];
+    if (page === undefined) throw new Error("the harness opened no page");
+    await page.gotoMock("https://evil.test/landing");
+    navigate(page, "https://evil.test/landing");
+
+    let resolved = false;
+    const call = callMember(browser, "screenshot", {}).then((result) => { resolved = true; return result; });
+    await drain();
+    expect(resolved).toBe(false);
+    expect(blanked(page)).toBe(false);
+
+    admit();
+    const result = await call;
+    expect(result.is_error).not.toBe(true);
+    expect(blanked(page)).toBe(true);
+    await browser.close();
+  });
 });
 
 describe("members and bounds", () => {
