@@ -1,0 +1,20 @@
+packages/claude-toolsets/README.md
+  s_d0e6c0983fff75::t_2692e3033d7402 131
+  s_d0e6c0983fff75::t_f7ef42bca8cefe 137,139-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "653046c9b77de915408907456057f0b43b071ce9",
+  "prompts": {},
+  "sessions": {
+    "s_d0e6c0983fff75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee31f362effeSAp6Qh7qul7sdf",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
