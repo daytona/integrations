@@ -51,11 +51,13 @@ jobs:
             convex:
               - 'packages/convex/**'
             toolsets:
-              - 'packages/daytona-claude-toolsets/**'
+              - 'packages/claude-toolsets/python/**'
             # npm (TypeScript) package — distinct from the `toolsets` filter above,
-            # which routes the PyPI/Python packages/daytona-claude-toolsets.
+            # which routes the PyPI/Python packages/claude-toolsets/python. The two
+            # live side by side under packages/claude-toolsets/, so both filters are
+            # scoped to their own language subfolder and never overlap.
             claude_toolsets:
-              - 'packages/claude-toolsets/**'
+              - 'packages/claude-toolsets/typescript/**'
 
   adk:
     needs: changes
@@ -266,27 +268,27 @@ jobs:
       - name: Detect package
         id: guard
         run: |
-          test -f packages/daytona-claude-toolsets/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+          test -f packages/claude-toolsets/python/pyproject.toml && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
       - name: Install
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-claude-toolsets
+        working-directory: packages/claude-toolsets/python
         run: python -m pip install -e ".[dev]"
       - name: Lint (ruff)
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-claude-toolsets
+        working-directory: packages/claude-toolsets/python
         run: ruff check .
       - name: Type check (mypy)
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-claude-toolsets
+        working-directory: packages/claude-toolsets/python
         run: mypy daytona_claude_toolsets
       - name: Unit tests (offline, Daytona and Playwright mocked)
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/daytona-claude-toolsets
+        working-directory: packages/claude-toolsets/python
         run: pytest
       # NOTE: live checks (examples/exercise_*.py, real Daytona sandboxes) are not in per-PR CI.
 
   # npm (TypeScript) toolsets — distinct from the `toolsets` job above, which
-  # covers the PyPI/Python packages/daytona-claude-toolsets.
+  # covers the PyPI/Python packages/claude-toolsets/python.
   claude-toolsets:
     needs: changes
     if: needs.changes.outputs.claude_toolsets == 'true'
@@ -303,25 +305,25 @@ jobs:
       - name: Detect package
         id: guard
         run: |
-          test -f packages/claude-toolsets/package.json && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
+          test -f packages/claude-toolsets/typescript/package.json && echo "ready=true" >> "$GITHUB_OUTPUT" || echo "ready=false" >> "$GITHUB_OUTPUT"
       - name: Install
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/claude-toolsets
+        working-directory: packages/claude-toolsets/typescript
         # --ignore-scripts: nothing here needs a dependency's install script. tsc and vitest run
         # from the lockfile alone — esbuild's platform binary arrives as the @esbuild/linux-x64
         # optional dependency, not from its postinstall.
         run: npm ci --ignore-scripts
       - name: Typecheck
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/claude-toolsets
+        working-directory: packages/claude-toolsets/typescript
         run: npm run typecheck
       - name: Build
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/claude-toolsets
+        working-directory: packages/claude-toolsets/typescript
         run: npm run build
       - name: Unit tests (offline, Daytona and Playwright mocked)
         if: steps.guard.outputs.ready == 'true'
-        working-directory: packages/claude-toolsets
+        working-directory: packages/claude-toolsets/typescript
         run: npm test
       # NOTE: live checks (examples/, real Daytona sandboxes) are not in per-PR CI.
 
