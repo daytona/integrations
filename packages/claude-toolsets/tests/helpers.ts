@@ -19,12 +19,18 @@ export type MockSandbox = {
     readonly start: ReturnType<typeof vi.fn<() => Promise<void>>>;
     readonly stop: ReturnType<typeof vi.fn<() => Promise<void>>>;
     readonly delete: ReturnType<typeof vi.fn<() => Promise<void>>>;
+    readonly refreshActivity: ReturnType<typeof vi.fn<() => Promise<void>>>;
+    readonly getSignedPreviewUrl: ReturnType<typeof vi.fn<(port: number, expires: number) => Promise<{ readonly sandboxId: string; readonly port: number; readonly token: string; readonly url: string }>>>;
+    readonly expireSignedPreviewUrl: ReturnType<typeof vi.fn<(port: number, token: string) => Promise<void>>>;
     readonly fs: {
       readonly uploadFile: ReturnType<typeof vi.fn<(data: Buffer, path: string) => Promise<void>>>;
       readonly deleteFile: ReturnType<typeof vi.fn<(path: string) => Promise<void>>>;
     };
     readonly process: {
       readonly executeCommand: ReturnType<typeof vi.fn<(command: string, cwd?: string, env?: Record<string, string>, timeout?: number) => Promise<{ readonly exitCode: number; readonly result: string }>>>;
+      readonly createSession: ReturnType<typeof vi.fn<(id: string) => Promise<void>>>;
+      readonly executeSessionCommand: ReturnType<typeof vi.fn<(id: string, request: object) => Promise<unknown>>>;
+      readonly deleteSession: ReturnType<typeof vi.fn<(id: string) => Promise<void>>>;
     };
     readonly computerUse: {
       readonly getStatus: ReturnType<typeof vi.fn<() => Promise<{ readonly status: string }>>>;
@@ -60,12 +66,18 @@ export const mockSandbox = (width = 1280, height = 800): MockSandbox => {
     start: daytonaMethod<[], void>(undefined),
     stop: daytonaMethod<[], void>(undefined),
     delete: daytonaMethod<[], void>(undefined),
+    refreshActivity: daytonaMethod<[], void>(undefined),
+    getSignedPreviewUrl: daytonaMethod<[number, number], { readonly sandboxId: string; readonly port: number; readonly token: string; readonly url: string }>({ sandboxId: "sbx-test", port: 9222, token: "signed-token", url: "https://signed.test/token" }),
+    expireSignedPreviewUrl: daytonaMethod<[number, string], void>(undefined),
     fs: {
       uploadFile: daytonaMethod<[Buffer, string], void>(undefined),
       deleteFile: daytonaMethod<[string], void>(undefined),
     },
     process: {
       executeCommand: daytonaMethod<[string, string?, Record<string, string>?, number?], { readonly exitCode: number; readonly result: string }>({ exitCode: 0, result: "" }),
+      createSession: daytonaMethod<[string], void>(undefined),
+      executeSessionCommand: daytonaMethod<[string, object], unknown>(undefined),
+      deleteSession: daytonaMethod<[string], void>(undefined),
     },
     computerUse: {
       getStatus: daytonaMethod<[], { readonly status: string }>({ status: "active" }),
