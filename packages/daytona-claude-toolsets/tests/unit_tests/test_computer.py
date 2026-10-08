@@ -132,9 +132,7 @@ def test_screenshot_base64_size_is_bounded_before_decoding(sandbox: MagicMock) -
 
 
 @pytest.mark.parametrize("screenshot", ["", "not base64!", base64.b64encode(b"not png").decode()])
-def test_invalid_screenshot_bytes_use_the_fixed_phrase(
-    sandbox: MagicMock, screenshot: str
-) -> None:
+def test_invalid_screenshot_bytes_use_the_fixed_phrase(sandbox: MagicMock, screenshot: str) -> None:
     sandbox.computer_use.screenshot.take_full_screen.return_value = SimpleNamespace(
         screenshot=screenshot
     )
