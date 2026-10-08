@@ -1,0 +1,34 @@
+packages/claude-toolsets/package.json
+  s_db769e313121ca::t_76f06a5cddb9f6 50-54
+packages/claude-toolsets/examples/support.ts
+  s_db769e313121ca::t_275b7f7392a211 107
+  s_db769e313121ca::t_47232ad1ae000b 1-9,11-106,108-116
+  s_db769e313121ca::t_8b663fcd16246c 10
+packages/claude-toolsets/examples/exerciseBrowser.ts
+  s_db769e313121ca::t_56795925b125a9 1-4
+  s_db769e313121ca::t_ecb7cfb95e7c84 5-503
+packages/claude-toolsets/tests/exerciseComputer.test.ts
+  s_db769e313121ca::t_d3c8faa65eca4b 1-63
+packages/claude-toolsets/examples/runBrowser.ts
+  s_db769e313121ca::t_98601dd45a5602 1-79
+packages/claude-toolsets/examples/exerciseComputer.ts
+  s_db769e313121ca::t_664a0da2612f91 1-305
+packages/claude-toolsets/examples/runComputer.ts
+  s_db769e313121ca::t_d93081e68ffc17 1-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fc6069f948780a41cce33e2b23f11b86c138081f",
+  "prompts": {},
+  "sessions": {
+    "s_db769e313121ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee70b59f5ffehjkpnbPlvu4VDa",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
