@@ -1,0 +1,22 @@
+packages/claude-toolsets/tests/sandbox.test.ts
+  s_47fc6999bc13b6::t_4ccabe8d20a721 71-90
+  s_47fc6999bc13b6::t_19b849f475d847 1
+packages/claude-toolsets/src/sandbox.ts
+  s_47fc6999bc13b6::t_c7bc7f03518b2a 48-52,57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a6a5dd7a4017fa2bde49c51db2610384abef4701",
+  "prompts": {},
+  "sessions": {
+    "s_47fc6999bc13b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee6e91673ffeIQqPmluQI2Tb7h",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
