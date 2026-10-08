@@ -34,7 +34,8 @@ Standalone projects **not published to a package registry** live in [`apps/`](ap
 Versioning is **per package**, automated with [release-please](https://github.com/googleapis/release-please):
 
 - Merging PRs to `main` keeps a rolling **Release PR** per affected package up to date.
-- Merging a package's Release PR tags it (`<component>-vX.Y.Z`), publishes a GitHub Release, and publishes to npm/PyPI via OIDC (with provenance) — no manual publish step.
+- Merging a package's Release PR tags it (`<component>-vX.Y.Z`), publishes a GitHub Release, and publishes to PyPI via OIDC (with provenance) — no manual publish step.
+- For npm packages, the Release PR merge stages the version with provenance. A maintainer must then approve it with 2FA on npmjs.com (**package → Staged Packages**) or with `npm stage list` and `npm stage approve <id>`.
 
 ## Contributing
 
