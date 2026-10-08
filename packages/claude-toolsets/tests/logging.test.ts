@@ -11,6 +11,16 @@ import { callMember, mockSandbox } from "./helpers.js";
 
 const PREFIX = "[daytona-claude-toolsets] ";
 
+/**
+ * The construction-time warnings, spelled out here rather than imported.
+ *
+ * Importing the driver's own constant would assert a string against itself, and pass through any
+ * rewrite of it. These are a security review's agreed wording, so the literal is the test.
+ */
+const UNCHECKED_URL_POLICY = "no urlPolicy was given, so navigate and page requests are not checked; anything the sandbox network can reach is reachable, including local services. Pass urlPolicy (or null to refuse everything) to restrict it.";
+const PUBLIC_BROWSER_SANDBOX = "the sandbox is public, so its preview URLs need no authentication: anyone who knows the sandbox id can reach Chromium's debugging port and control the browser. Use a private sandbox.";
+const PUBLIC_COMPUTER_SANDBOX = "the sandbox is public, so its preview URLs need no authentication: the desktop's noVNC port is reachable by anyone who knows the sandbox id. Use a private sandbox.";
+
 const mocks = vi.hoisted(() => ({
   connectOverCDP: vi.fn(),
   launch: vi.fn(async () => 9222),
@@ -86,8 +96,10 @@ const harness = () => {
   };
 };
 
-const makeBrowser = async (options: Parameters<typeof DaytonaBrowser.create>[0] = {}) => {
-  const sandbox = mockSandbox();
+const makeBrowser = async (
+  options: Parameters<typeof DaytonaBrowser.create>[0] = {},
+  sandbox = mockSandbox(),
+) => {
   const h = harness();
   const browser = await DaytonaBrowser.create({ sandbox: sandbox.sandbox, ...options });
   return { browser, sandbox, ...h };
@@ -115,6 +127,15 @@ const silence = (level: "debug" | "warn") => vi.spyOn(console, level).mockImplem
 
 let debugSpy: ReturnType<typeof silence>;
 let warnSpy: ReturnType<typeof silence>;
+
+/**
+ * Every warning line in order.
+ *
+ * Asserted with `toEqual` against the whole array rather than with a "does not contain" matcher:
+ * a negated `expect.stringContaining` inside `not.toContain` passes on any array, so it proves
+ * nothing. An exact array says both which lines were written and which were not.
+ */
+const warnings = (): readonly string[] => warnSpy.mock.calls.map(([line]) => String(line));
 
 beforeEach(() => {
   mocks.connectOverCDP.mockReset(); mocks.launch.mockClear();
@@ -275,6 +296,94 @@ describe("browser policy logging", () => {
     // Then: the path is hidden AND the policy failure that hid it is recorded.
     expect(debugSpy).toHaveBeenCalledWith(`${PREFIX}the file policy could not judge a download path: TypeError`);
     await browser.close();
+  });
+});
+
+describe("browser url policy warning", () => {
+  it("warns once per create() that nothing is checking addresses", async () => {
+    // Given: a browser built the way the SDK allows — with no urlPolicy at all.
+    const { browser } = await makeBrowser();
+
+    // Then: the unchecked run is announced, in the agreed words.
+    expect(warnings()).toEqual([`${PREFIX}${UNCHECKED_URL_POLICY}`]);
+
+    // When: the model drives the browser.
+    await callMember(browser, "screenshot", {});
+    await callMember(browser, "screenshot", {});
+
+    // Then: it is still one line — a per-call warning would be noise a host learns to filter.
+    expect(warnings()).toEqual([`${PREFIX}${UNCHECKED_URL_POLICY}`]);
+    await browser.close();
+  });
+
+  it("stays silent for an explicit null, which is deny-all and not unchecked", async () => {
+    // Given / When: the locked-down shape, which is a decision rather than an omission.
+    const { browser } = await makeBrowser({ urlPolicy: null });
+
+    // Then: nothing is said.
+    expect(warnings()).toEqual([]);
+    await browser.close();
+  });
+
+  it("stays silent for a urlPolicy callable", async () => {
+    // Given / When: a caller who answered the question themselves.
+    const { browser } = await makeBrowser({ urlPolicy: () => undefined });
+
+    // Then: nothing is said.
+    expect(warnings()).toEqual([]);
+    await browser.close();
+  });
+});
+
+describe("public sandbox warning", () => {
+  it("warns that a public sandbox serves the browser's debugging port to anyone", async () => {
+    // Given: a leased sandbox whose preview URLs need no authentication.
+    const sandbox = mockSandbox();
+    sandbox.raw.public = true;
+
+    // When: a browser is built on it.
+    const { browser } = await makeBrowser({}, sandbox);
+
+    // Then: both construction-time warnings are written, in order, and neither names the sandbox.
+    expect(warnings()).toEqual([
+      `${PREFIX}${UNCHECKED_URL_POLICY}`,
+      `${PREFIX}${PUBLIC_BROWSER_SANDBOX}`,
+    ]);
+    expect(warnings().some((line) => line.includes(sandbox.raw.id))).toBe(false);
+    await browser.close();
+  });
+
+  it("says nothing about a private sandbox under the browser", async () => {
+    // Given / When: the default, private sandbox.
+    const { browser } = await makeBrowser();
+
+    // Then: only the unchecked-policy line is written — the public one is not.
+    expect(warnings()).toEqual([`${PREFIX}${UNCHECKED_URL_POLICY}`]);
+    await browser.close();
+  });
+
+  it("warns that a public sandbox serves the desktop's noVNC port to anyone", async () => {
+    // Given: a leased sandbox whose preview URLs need no authentication.
+    const sandbox = mockSandbox();
+    sandbox.raw.public = true;
+
+    // When: a computer is built on it.
+    const computer = await DaytonaComputer.create({ sandbox: sandbox.sandbox, confirm: () => true, settleDelay: 0 });
+
+    // Then: the desktop's own wording is written, and it does not name the sandbox.
+    expect(warnings()).toEqual([`${PREFIX}${PUBLIC_COMPUTER_SANDBOX}`]);
+    expect(warnings().some((line) => line.includes(sandbox.raw.id))).toBe(false);
+    await computer.close();
+  });
+
+  it("says nothing about a private sandbox under the computer", async () => {
+    // Given / When: the default, private sandbox.
+    const sandbox = mockSandbox();
+    const computer = await DaytonaComputer.create({ sandbox: sandbox.sandbox, confirm: () => true, settleDelay: 0 });
+
+    // Then: construction is silent.
+    expect(warnings()).toEqual([]);
+    await computer.close();
   });
 });
 

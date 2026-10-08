@@ -65,6 +65,8 @@ export const FIND_LIMIT = 20;
 export const KEEP_ALIVE = 45;
 const SCRIPT_TIMEOUT_MS = 10_000;
 const WHEEL_NOTCH = 100;
+const UNCHECKED_URL_POLICY = "no urlPolicy was given, so navigate and page requests are not checked; anything the sandbox network can reach is reachable, including local services. Pass urlPolicy (or null to refuse everything) to restrict it.";
+const PUBLIC_SANDBOX = "the sandbox is public, so its preview URLs need no authentication: anyone who knows the sandbox id can reach Chromium's debugging port and control the browser. Use a private sandbox.";
 const MODIFIERS = { ctrl: "Control", alt: "Alt", shift: "Shift", cmd: "Meta" } as const;
 
 type Size = readonly [number, number];
@@ -170,6 +172,11 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     const urlPolicy = options.urlPolicy === null
       ? (): never => { throw new URLRefusedError("The navigation was refused."); }
       : options.urlPolicy;
+    // The SDK's own semantics: no policy means no check. Kept, because a driver that invented a
+    // default would answer a question only the caller can — but said out loud once per driver,
+    // because "unchecked" is the one setting nothing downstream will remind anyone of. `null` is
+    // the deliberate deny-all above, and a callable is a decision already made: neither warns.
+    if (options.urlPolicy === undefined) warn(UNCHECKED_URL_POLICY);
     let browser: DaytonaBrowser | undefined;
     const browserState = async (ctx: BetaToolsetCallContext): Promise<BetaBrowserState> => {
       if (browser === undefined) throw new DaytonaBrowserClosedError("this DaytonaBrowser is not ready");
@@ -195,6 +202,12 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
         ...(options.createParams === undefined ? {} : { createParams: options.createParams }),
         defaultEnv: {}, onClose: options.onClose ?? "delete", createTimeout: options.createTimeout ?? 120,
       });
+      // Checked on the leased sandbox rather than on the options, so it covers a borrowed public
+      // sandbox as well as one `createParams.public` asked for. A public sandbox serves every
+      // preview port to anyone who knows its id, with no token — including the debugging port this
+      // driver is about to open, which is unrestricted control of the browser. The message carries
+      // no id and no URL: a log line must not become the credential it is warning about.
+      if (browser.sandbox.public === true) warn(PUBLIC_SANDBOX);
       await browser.start(options.chromium ?? "chromium", options.headless ?? true);
       return browser;
     } catch (error: unknown) {

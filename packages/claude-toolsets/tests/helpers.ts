@@ -34,6 +34,8 @@ export type MockSandbox = {
   readonly raw: {
     readonly id: string;
     state: string;
+    /** Daytona's own `Sandbox.public`; writable here so a test can lease a public sandbox. */
+    public: boolean;
     readonly start: ReturnType<typeof vi.fn<() => Promise<void>>>;
     readonly stop: ReturnType<typeof vi.fn<() => Promise<void>>>;
     readonly delete: ReturnType<typeof vi.fn<() => Promise<void>>>;
@@ -81,6 +83,7 @@ export const mockSandbox = (width = 1280, height = 800): MockSandbox => {
   const raw = {
     id: "sbx-test",
     state: "started",
+    public: false,
     start: daytonaMethod<[], void>(undefined),
     stop: daytonaMethod<[], void>(undefined),
     delete: daytonaMethod<[], void>(undefined),

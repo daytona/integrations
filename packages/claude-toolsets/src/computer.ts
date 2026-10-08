@@ -30,7 +30,7 @@ import { DaytonaError } from "@daytona/sdk";
 import type { Daytona, Sandbox } from "@daytona/sdk";
 
 import { XKEYSYMS, desktopKey, parseChord, splitSequence } from "./keys.js";
-import { debug, errorName } from "./logging.js";
+import { debug, errorName, warn } from "./logging.js";
 import { SCREENSHOT_BOUNDS, decodePng, encodePng, resizePng, type PngImage } from "./png.js";
 import {
   SandboxLease,
@@ -45,6 +45,7 @@ export const MAX_REPEAT = 100;
 export const MAX_SCROLL = 50;
 export const NATIVE_INPUT_FLOOR_ERROR = "This sandbox's platform does not support native held input; recreate the sandbox on a current Daytona version.";
 export const INVALID_SCREENSHOT_ERROR = "The sandbox desktop returned an invalid screenshot.";
+const PUBLIC_SANDBOX = "the sandbox is public, so its preview URLs need no authentication: the desktop's noVNC port is reachable by anyone who knows the sandbox id. Use a private sandbox.";
 
 const WHEEL = {
   up: "up",
@@ -144,6 +145,12 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
         onClose,
         createTimeout,
       });
+      // Checked on the leased sandbox rather than on the options, so it covers a borrowed public
+      // sandbox as well as one `createParams.public` asked for. A public sandbox serves every
+      // preview port to anyone who knows its id, with no token — including the noVNC port
+      // `startDesktop` is about to bring up, which is the desktop itself. The message carries no id
+      // and no URL: a log line must not become the credential it is warning about.
+      if (computer.sandbox.public === true) warn(PUBLIC_SANDBOX);
       computer.xtest = new XTest(computer.lease.sandbox);
       await computer.startDesktop();
       return computer;
