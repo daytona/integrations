@@ -8,8 +8,10 @@
  *
  * `debug` carries the best-effort cleanup and fail-closed policy failures the driver deliberately
  * swallows — none of them fails a call, and none of them is actionable on its own. `warn` is for
- * the two a human has to act on: a sandbox that could not be released, and a URL policy that threw
- * instead of answering.
+ * the ones a human has to act on, none of which stops the run: a sandbox that could not be
+ * released, a URL policy that threw instead of answering, a `DaytonaBrowser` built with no URL
+ * policy at all, and a driver leased onto a public sandbox, whose preview ports — the debugging
+ * port and the desktop among them — need no credential from anyone who knows the sandbox id.
  *
  * Nothing here is re-exported from `index.ts`: these are the module's own voice, not API.
  */
