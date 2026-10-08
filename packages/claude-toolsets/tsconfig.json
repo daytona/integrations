@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "forceConsistentCasingInFileNames": true,
+    "noErrorTruncation": true,
+    // NodeNext (not Bundler): this package ships ESM that Node resolves itself,
+    // so relative imports must carry explicit .js extensions and the compiler
+    // has to enforce that at build time rather than let a bundler paper over it.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*", "examples/**/*", "tests/**/*"]
+}

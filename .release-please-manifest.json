@@ -6,5 +6,6 @@
   "packages/opencode-plugin": "0.193.0",
   "packages/pydantic-ai-daytona": "0.1.0",
   "packages/convex": "2.0.0",
+  "packages/claude-toolsets": "0.0.0",
   "packages/daytona-claude-toolsets": "0.1.0"
 }
