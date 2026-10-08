@@ -1,6 +1,6 @@
 {
   "name": "@daytona/claude-toolsets",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Daytona sandbox drivers for the Anthropic SDK's computer and browser toolsets — hand one to the SDK's tool runner and Claude drives a desktop or a Chromium running in an isolated Daytona sandbox",
   "type": "module",
   "repository": {
