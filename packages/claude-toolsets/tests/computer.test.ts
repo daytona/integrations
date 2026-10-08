@@ -201,7 +201,7 @@ describe("DaytonaComputer screenshot decoding bounds", () => {
     // itself was perfectly valid, so the model is told what actually happened and what the screen
     // is now, not that the sandbox returned an invalid screenshot.
     expect(result.is_error).toBe(true);
-    expect(resultText(result)).toBe(`The desktop changed size; ${"region must satisfy 0 <= x0 < x1 <= 100 and 0 <= y0 < y1 <= 100 (the screen in screenshot pixels)."}`);
+    expect(resultText(result)).toBe("The desktop changed size; region must satisfy 0 <= x0 < x1 <= 100 and 0 <= y0 < y1 <= 100 (the screen in screenshot pixels).");
     expect(resultText(result)).not.toContain(INVALID_SCREENSHOT_ERROR);
     expect([toolset.width, toolset.height]).toEqual([100, 100]);
     await toolset.close();

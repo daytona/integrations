@@ -220,7 +220,8 @@ describe("decodePng bounds", () => {
 
   it("refuses an interlaced deflate bomb whose header is inside every bound", () => {
     // Given: a 1000x1000 IHDR — well inside maxWidth, maxHeight and maxPixels — with an IDAT
-    // of deflated zeros behind it that inflates to ~1000x what the header promises
+    // of deflated zeros behind it that inflates to 16 MiB, four times the ~4 MB the header
+    // promises and a few hundred times the ~16 KB it costs on the wire
     const encoded = bomb(16 * 1024 * 1024, 1);
     const inflate = vi.spyOn(PNG.sync, "read");
     expect(encoded.length).toBeLessThan(SCREENSHOT_BOUNDS.maxBytes);
@@ -229,8 +230,11 @@ describe("decodePng bounds", () => {
     // When: it is decoded under the screenshot bounds
     const decode = (): PngImage => decodePng(encoded, SCREENSHOT_BOUNDS);
 
-    // Then: the interlace byte alone refuses it, and the unbounded inflate is never entered —
-    // every other bound passes, so without that check this is tens of GB of host memory.
+    // Then: the interlace byte alone refuses it, and the unbounded inflate is never entered.
+    // What this asserts is the early rejection, not a measured blow-up: the fixture stays at
+    // 16 MiB so the suite allocates nothing dangerous. Scaling the same shape to the 64 MiB
+    // input cap is what reaches tens of GB, and it is the spy below that proves that cannot
+    // start — every other bound passes.
     expect(decode).toThrow(RangeError);
     expect(inflate).not.toHaveBeenCalled();
   });
