@@ -1,0 +1,24 @@
+packages/claude-toolsets/tests/browser.test.ts
+  s_5b42ced7b28270::t_8e5c33d7f56730 248-273
+packages/claude-toolsets/tests/tabs.test.ts
+  s_5b42ced7b28270::t_40f38b375316c7 55-57,60-69
+  s_5b42ced7b28270::t_8a90f0b3ee9e21 70
+packages/claude-toolsets/src/tabs.ts
+  s_5b42ced7b28270::t_331e9cd1e1daad 77-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ffb0f8f9e8c5c7e830b7fcfc89a152581a2ac681",
+  "prompts": {},
+  "sessions": {
+    "s_5b42ced7b28270": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee6ccea94ffe3UOzC3lSIrAtTa",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
