@@ -307,7 +307,10 @@ jobs:
       - name: Install
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/claude-toolsets
-        run: npm ci
+        # --ignore-scripts: nothing here needs a dependency's install script. tsc and vitest run
+        # from the lockfile alone — esbuild's platform binary arrives as the @esbuild/linux-x64
+        # optional dependency, not from its postinstall.
+        run: npm ci --ignore-scripts
       - name: Typecheck
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/claude-toolsets

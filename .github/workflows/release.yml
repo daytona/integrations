@@ -311,6 +311,8 @@ jobs:
       - name: Install, build, publish
         working-directory: packages/claude-toolsets
         run: |
-          npm ci
+          # --ignore-scripts: this job holds `id-token: write`, and the build is just tsc, so no
+          # dependency's install script (protobufjs' postinstall, via @daytona/sdk) needs to run.
+          npm ci --ignore-scripts
           npm run build
           npm publish --provenance --access public
