@@ -1,0 +1,27 @@
+packages/claude-toolsets/tests/browser.test.ts
+  s_d2a804ea803380::t_b6d4e4f1f0a05d 30-42,47-59,62-64,68-70,76-81,85-95,99-100,106-109
+  s_d2a804ea803380::t_fa1dcb7bc98a99 408-807
+  s_d2a804ea803380::t_bb80ca486a3d7a 808-951
+  s_d2a804ea803380::t_da039f2e87db30 9,11
+packages/claude-toolsets/tests/computer.test.ts
+  s_d2a804ea803380::t_49d4312170da49 298-343
+packages/claude-toolsets/tests/helpers.ts
+  s_d2a804ea803380::t_1de0731b6cf478 156-170
+  s_d2a804ea803380::t_65f863bec70e7d 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "485636387bf8ae9d5f8dc67298b63a130a4a7fcf",
+  "prompts": {},
+  "sessions": {
+    "s_d2a804ea803380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee2be1cb2ffeQv98wDm9qX2PRH",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
