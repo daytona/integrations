@@ -1,0 +1,18 @@
+.github/workflows/ci.yml
+  h_634fa4b3782b12 130,156,182,238
+.github/workflows/release.yml
+  h_634fa4b3782b12 197,201-202,206,208-209,234,236-237,262,264-265,288,290-291,321-322
+README.md
+  h_634fa4b3782b12 37-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4cc587fb95cce68c79df1a248e7ae9b6dc418052",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
