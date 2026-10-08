@@ -1,0 +1,16 @@
+packages/claude-toolsets/src/chromium.ts
+  h_634fa4b3782b12 1-164
+packages/claude-toolsets/tests/chromium.test.ts
+  h_634fa4b3782b12 1-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "15df0e52cf6fd6bbf5b0c6e28f8c710abec64dde",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
