@@ -82,6 +82,8 @@ class DaytonaFilePolicy:
         self.download_dir = (
             None if download_dir is None else self._absolute(download_dir, "download_dir")
         )
+        if self.download_dir is not None and is_filesystem_root(self.download_dir):
+            raise ValueError("download_dir cannot be the filesystem root")
         if self.download_dir is not None and any(
             is_under(self.download_dir, root) or is_under(root, self.download_dir) for root in roots
         ):
