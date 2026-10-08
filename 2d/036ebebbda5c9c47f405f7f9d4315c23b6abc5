@@ -1,0 +1,20 @@
+packages/claude-toolsets/src/pageJs.ts
+  h_634fa4b3782b12 1-302
+packages/claude-toolsets/src/png.ts
+  h_634fa4b3782b12 1-116
+packages/claude-toolsets/tests/pageJs.test.ts
+  h_634fa4b3782b12 1-41
+packages/claude-toolsets/tests/png.test.ts
+  h_634fa4b3782b12 1-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2d036ebebbda5c9c47f405f7f9d4315c23b6abc5",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
