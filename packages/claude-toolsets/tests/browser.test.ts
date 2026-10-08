@@ -202,6 +202,30 @@ describe("members and bounds", () => {
   it("refuses unknown tabs", async () => { const { browser } = await makeBrowser(); const result = await callMember(browser, "switch_tab", { tab_id: "tab_9" }); expect(resultText(result)).toContain("not open"); await browser.close(); });
   it("drains console reads", async () => { const { browser } = await makeBrowser({ configs: { read_console: { enabled: true } } }); const first = await callMember(browser, "read_console", {}); const second = await callMember(browser, "read_console", {}); expect(resultText(first)).toContain("(empty)"); expect(resultText(second)).toContain("(empty)"); await browser.close(); });
   it("refuses upload without paths", async () => { const policy = new DaytonaFilePolicy({ uploadRoots: ["/up"] }); const { browser } = await makeBrowser({ configs: { file_upload: { enabled: true } }, confirm: () => true, filePolicy: policy }); const result = await callMember(browser, "file_upload", { target: { type: "ref", ref: "ref_1" } }); expect(resultText(result)).toContain("at least one path"); await browser.close(); });
+  it("still checks a navigation another tab starts while one tab is navigating", async () => {
+    // Given: two tabs, and a policy refusing only the second tab's destination.
+    const { browser, pages } = await makeBrowser({
+      urlPolicy: (_context: unknown, url: string): void => { if (url.includes("evil.test")) throw new URLRefusedError("blocked"); },
+    });
+    await callMember(browser, "new_tab", {});
+    const [first, second] = pages;
+    if (first === undefined || second === undefined) throw new Error("the harness opened too few pages");
+
+    // When: the second tab commits a refused navigation while the first tab's navigate is in flight.
+    first.gotoMock.mockImplementationOnce(async () => {
+      await second.gotoMock("https://evil.test/landing");
+      navigate(second, "https://evil.test/landing");
+      await drain();
+      return { status: () => 200 };
+    });
+    await callMember(browser, "navigate", { url: "https://good.test", tab_id: "tab_1" });
+
+    // Then: the other tab's navigation was not suppressed — it is blanked before the next member.
+    await callMember(browser, "screenshot", {});
+    expect(blanked(second)).toBe(true);
+    await browser.close();
+  });
+
   it("caps page-controlled titles and URLs in the browser state", async () => {
     // Given: a page reporting a title and URL far longer than the text limit.
     const { browser, browserCdp } = await makeBrowser();

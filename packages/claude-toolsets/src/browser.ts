@@ -105,8 +105,8 @@ class BrowserConnectionError extends Error { readonly name = "BrowserConnectionE
  * The handlers are also not independent: every one of them reads and mutates the same
  * live, in-flight state — `tabs`/`byPage`/`recent`/`active` (tab identity), `changes`
  * (the per-call browser-state delta), `downloads` and `refusedTabs` (populated by CDP
- * and route listeners registered at launch), `navigating` (which makes interception
- * fail closed mid-navigation), and `lastActivity` (keep-alive). Splitting by
+ * and route listeners registered at launch), `navigatingTabs` (which keeps a member's own
+ * navigation from racing its observer), and `lastActivity` (keep-alive). Splitting by
  * "responsibility" would convert these fields into cross-object mutable references
  * threaded through every call — strictly more coupling, and more regression risk, than
  * the private fields they are today.
@@ -136,7 +136,7 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   private readonly downloads = new Map<string, string>();
   private readonly refusedTabs = new Set<string>();
   private readonly navigationChecks = new Set<Promise<void>>();
-  private navigating = false;
+  private readonly navigatingTabs = new Set<string>();
   private disconnected = false;
   private lastActivity = performance.now() / 1000;
   private constructor(
@@ -335,13 +335,16 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   /**
    * Every main-frame navigation is policy-checked here, whichever way it was triggered — a link
    * click, a script assignment to `location`, a meta refresh, or a server redirect the route
-   * interception did not see. `navigate()` is the one exception, and only because it suppresses this
-   * observer (`navigating`) and runs {@link checkLanded} instead, which refuses the call outright.
+   * interception did not see. `navigate()` is the one exception, and only for the tab it is driving:
+   * it suppresses this observer for THAT tab (`navigatingTabs`) and runs {@link checkLanded}
+   * instead, which refuses the call outright. The suppression is per tab, so a navigation another
+   * tab starts during that window is still checked.
    */
   private async onNavigated(frame: Frame): Promise<void> {
-    if (this.navigating || this.urlPolicy === undefined || frame.parentFrame() !== null) return;
+    if (this.urlPolicy === undefined || frame.parentFrame() !== null) return;
     const tab = this.tabOf(frame.page()); const url = frame.url();
-    if (tab === undefined || url === "" || url === "about:blank" || !(await this.refuses(url, tab.id))) return;
+    if (tab === undefined || this.navigatingTabs.has(tab.id)) return;
+    if (url === "" || url === "about:blank" || !(await this.refuses(url, tab.id))) return;
     this.refusedTabs.add(tab.id); this.changes.push({ type: "navigation_refused" });
   }
   /**
@@ -361,10 +364,10 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     for (const id of [...this.refusedTabs]) { const tab = this.tabs.get(id); if (tab !== undefined) await this.blank(tab); }
   }
   private async blank(tab: Tab): Promise<void> {
-    this.navigating = true;
+    this.navigatingTabs.add(tab.id);
     try { await tab.page.goto("about:blank", { waitUntil: "commit", timeout: this.navigationMs }); }
     catch { /* no-excuse-ok: catch — leaving a refused page never masks the original refusal. */ }
-    finally { this.navigating = false; this.refusedTabs.delete(tab.id); tab.world = null; }
+    finally { this.navigatingTabs.delete(tab.id); this.refusedTabs.delete(tab.id); tab.world = null; }
   }
   private async installInterception(context: BrowserContext): Promise<void> {
     if (this.urlPolicy === undefined) return;
@@ -396,7 +399,7 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     const request = route.request(); const tab = this.requestTab(request);
     if (!(await this.refuses(request.url(), tab?.id))) { await route.continue(); return; }
     try { await route.abort("blockedbyclient"); } catch { return; }
-    if (request.isNavigationRequest() && request.frame().parentFrame() === null && !this.navigating) {
+    if (request.isNavigationRequest() && request.frame().parentFrame() === null && !(tab !== undefined && this.navigatingTabs.has(tab.id))) {
       this.changes.push({ type: "navigation_refused" });
     }
   }
@@ -520,7 +523,7 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
 
   protected override async navigate(_ctx: BetaToolsetCallContext, input: BetaBrowserNavigateInput): Promise<BetaBrowserNavigateResult> {
     const tab = this.tab(input.tab_id); const page = tab.page; const before = page.url(); let response: Response | null = null;
-    this.navigating = true;
+    this.navigatingTabs.add(tab.id);
     try {
       if (input.url === "back" || input.url === "forward" || input.url === "reload") {
         response = input.url === "back" ? await page.goBack({ waitUntil: "commit", timeout: this.navigationMs })
@@ -533,7 +536,7 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
       if (error instanceof ToolError) throw error;
       if (error instanceof playwrightErrors.TimeoutError) throw new ToolError(`The page did not load within ${this.navigationMs / 1000} seconds.`);
       if (!(error instanceof Error) || !error.message.includes("Download is starting")) throw new ToolError(failurePhrase(error));
-    } finally { this.navigating = false; }
+    } finally { this.navigatingTabs.delete(tab.id); }
     tab.world = null; await this.checkLanded(tab, before);
     let title = ""; try { title = await page.title(); } catch { /* closed page has no title */ }
     return { url: page.url(), ...(response === null ? {} : { status: response.status() }), ...(title ? { title } : {}) };
@@ -632,6 +635,13 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     if (remote["subtype"] !== "node" || typeof remote["objectId"] !== "string") { const inner = remote["value"]; if (typeof inner === "object" && inner !== null && "error" in inner && inner.error === "not-file") throw new ToolError(`${input.target.ref} is not a file input.`); throw this.stale(input.target.ref); }
     await (await this.cdp(tab)).send("DOM.setFileInputFiles", { files: resolved, objectId: remote["objectId"] }); await this.settle(tab);
   }
+  /**
+   * Both the requested paths and the configured roots are canonicalized in the sandbox on EVERY
+   * upload, on purpose. The sandbox filesystem is mutable by anything else running in it, so a root
+   * resolved once at construction would be checked against a link that has since been re-pointed —
+   * the same TOCTOU the two-step resolve-then-upload exists to narrow. Two cheap `realpath` calls
+   * per upload are the price of that; they are not an accidental repetition.
+   */
   private async resolveInSandbox(paths: readonly string[]): Promise<string[]> {
     const result = await this.sandbox.process.executeCommand(`realpath -e -- ${paths.map(shellQuote).join(" ")}`); const resolved = result.result.split(/\r?\n/u).filter(Boolean);
     if (result.exitCode !== 0 || resolved.length !== paths.length) throw new UploadRefusedError("An upload path does not exist in the sandbox.");
