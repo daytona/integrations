@@ -1,0 +1,19 @@
+packages/convex/src/component/schema.ts
+  s_9e8ad65491cef8::t_96b60ba716db0b 26-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b545691f658cddf493545a10d5f2b64a7653289f",
+  "prompts": {},
+  "sessions": {
+    "s_9e8ad65491cef8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f5b933ca8ffeccLCjEjEY9EwCp",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
