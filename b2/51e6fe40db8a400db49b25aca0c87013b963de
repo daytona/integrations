@@ -1,0 +1,14 @@
+packages/convex/README.md
+  h_634fa4b3782b12 256-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b251e6fe40db8a400db49b25aca0c87013b963de",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
