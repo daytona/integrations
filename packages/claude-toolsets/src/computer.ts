@@ -76,6 +76,33 @@ class DesktopStartError extends Error {
 const sleep = (seconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
+/**
+ * Daytona-backed implementation of the Anthropic computer toolset.
+ *
+ * DESIGN NOTE — one class, deliberately, not an oversight.
+ *
+ * `BetaAbstractComputerToolset20260801` is an abstract base whose 17 members are `protected`
+ * overrides on a single subclass; the SDK dispatches to `this.left_click`, `this.key`, ... itself.
+ * The member handlers therefore cannot move into collaborator objects without re-implementing that
+ * dispatch and widening their visibility. The contract, not the file, chooses the unit.
+ *
+ * What looks like several responsibilities is one: translating a model coordinate or keystroke into
+ * the input the sandbox desktop will actually accept. That decision is not separable, because every
+ * part of it reads the same pinned state — `screen`/`scale` (set once at startup, see
+ * {@link cursor_position}), `nativeInputCapability` (the one-shot probe whose result decides between
+ * the native endpoints and XTest for EVERY member), and `lastInput` (the screenshot freshness
+ * delay). Routing a single `key` call needs the key model, the probe result and the XTest runner at
+ * once; splitting them would thread the same three values through every hop.
+ *
+ * What IS separable is already separated, into single-purpose modules this class only consumes:
+ * `keys.ts` (the key model and chord parsing), `xtest.ts` (the helper-script runner), `png.ts`
+ * (decode/encode/resize), `sandbox.ts` (lease lifecycle), `text.ts` (result vocabulary). What
+ * remains is the irreducible adapter between the SDK contract and those modules.
+ *
+ * Regression risk is carried by tests rather than by file size: the suite asserts all 17 member
+ * declarations plus their behaviour, and the whole surface is additionally exercised live against a
+ * real sandbox by `examples/exerciseComputer.ts`.
+ */
 export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
   private lease: SandboxLease<Sandbox> | undefined;
   private xtest: XTest | undefined;
