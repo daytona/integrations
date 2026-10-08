@@ -1,0 +1,16 @@
+packages/daytona-claude-toolsets/daytona_claude_toolsets/browser.py
+  h_634fa4b3782b12 602-605
+packages/daytona-claude-toolsets/tests/unit_tests/test_browser.py
+  h_634fa4b3782b12 552-583
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "63f453589eed97e16904d094363141655c973130",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
