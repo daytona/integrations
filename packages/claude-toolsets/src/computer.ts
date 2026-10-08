@@ -181,7 +181,7 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
     const sandbox = this.sandbox;
     if (sandbox.state !== "started") await sandbox.start();
     if ((await sandbox.computerUse.getStatus()).status !== "active") await sandbox.computerUse.start();
-    const deadline = Date.now() + 60_000;
+    const deadline = performance.now() + 60_000;
     while (true) {
       try {
         const displays = (await sandbox.computerUse.display.getInfo()).displays ?? [];
@@ -194,7 +194,7 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
       } catch (error: unknown) {
         if (!(error instanceof DaytonaError)) throw error;
       }
-      if (Date.now() > deadline) throw new DesktopStartError("the sandbox desktop did not start within 60 seconds");
+      if (performance.now() > deadline) throw new DesktopStartError("the sandbox desktop did not start within 60 seconds");
       await sleep(1);
     }
   }
@@ -478,16 +478,19 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
         primaryError = error;
         throw error;
       } finally {
-        let releaseError: DaytonaError | undefined;
+        // Every key must be released even if one release fails, so no error — of any type —
+        // leaves the rest of the chord held down. The first one is kept and rethrown after the
+        // loop, and only when it would not mask the error that brought us into this `finally`.
+        let releaseError: unknown;
+        let released = false;
         for (const name of [...pressed].reverse()) {
           try {
             await keyboard.up(name);
           } catch (error: unknown) {
-            if (error instanceof DaytonaError && releaseError === undefined) releaseError = error;
-            else if (!(error instanceof DaytonaError)) throw error;
+            if (!released) { releaseError = error; released = true; }
           }
         }
-        if (primaryError === undefined && releaseError !== undefined) throw releaseError;
+        if (primaryError === undefined && released) throw releaseError;
       }
     });
   }

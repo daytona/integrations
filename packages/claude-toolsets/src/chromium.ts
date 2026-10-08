@@ -148,13 +148,15 @@ export const launch = async (
   const request = { command, runAsync: true } satisfies SessionExecuteRequest;
   await sandbox.process.executeSessionCommand(options.sessionId, request);
 
-  const deadline = Date.now() + START_TIMEOUT * 1000;
+  // performance.now() is monotonic; a wall-clock jump must not cut the launch wait short
+  // or stretch it (the Python original uses time.monotonic() here for the same reason).
+  const deadline = performance.now() + START_TIMEOUT * 1000;
   while (true) {
     const port = await boundPort(sandbox, active);
     if (port !== undefined) {
       return port;
     }
-    if (Date.now() > deadline) {
+    if (performance.now() > deadline) {
       throw new ChromiumLaunchError(options.profile);
     }
     await new Promise<void>((resolve) => {
