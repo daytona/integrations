@@ -1,0 +1,33 @@
+packages/claude-toolsets/src/computer.ts
+  s_d0e6c0983fff75::t_3040c17fc2fa10 148-153
+  s_d0e6c0983fff75::t_28266836a293a0 48
+  s_d0e6c0983fff75::t_c2eda304c59b49 33
+packages/claude-toolsets/tests/helpers.ts
+  s_d0e6c0983fff75::t_fde5e9534ca53d 37-38
+  s_d0e6c0983fff75::t_09d7f56f6cbe9d 86
+packages/claude-toolsets/src/browser.ts
+  s_d0e6c0983fff75::t_ec0be6e0736498 205-210
+  s_d0e6c0983fff75::t_6cd1e3dd48d33f 68-69
+  s_d0e6c0983fff75::t_3d4d1f76cbb5ff 175-179
+packages/claude-toolsets/tests/logging.test.ts
+  s_d0e6c0983fff75::t_87f4ac8e5aee41 14-23
+  s_d0e6c0983fff75::t_a938aeff46ebd4 99-102
+  s_d0e6c0983fff75::t_5421b91dc42598 131-139
+  s_d0e6c0983fff75::t_e72039e1551fc8 302-389
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2b4a170426725e1b8a044c4ade25060c36d39ef9",
+  "prompts": {},
+  "sessions": {
+    "s_d0e6c0983fff75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee31f362effeSAp6Qh7qul7sdf",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
