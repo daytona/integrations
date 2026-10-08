@@ -1,0 +1,14 @@
+packages/daytona-claude-toolsets/README.md
+  h_634fa4b3782b12 48,59,102,108,110-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bddd783193075f4dd34e7341a6202c78b09eb48d",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
