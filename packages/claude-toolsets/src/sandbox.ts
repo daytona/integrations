@@ -45,16 +45,16 @@ export class SandboxLeaseConfigError extends Error {
   readonly name = "SandboxLeaseConfigError";
 }
 
+/**
+ * `Daytona.create` is overloaded (snapshot params and image params), and the two overloads differ
+ * only in options this package never passes. Both shapes therefore take the same call, resolved in
+ * one place so neither call site has to restate the union.
+ */
 const createWithDaytona = async (
   daytona: Daytona,
   params: CreateParams,
   timeout: number,
-): Promise<Sandbox> => {
-  if ("image" in params) {
-    return daytona.create(params, { timeout });
-  }
-  return daytona.create(params, { timeout });
-};
+): Promise<Sandbox> => daytona.create(params, { timeout });
 
 export const withDefaults = (
   params: CreateParams | undefined,

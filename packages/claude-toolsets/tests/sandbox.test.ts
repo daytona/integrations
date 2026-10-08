@@ -1,3 +1,4 @@
+import { Daytona, type Sandbox } from "@daytona/sdk";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -65,6 +66,26 @@ describe("sandbox lease", () => {
     // Then: the owned sandbox is deleted once and never stopped.
     expect(sandbox.delete).toHaveBeenCalledOnce();
     expect(sandbox.stop).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["snapshot", { snapshot: "default" }],
+    ["image", { image: "debian:12.9" }],
+  ])("passes %s create params and the timeout through a real Daytona client", async (_shape, createParams) => {
+    // Given: a Daytona client whose create is observed (this is the `instanceof Daytona` path).
+    const sandbox = fakeSandbox();
+    const daytona = new Daytona({ apiKey: "dtn_test", apiUrl: "https://example.invalid/api" });
+    const create = vi.fn(async () => sandbox as unknown as Sandbox);
+    daytona.create = create as unknown as Daytona["create"];
+
+    // When: an owned lease is acquired with those create params and a non-default timeout.
+    await SandboxLease.acquire(undefined, { daytona, createParams, createTimeout: 45 });
+
+    // Then: both shapes reach create unchanged, carrying the package defaults and the timeout.
+    expect(create).toHaveBeenCalledWith(
+      { ...createParams, envVars: DEFAULT_ENV, labels: LABELS },
+      { timeout: 45 },
+    );
   });
 
   it("stops an owned sandbox when requested", async () => {
