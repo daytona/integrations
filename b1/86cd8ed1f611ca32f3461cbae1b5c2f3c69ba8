@@ -1,0 +1,16 @@
+packages/claude-toolsets/src/tabs.ts
+  h_634fa4b3782b12 1-101
+packages/claude-toolsets/tests/tabs.test.ts
+  h_634fa4b3782b12 1-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b186cd8ed1f611ca32f3461cbae1b5c2f3c69ba8",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
