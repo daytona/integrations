@@ -89,7 +89,10 @@ export const parseChord = (chord: string): [string[], string | null] => {
 };
 
 export const desktopKey = (token: string): DesktopKey => {
-  if (token.length === 1) {
+  // Code points, not UTF-16 units: Python's `len(token) == 1` counts code points, so a
+  // supplementary character (emoji, rarer CJK) must reach the `U<hex>` keysym path below
+  // rather than falling through to the named-key tables as a two-unit string.
+  if ([...token].length === 1) {
     if (token === " ") return { daytona: "space", keysym: "space", shift: false, char: " " };
     if (token in SHIFTED) { const base = SHIFTED[token] ?? token; return { daytona: base, keysym: XKEYSYMS[base as keyof typeof XKEYSYMS] ?? base, shift: true, char: token }; }
     if (/^[A-Z]$/.test(token)) return { daytona: token.toLowerCase(), keysym: token.toLowerCase(), shift: true, char: token };
