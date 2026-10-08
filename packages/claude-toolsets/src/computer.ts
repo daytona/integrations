@@ -47,6 +47,10 @@ export const NATIVE_INPUT_FLOOR_ERROR = "This sandbox's platform does not suppor
 export const INVALID_SCREENSHOT_ERROR = "The sandbox desktop returned an invalid screenshot.";
 const PUBLIC_SANDBOX = "the sandbox is public, so its preview URLs need no authentication: the desktop's noVNC port is reachable by anyone who knows the sandbox id. Use a private sandbox.";
 
+/** The rule a `zoom` region must satisfy, against whichever screen size is current when it is checked. */
+const regionRule = (width: number, height: number): string =>
+  `region must satisfy 0 <= x0 < x1 <= ${width} and 0 <= y0 < y1 <= ${height} (the screen in screenshot pixels).`;
+
 const WHEEL = {
   up: "up",
   down: "down",
@@ -214,6 +218,11 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
     this.scale = Math.min(1, this.maxSize[0] / width, this.maxSize[1] / height);
   }
 
+  /** Whether a `zoom` region lies inside the screen as the model sees it, at its size right now. */
+  private regionFits(x0: number, y0: number, x1: number, y1: number): boolean {
+    return 0 <= x0 && x0 < x1 && x1 <= this.width && 0 <= y0 && y0 < y1 && y1 <= this.height;
+  }
+
   private async desktop<T>(action: string, isInput: boolean, call: () => Promise<T>): Promise<T> {
     try {
       return await call();
@@ -355,18 +364,23 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
 
   protected override async zoom(_context: BetaToolsetCallContext, input: BetaComputerZoomInput): Promise<BetaScreenshotResult> {
     const [x0, y0, x1, y1] = input.region;
-    if (x0 === undefined || y0 === undefined || x1 === undefined || y1 === undefined || !(0 <= x0 && x0 < x1 && x1 <= this.width && 0 <= y0 && y0 < y1 && y1 <= this.height)) {
-      throw new ToolError(`region must satisfy 0 <= x0 < x1 <= ${this.width} and 0 <= y0 < y1 <= ${this.height} (the screen in screenshot pixels).`);
+    if (x0 === undefined || y0 === undefined || x1 === undefined || y1 === undefined || !this.regionFits(x0, y0, x1, y1)) {
+      throw new ToolError(regionRule(this.width, this.height));
     }
+    const { image } = await this.screenshotPng();
+    // The region was checked against the screen size known BEFORE this screenshot, and
+    // `screenshotPng` has just replaced that size (and `scale`) with whatever the frame actually
+    // is. A desktop that shrank in between leaves a region that was legal when the model asked
+    // and is not any more: that is a changed desktop, not an invalid screenshot, so it is named
+    // as one — and the region is re-stated against the size the next call must use.
+    if (!this.regionFits(x0, y0, x1, y1)) throw new ToolError(`The desktop changed size; ${regionRule(this.width, this.height)}`);
+    // Recomputed from the fresh `scale`, and clamped to the decoded frame itself rather than to
+    // `this.screen`, so the copy below cannot read past `image.data` whatever the sandbox sent.
     const left = Math.trunc(x0 / this.scale);
     const top = Math.trunc(y0 / this.scale);
-    const right = Math.min(this.screen[0], Math.max(left + 1, Math.round(x1 / this.scale)));
-    const bottom = Math.min(this.screen[1], Math.max(top + 1, Math.round(y1 / this.scale)));
-    const { image } = await this.screenshotPng();
-    // The crop was computed from the screen size known BEFORE this screenshot. A desktop that
-    // shrank in between — or a sandbox answering with a frame smaller than the display it
-    // reported — would otherwise have the copy below read past the decoded image.
-    if (right > image.width || bottom > image.height) throw new ToolError(INVALID_SCREENSHOT_ERROR);
+    const right = Math.min(image.width, Math.max(left + 1, Math.round(x1 / this.scale)));
+    const bottom = Math.min(image.height, Math.max(top + 1, Math.round(y1 / this.scale)));
+    if (left >= right || top >= bottom) throw new ToolError(INVALID_SCREENSHOT_ERROR);
     const crop: PngImage = {
       width: right - left,
       height: bottom - top,

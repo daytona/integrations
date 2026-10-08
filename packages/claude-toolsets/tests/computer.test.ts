@@ -189,7 +189,7 @@ describe("DaytonaComputer screenshot decoding bounds", () => {
     await toolset.close();
   });
 
-  it("refuses a zoom whose crop no longer fits the frame the sandbox returned", async () => {
+  it("tells the model the desktop changed size when the zoom region no longer fits the new frame", async () => {
     // Given: a 1280x800 screen, and a sandbox that answers the zoom's screenshot with 100x100
     const { mock, toolset } = await computer();
     mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({ screenshot: encodePng({ width: 100, height: 100, data: Buffer.alloc(100 * 100 * 4, 255) }).toString("base64") });
@@ -197,9 +197,45 @@ describe("DaytonaComputer screenshot decoding bounds", () => {
     // When: a region valid for 1280x800 is zoomed
     const result = await callMember(toolset, "zoom", { region: [10, 20, 210, 120] });
 
-    // Then: the crop is refused rather than copied from outside the decoded image
+    // Then: the crop is refused rather than copied from outside the decoded image — but the frame
+    // itself was perfectly valid, so the model is told what actually happened and what the screen
+    // is now, not that the sandbox returned an invalid screenshot.
     expect(result.is_error).toBe(true);
-    expect(resultText(result)).toBe(INVALID_SCREENSHOT_ERROR);
+    expect(resultText(result)).toBe(`The desktop changed size; ${"region must satisfy 0 <= x0 < x1 <= 100 and 0 <= y0 < y1 <= 100 (the screen in screenshot pixels)."}`);
+    expect(resultText(result)).not.toContain(INVALID_SCREENSHOT_ERROR);
+    expect([toolset.width, toolset.height]).toEqual([100, 100]);
+    await toolset.close();
+  });
+
+  it("zooms a region that still fits after the desktop shrinks, recomputing the crop from the new scale", async () => {
+    // Given: a first zoom on the 1280x800 display the driver started with, then a desktop that
+    // shrinks to 640x400 before the second zoom's screenshot
+    const { mock, toolset } = await computer();
+    expect((await callMember(toolset, "zoom", { region: [0, 0, 200, 100] })).is_error).toBeFalsy();
+    const shrunk = 4;
+    mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({
+      screenshot: encodePng({
+        width: 640, height: 400,
+        // Each pixel carries its own source coordinate, so the crop's corners prove which
+        // rectangle of the SHRUNKEN frame was copied.
+        data: Buffer.from(Uint8Array.from({ length: 640 * 400 * shrunk }, (_unused, index) =>
+          index % shrunk === 0 ? Math.floor(index / shrunk) % 640 : index % shrunk === 1 ? Math.floor(index / shrunk / 640) : index % shrunk === 2 ? 0 : 255)),
+      }).toString("base64"),
+    });
+
+    // When: the same region, still inside 640x400, is zoomed again
+    const result = await callMember(toolset, "zoom", { region: [0, 0, 200, 100] });
+
+    // Then: it succeeds against the fresh frame instead of failing on the stale screen size
+    expect(result.is_error).toBeFalsy();
+    const image = decodePng(Buffer.from(imageData(result), "base64"), SCREENSHOT_BOUNDS);
+    expect([toolset.width, toolset.height]).toEqual([640, 400]);
+    const pixelAt = (x: number, y: number): ReadonlyArray<number | undefined> => {
+      const at = (y * image.width + x) * 4;
+      return [image.data[at], image.data[at + 1]];
+    };
+    expect(pixelAt(0, 0)).toEqual([0, 0]);
+    expect(pixelAt(image.width - 1, image.height - 1)).toEqual([199, 99]);
     await toolset.close();
   });
 });
