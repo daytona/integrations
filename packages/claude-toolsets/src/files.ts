@@ -4,10 +4,11 @@ import {
   type BetaFilePolicy,
   type BetaURLContext,
 } from "@anthropic-ai/sdk/helpers/beta/toolsets";
+import { trimTrailingSlashes } from "./text.js";
 
 const normalizePath = (path: string): string => {
   const normalized = posix.normalize(path);
-  return normalized.length > 1 ? normalized.replace(/\/+$/g, "") : normalized;
+  return normalized.length > 1 ? trimTrailingSlashes(normalized) : normalized;
 };
 
 export const isFilesystemRoot = (path: string): boolean => path.startsWith("/") && normalizePath(path) === "/";

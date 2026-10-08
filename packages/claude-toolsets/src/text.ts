@@ -2,6 +2,22 @@ import { ToolError } from "@anthropic-ai/sdk/helpers/beta/toolsets";
 
 export const MAX_TEXT = 2000;
 
+const SLASH = "/".charCodeAt(0);
+
+/**
+ * Drops every trailing `/` in linear time.
+ *
+ * The obvious `replace(/\/+$/, "")` is polynomial: an unanchored `+` run followed
+ * by `$` makes the engine retry the run from each start position, so a string of
+ * n slashes costs O(n^2) — 40k slashes take about half a second. Both callers
+ * take a string a model or a page can influence, so the regex is not used.
+ */
+export const trimTrailingSlashes = (text: string): string => {
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === SLASH) end -= 1;
+  return end === text.length ? text : text.slice(0, end);
+};
+
 const SCHEME = /^([a-zA-Z][a-zA-Z0-9+.-]*):/;
 const CONTROL = /[\x00-\x1f\x7f]/;
 const OPAQUE_SCHEMES = new Set([

@@ -5,6 +5,7 @@ import {
   formatRemote,
   normalizeUrl,
   rank,
+  trimTrailingSlashes,
 } from "../src/text.js";
 
 describe("text utilities", () => {
@@ -73,5 +74,21 @@ describe("text utilities", () => {
 
   it("bounds page-supplied text to MAX_TEXT", () => {
     expect(MAX_TEXT).toBe(2000);
+  });
+
+  it("drops trailing slashes exactly as the replaced regex did", () => {
+    for (const text of ["", "/", "//", "///", "a", "a/", "a//", "/a", "/a/", "/a//b///", "https://h", "https://h/"]) {
+      expect(trimTrailingSlashes(text)).toBe(text.replace(/\/+$/u, ""));
+    }
+  });
+
+  it("drops trailing slashes in linear time", () => {
+    // The replaced `/\/+$/` is O(n^2) here: 40k slashes cost ~0.5 s, 60k ~1.2 s.
+    // A linear scan is microseconds, so this bound has a ~1000x margin and only
+    // fails if the polynomial regex comes back.
+    const pathological = "/".repeat(60_000) + "x";
+    const started = performance.now();
+    expect(trimTrailingSlashes(pathological)).toBe(pathological);
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });

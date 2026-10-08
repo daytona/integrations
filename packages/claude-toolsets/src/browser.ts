@@ -55,7 +55,7 @@ import { PLAYWRIGHT, parseChord, playwrightChord, splitSequence } from "./keys.j
 import { PAGE_JS } from "./pageJs.js";
 import { SandboxLease, type CreateParams, type OnClose, type SandboxCreator } from "./sandbox.js";
 import { Tab } from "./tabs.js";
-import { MAX_TEXT, failurePhrase, formatRemote, normalizeUrl, rank } from "./text.js";
+import { MAX_TEXT, failurePhrase, formatRemote, normalizeUrl, rank, trimTrailingSlashes } from "./text.js";
 
 export const MAX_TABS = 100;
 export const MAX_DURATION = 30;
@@ -247,7 +247,7 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     this.signed = { port, token };
     let browser: Browser;
     try {
-      const base = url.replace(/\/+$/u, "");
+      const base = trimTrailingSlashes(url);
       const response = await fetch(`${base}/json/version`, { signal: AbortSignal.timeout(30_000) });
       if (!response.ok) throw new BrowserConnectionError("version endpoint failed");
       const version: unknown = await response.json();
