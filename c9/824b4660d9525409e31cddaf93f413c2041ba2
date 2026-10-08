@@ -1,0 +1,20 @@
+packages/daytona-claude-toolsets/daytona_claude_toolsets/_files.py
+  h_634fa4b3782b12 85-86
+packages/daytona-claude-toolsets/daytona_claude_toolsets/_tabs.py
+  h_634fa4b3782b12 74
+packages/daytona-claude-toolsets/daytona_claude_toolsets/browser.py
+  h_634fa4b3782b12 139-147,238-239,263,276-277,508,516-518,532,538,602,606,790-796,895,923,927,929,1329,1335,1344
+packages/daytona-claude-toolsets/tests/unit_tests/test_browser.py
+  h_634fa4b3782b12 4,185-186,528-551,581-601,612-648
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c9824b4660d9525409e31cddaf93f413c2041ba2",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
