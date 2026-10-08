@@ -1,0 +1,44 @@
+packages/claude-toolsets/tests/sandbox.test.ts
+  s_225108f4338739::t_22f08c040552d9 131
+packages/claude-toolsets/src/sandbox.ts
+  s_225108f4338739::t_08d6c85776575b 136-137
+  s_225108f4338739::t_509b84d9b75d3e 8-9
+packages/claude-toolsets/src/logging.ts
+  s_225108f4338739::t_a7045e09186772 1-33
+packages/claude-toolsets/src/browser.ts
+  s_225108f4338739::t_7a566f966b6463 220-221,225,227
+  s_225108f4338739::t_58f6bebe5dfc1d 437,439
+  s_225108f4338739::t_901db1b6e837ee 236-239
+  s_225108f4338739::t_88436882c3dac9 526-528
+  s_225108f4338739::t_3e6c7b8af8c5b7 537-539
+  s_225108f4338739::t_df86a8e769c0d1 55
+  s_225108f4338739::t_d99998e5091676 326-329
+  s_225108f4338739::t_56002066a1f3f4 390-396,400
+  s_225108f4338739::t_dd98e6ae65c03f 377,379
+packages/claude-toolsets/src/computer.ts
+  s_225108f4338739::t_9d1565aa25261c 33
+  s_225108f4338739::t_e6daf82959fc86 214
+packages/claude-toolsets/src/xtest.ts
+  s_225108f4338739::t_f9f8db52046c7c 5-6
+  s_225108f4338739::t_338e5ab21a573b 129-130
+packages/claude-toolsets/tests/logging.test.ts
+  s_225108f4338739::t_c6ccb556c3e43e 1-37,39-113,115,119-122,125-329
+  s_225108f4338739::t_f27cb6360c8e87 38
+  s_225108f4338739::t_c38c897cca34f4 114,116-118,123-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6c86f2a357f312c29d307d9fc5e1246d8668916e",
+  "prompts": {},
+  "sessions": {
+    "s_225108f4338739": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee69b552dffeo7ieQ5pP6ftFhe",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
