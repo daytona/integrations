@@ -42,6 +42,11 @@ export class DaytonaFilePolicy implements BetaFilePolicy {
     this.uploadRoots = roots;
     this.downloadDir = options.downloadDir === undefined ? undefined : DaytonaFilePolicy.absolute(options.downloadDir, "downloadDir");
     const downloadDir = this.downloadDir;
+    // `isUnder` refuses every filesystem-root argument, so a `/` download directory would slip
+    // through the overlap check below and then make `isPathVisible` hide every download.
+    if (downloadDir !== undefined && isFilesystemRoot(downloadDir)) {
+      throw new RangeError("downloadDir cannot be the filesystem root");
+    }
     if (
       downloadDir !== undefined &&
       roots.some((root) => isUnder(downloadDir, root) || isUnder(root, downloadDir))

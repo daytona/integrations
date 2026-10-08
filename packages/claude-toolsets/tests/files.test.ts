@@ -74,4 +74,12 @@ describe("Daytona file policy", () => {
     await expect(bound.isPathVisible("/dl-other/x")).resolves.toBe(false);
     expect(DaytonaFilePolicy.forDownloadDir(bound, "/other")).toBe(bound);
   });
+
+  it("refuses a filesystem-root download directory", () => {
+    // `isUnder` refuses every filesystem-root argument, so "/" would pass the overlap check
+    // vacuously and then make isPathVisible hide every download.
+    expect(() => new DaytonaFilePolicy({ uploadRoots: ["/uploads"], downloadDir: "/" })).toThrow(RangeError);
+    expect(() => new DaytonaFilePolicy({ downloadDir: "///" })).toThrow(/filesystem root/);
+    expect(() => DaytonaFilePolicy.forDownloadDir(new DaytonaFilePolicy({ uploadRoots: ["/uploads"] }), "/")).toThrow(RangeError);
+  });
 });
