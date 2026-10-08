@@ -83,7 +83,8 @@ describe("DaytonaComputer coordinates and screenshots", () => {
   it("crops zoom regions in display pixels and scales the crop up", async () => {
     const { mock, toolset } = await computer();
     const result = await callMember(toolset, "zoom", { region: [10, 20, 210, 120] });
-    expect(mock.raw.computerUse.screenshot.takeRegion).toHaveBeenCalledWith({ x: 10, y: 20, width: 200, height: 100 });
+    expect(mock.raw.computerUse.screenshot.takeFullScreen).toHaveBeenCalledOnce();
+    expect(mock.raw.computerUse.screenshot.takeRegion).not.toHaveBeenCalled();
     const image = decodePng(Buffer.from(imageData(result), "base64"));
     expect([image.width, image.height]).toEqual([1280, 640]);
     await toolset.close();

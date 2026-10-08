@@ -306,9 +306,20 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
     const top = Math.trunc(y0 / this.scale);
     const right = Math.min(this.screen[0], Math.max(left + 1, Math.round(x1 / this.scale)));
     const bottom = Math.min(this.screen[1], Math.max(top + 1, Math.round(y1 / this.scale)));
-    await this.settle();
-    const response = await this.desktop("take a screenshot", false, () => this.sandbox.computerUse.screenshot.takeRegion({ x: left, y: top, width: right - left, height: bottom - top }));
-    const crop = decodePng(Buffer.from(response.screenshot ?? "", "base64"));
+    const { image } = await this.screenshotPng();
+    const crop: PngImage = {
+      width: right - left,
+      height: bottom - top,
+      data: Buffer.alloc((right - left) * (bottom - top) * 4),
+    };
+    for (let row = 0; row < crop.height; row += 1) {
+      image.data.copy(
+        crop.data,
+        row * crop.width * 4,
+        ((top + row) * image.width + left) * 4,
+        ((top + row) * image.width + right) * 4,
+      );
+    }
     const factor = Math.min(this.width / crop.width, this.height / crop.height);
     const output = resizePng(crop, Math.max(1, Math.round(crop.width * factor)), Math.max(1, Math.round(crop.height * factor)));
     return { data: encodePng(output).toString("base64"), mediaType: "image/png" };
