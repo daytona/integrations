@@ -1,0 +1,20 @@
+packages/convex/scripts/live.mjs
+  h_634fa4b3782b12 172,174-179
+packages/convex/src/component/http.ts
+  h_634fa4b3782b12 47,49,53-56,63-68,73-74
+packages/convex/src/component/sandboxes.ts
+  h_634fa4b3782b12 161-167,173,195-197
+packages/convex/src/component/webhooks.test.ts
+  h_634fa4b3782b12 38-41,112,124,136,145,176,189,206-207,218-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2c319ddc5e0171ff5192bbc98dd87f461efc822e",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
