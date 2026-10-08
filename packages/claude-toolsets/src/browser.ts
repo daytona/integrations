@@ -91,6 +91,36 @@ export type DaytonaBrowserOptions = Omit<BetaBrowserToolsetOptions, "browserStat
 class DaytonaBrowserClosedError extends Error { readonly name = "DaytonaBrowserClosedError"; }
 class BrowserConnectionError extends Error { readonly name = "BrowserConnectionError"; }
 
+/**
+ * Daytona-backed implementation of the Anthropic browser toolset.
+ *
+ * DESIGN NOTE — one class, deliberately, not an oversight.
+ *
+ * `BetaAbstractBrowserToolset20260801` is an abstract base whose 31 members are
+ * `protected` overrides on a single subclass. The SDK dispatches to `this.navigate`,
+ * `this.screenshot`, ... itself, so the member handlers cannot be moved into
+ * collaborator objects without re-implementing the SDK's dispatch and widening those
+ * members' visibility. The contract, not the file, chooses the unit.
+ *
+ * The handlers are also not independent: every one of them reads and mutates the same
+ * live, in-flight state — `tabs`/`byPage`/`recent`/`active` (tab identity), `changes`
+ * (the per-call browser-state delta), `downloads` and `refusedTabs` (populated by CDP
+ * and route listeners registered at launch), `navigating` (which makes interception
+ * fail closed mid-navigation), and `lastActivity` (keep-alive). Splitting by
+ * "responsibility" would convert these fields into cross-object mutable references
+ * threaded through every call — strictly more coupling, and more regression risk, than
+ * the private fields they are today.
+ *
+ * What IS separable is already separated, into single-purpose modules this class only
+ * consumes: `chromium.ts` (launch + paths), `sandbox.ts` (lease lifecycle), `files.ts`
+ * (upload policy), `keys.ts` (chord parsing), `pageJs.ts` (injected toolkit),
+ * `tabs.ts` (tab record), `png.ts` (image scaling), `text.ts` (result vocabulary).
+ * What remains is the irreducible adapter between that SDK contract and those modules.
+ *
+ * Regression risk is carried by tests rather than by file size: the suite asserts all
+ * 31 member declarations plus their behaviour, and the whole surface is additionally
+ * exercised live against a real sandbox by `examples/exerciseBrowser.ts`.
+ */
 export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
   private lease: SandboxLease<Sandbox> | undefined;
   private browser: Browser | undefined;
