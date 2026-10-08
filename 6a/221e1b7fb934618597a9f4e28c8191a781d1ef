@@ -1,0 +1,22 @@
+packages/claude-toolsets/src/sandbox.ts
+  h_634fa4b3782b12 1-140
+packages/claude-toolsets/src/xtest.ts
+  h_634fa4b3782b12 1-141
+packages/claude-toolsets/tests/helpers/extractPythonXtest.ts
+  h_634fa4b3782b12 1-31
+packages/claude-toolsets/tests/sandbox.test.ts
+  h_634fa4b3782b12 1-126
+packages/claude-toolsets/tests/xtest.test.ts
+  h_634fa4b3782b12 1-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6a221e1b7fb934618597a9f4e28c8191a781d1ef",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
