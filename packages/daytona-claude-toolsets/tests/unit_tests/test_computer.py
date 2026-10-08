@@ -15,11 +15,9 @@ from daytona import DaytonaError
 from PIL import Image
 
 from daytona_claude_toolsets import DaytonaComputer
+from daytona_claude_toolsets.computer import INVALID_SCREENSHOT_ERROR, SCREENSHOT_BOUNDS
 
 from .conftest import blocks_of, call, fake_sandbox, png, text_of, xtest_actions
-
-INVALID_SCREENSHOT_ERROR = "The sandbox desktop returned an invalid screenshot."
-MAX_SCREENSHOT_BYTES = 64 * 1024 * 1024
 
 
 def approve(_context: object) -> bool:
@@ -123,7 +121,7 @@ def test_screenshot_headers_are_bounded_before_pillow_decodes(
 
 def test_screenshot_base64_size_is_bounded_before_decoding(sandbox: MagicMock) -> None:
     sandbox.computer_use.screenshot.take_full_screen.return_value = SimpleNamespace(
-        screenshot="A" * ((MAX_SCREENSHOT_BYTES * 4 + 2) // 3 + 1)
+        screenshot="A" * (((SCREENSHOT_BOUNDS.max_bytes + 2) // 3) * 4 + 1)
     )
     with patch("daytona_claude_toolsets.computer.base64.b64decode") as decode:
         result = call(computer(sandbox), "screenshot", {})

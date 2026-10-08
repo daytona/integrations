@@ -81,7 +81,7 @@ SCREENSHOT_BOUNDS = ScreenshotBounds(
 )
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _PNG_HEADER_LENGTH = 29
-_MAX_SCREENSHOT_BASE64 = (SCREENSHOT_BOUNDS.max_bytes * 4 + 2) // 3
+_MAX_SCREENSHOT_BASE64 = ((SCREENSHOT_BOUNDS.max_bytes + 2) // 3) * 4
 
 
 class DaytonaComputer(BetaAbstractComputerToolset20260801):
