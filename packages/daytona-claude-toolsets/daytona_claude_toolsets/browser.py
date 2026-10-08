@@ -599,6 +599,10 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             top_level = request.is_navigation_request() and request.frame.parent_frame is None
         except PlaywrightError:
             top_level = False
+        # Aborting a page-started top-level request is itself a refused navigation and must be
+        # reported, even though no refused document committed. Suppress only the tab whose
+        # `navigate()` call is already responsible for reporting its own refusal; another tab's
+        # request remains an independent page-started navigation.
         if top_level and (tab is None or tab.id not in self._navigating_tabs):
             self._changes.append(BetaNavigationRefused())
 

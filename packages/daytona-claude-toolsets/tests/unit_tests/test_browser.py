@@ -549,6 +549,38 @@ def test_navigate_only_suppresses_the_observer_for_its_own_tab(
     assert second.goto.call_args_list[-1].args[0] == "about:blank"
 
 
+def test_navigate_only_suppresses_blocked_requests_for_its_own_tab(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    browser = make_browser(monkeypatch, url_policy=lambda context, url: None)
+    call(browser, "new_tab", {})
+    first = browser._tabs["tab_1"].page
+    second = browser._tabs["tab_2"].page
+    browser._refuses = MagicMock(side_effect=lambda url, tab_id: "blocked" in url)  # type: ignore[method-assign]
+
+    def blocked_request(page: FakePage) -> MagicMock:
+        route = MagicMock()
+        route.request.url = "https://blocked.test/"
+        route.request.frame.page = page
+        route.request.frame.parent_frame = None
+        route.request.is_navigation_request.return_value = True
+        return route
+
+    own = blocked_request(first)
+    other = blocked_request(second)
+
+    def navigate_first(url: str, **kwargs: object) -> MagicMock:
+        first.url = url
+        browser._guard(own)
+        browser._guard(other)
+        return MagicMock(status=200)
+
+    first.goto.side_effect = navigate_first
+    result = call(browser, "navigate", {"url": "https://good.test", "tab_id": "tab_1"})
+    assert own.abort.call_count == other.abort.call_count == 1
+    assert blocks_of(result).count({"type": "text", "text": "A navigation was refused."}) == 1
+
+
 def test_state_never_raises(browser: DaytonaBrowser) -> None:
     cdp: Any = browser._browser_cdp
     cdp.send.side_effect = RuntimeError("connection lost")
