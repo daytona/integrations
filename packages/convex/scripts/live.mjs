@@ -169,9 +169,14 @@ try {
     "onComplete fired for the cancelled execution too",
   );
 
-  const siteUrl = readFileSync(".env.local", "utf8").match(
+  const siteUrlMatch = readFileSync(".env.local", "utf8").match(
     /CONVEX_SITE_URL=(\S+)/,
-  )?.[1];
+  );
+  assert(
+    siteUrlMatch?.[1],
+    ".env.local provides CONVEX_SITE_URL for the webhook route",
+  );
+  const siteUrl = siteUrlMatch[1];
   const deliverStateEvent = async (newState, secret = webhookSecret) => {
     const now = new Date().toISOString();
     const body = JSON.stringify({

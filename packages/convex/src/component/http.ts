@@ -44,32 +44,34 @@ http.route({
       return json(401, { error: verified.reason });
     }
 
-    let event: {
-      event?: string;
-      id?: string;
-      newState?: string;
-      updatedAt?: string;
-      timestamp?: string;
-    };
+    let parsed: unknown;
     try {
-      event = JSON.parse(body);
+      parsed = JSON.parse(body);
     } catch {
       return json(400, { error: "invalid JSON" });
     }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return json(400, { error: "payload must be a JSON object" });
+    }
+    const event = parsed as Record<string, unknown>;
 
     // Other event types are valid deliveries we don't use: acknowledge them
     // (2xx) so they aren't retried.
     if (event.event !== "sandbox.state.updated") {
       return json(200, { result: "ignored-event" });
     }
-    const eventTime = Date.parse(event.updatedAt ?? event.timestamp ?? "");
-    if (!event.id || !event.newState || !Number.isFinite(eventTime)) {
+    const str = (value: unknown) =>
+      typeof value === "string" && value.length > 0 ? value : undefined;
+    const sandboxId = str(event.id);
+    const newState = str(event.newState);
+    const eventTime = Date.parse(str(event.updatedAt) ?? str(event.timestamp) ?? "");
+    if (!sandboxId || !newState || !Number.isFinite(eventTime)) {
       return json(400, { error: "malformed sandbox.state.updated payload" });
     }
 
     const result = await ctx.runMutation(internal.webhooks.applyStateEvent, {
-      sandboxId: event.id,
-      state: event.newState,
+      sandboxId,
+      state: newState,
       eventTime,
     });
     return json(200, { result });

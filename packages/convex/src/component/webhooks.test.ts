@@ -35,6 +35,10 @@ describe("signature scheme compatibility", () => {
   });
 });
 
+/** ISO timestamp `secondsFromNow` in the future (newer than any seed write). */
+const iso = (secondsFromNow: number) =>
+  new Date(Date.now() + secondsFromNow * 1000).toISOString();
+
 describe("webhook route", () => {
   beforeEach(() => {
     vi.stubEnv("DAYTONA_WEBHOOK_SECRET", SECRET);
@@ -105,7 +109,7 @@ describe("webhook route", () => {
     await seed(t, "sbx-1");
     const response = await deliver(
       t,
-      stateEvent("sbx-1", "stopped", "2026-10-02T10:00:00.000Z"),
+      stateEvent("sbx-1", "stopped", iso(60)),
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ result: "applied" });
@@ -117,7 +121,7 @@ describe("webhook route", () => {
     await seed(t, "sbx-1");
     const response = await deliver(
       t,
-      stateEvent("sbx-1", "stopped", "2026-10-02T10:00:00.000Z"),
+      stateEvent("sbx-1", "stopped", iso(60)),
       { headerPrefix: "webhook" },
     );
     expect(response.status).toBe(200);
@@ -129,7 +133,7 @@ describe("webhook route", () => {
     await seed(t, "sbx-1");
     const response = await deliver(
       t,
-      stateEvent("sbx-1", "stopped", "2026-10-02T10:00:00.000Z"),
+      stateEvent("sbx-1", "stopped", iso(60)),
       { extraSignatures: ["v1,bm90LXRoZS1yaWdodC1zaWduYXR1cmU="] },
     );
     expect(response.status).toBe(200);
@@ -138,7 +142,7 @@ describe("webhook route", () => {
   test("tampered body, wrong secret and stale timestamp are rejected", async () => {
     const t = initConvexTest();
     await seed(t, "sbx-1");
-    const body = stateEvent("sbx-1", "stopped", "2026-10-02T10:00:00.000Z");
+    const body = stateEvent("sbx-1", "stopped", iso(60));
 
     const tampered = await deliver(t, body, {
       tamper: (b) => b.replace("stopped", "destroyed"),
@@ -169,7 +173,7 @@ describe("webhook route", () => {
     try {
       const response = await deliver(
         t,
-        stateEvent("sbx-1", "stopped", "2026-10-02T10:00:00.000Z"),
+        stateEvent("sbx-1", "stopped", iso(60)),
       );
       expect(response.status).toBe(500);
       expect(await stateOf(t, "sbx-1")).toBe("started");
@@ -182,7 +186,7 @@ describe("webhook route", () => {
     const t = initConvexTest();
     const unknown = await deliver(
       t,
-      stateEvent("sbx-someone-elses", "stopped", "2026-10-02T10:00:00.000Z"),
+      stateEvent("sbx-someone-elses", "stopped", iso(60)),
     );
     expect(unknown.status).toBe(200);
     expect(await unknown.json()).toEqual({ result: "ignored-unknown" });
@@ -199,8 +203,8 @@ describe("webhook route", () => {
   test("out-of-order and duplicate deliveries converge on the newest state", async () => {
     const t = initConvexTest();
     await seed(t, "sbx-1");
-    const newer = stateEvent("sbx-1", "stopped", "2026-10-02T10:05:00.000Z");
-    const older = stateEvent("sbx-1", "started", "2026-10-02T10:00:00.000Z");
+    const newer = stateEvent("sbx-1", "stopped", iso(120));
+    const older = stateEvent("sbx-1", "started", iso(60));
 
     expect(await (await deliver(t, newer)).json()).toEqual({ result: "applied" });
     expect(await (await deliver(t, older)).json()).toEqual({
@@ -210,5 +214,32 @@ describe("webhook route", () => {
       result: "ignored-stale",
     });
     expect(await stateOf(t, "sbx-1")).toBe("stopped");
+  });
+
+  test("signed but malformed payloads get 400, not a crash", async () => {
+    const t = initConvexTest();
+    await seed(t, "sbx-1");
+    for (const body of [
+      "null",
+      "[1,2]",
+      "42",
+      JSON.stringify({ event: "sandbox.state.updated", id: 7, newState: "stopped", updatedAt: iso(60) }),
+      JSON.stringify({ event: "sandbox.state.updated", id: "sbx-1", newState: { x: 1 }, updatedAt: iso(60) }),
+      JSON.stringify({ event: "sandbox.state.updated", id: "sbx-1", newState: "stopped", updatedAt: 123 }),
+    ]) {
+      const response = await deliver(t, body);
+      expect(response.status, body).toBe(400);
+    }
+    expect(await stateOf(t, "sbx-1")).toBe("started");
+  });
+
+  test("a late event older than an API-observed state is discarded", async () => {
+    const t = initConvexTest();
+    // Event happened 30s ago, but the component observed the sandbox via the
+    // API just now (e.g. a start action), which is newer.
+    await seed(t, "sbx-1");
+    const late = stateEvent("sbx-1", "stopped", iso(-30));
+    expect(await (await deliver(t, late)).json()).toEqual({ result: "ignored-stale" });
+    expect(await stateOf(t, "sbx-1")).toBe("started");
   });
 });
