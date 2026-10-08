@@ -1,10 +1,26 @@
 import { ToolsetClosedError, ToolsetConfigError } from "@anthropic-ai/sdk/helpers/beta/toolsets";
 import { DaytonaError } from "@daytona/sdk";
+import pngjs from "pngjs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DaytonaComputer, NATIVE_INPUT_FLOOR_ERROR } from "../src/computer.js";
-import { decodePng, encodePng } from "../src/png.js";
+import { DaytonaComputer, INVALID_SCREENSHOT_ERROR, NATIVE_INPUT_FLOOR_ERROR } from "../src/computer.js";
+import { SCREENSHOT_BOUNDS, decodePng, encodePng } from "../src/png.js";
 import { callMember, imageData, mockSandbox, resultText, xtestActions } from "./helpers.js";
+
+const { PNG } = pngjs;
+
+/** The 33 bytes of signature + IHDR that are enough to claim any dimensions at all. */
+const pngHeader = (width: number, height: number): string => {
+  const buffer = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer, 0);
+  buffer.writeUInt32BE(13, 8);
+  buffer.write("IHDR", 12, "latin1");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
+  buffer.writeUInt8(8, 24);
+  buffer.writeUInt8(6, 25);
+  return buffer.toString("base64");
+};
 
 const approve = async (): Promise<boolean> => true;
 
@@ -67,16 +83,18 @@ describe("DaytonaComputer coordinates and screenshots", () => {
     expect(mock.raw.computerUse.mouse.move).toHaveBeenCalledWith(1280, 720);
     mock.raw.computerUse.mouse.getPosition.mockResolvedValue({ x: 2559, y: 1439 });
     expect(resultText(await callMember(toolset, "cursor_position", {}))).toBe("X=1919,Y=1079");
-    const image = decodePng(Buffer.from(imageData(await callMember(toolset, "screenshot", {})), "base64"));
+    const image = decodePng(Buffer.from(imageData(await callMember(toolset, "screenshot", {})), "base64"), SCREENSHOT_BOUNDS);
     expect([image.width, image.height]).toEqual([1920, 1080]);
     await toolset.close();
   });
 
-  it("always decodes screenshots and updates dimensions after a display-size change", async () => {
+  // The bounds are a ceiling, not an equality check against the known screen, precisely because
+  // the desktop may be resized under the driver — in either direction.
+  it.each([[640, 480], [1920, 1080]])("always decodes screenshots and updates dimensions after a resize to %sx%s", async (width, height) => {
     const { mock, toolset } = await computer();
-    mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({ screenshot: encodePng({ width: 640, height: 480, data: Buffer.alloc(640 * 480 * 4, 255) }).toString("base64") });
+    mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({ screenshot: encodePng({ width, height, data: Buffer.alloc(width * height * 4, 255) }).toString("base64") });
     await callMember(toolset, "screenshot", {});
-    expect([toolset.width, toolset.height]).toEqual([640, 480]);
+    expect([toolset.width, toolset.height]).toEqual([width, height]);
     await toolset.close();
   });
 
@@ -85,7 +103,7 @@ describe("DaytonaComputer coordinates and screenshots", () => {
     const result = await callMember(toolset, "zoom", { region: [10, 20, 210, 120] });
     expect(mock.raw.computerUse.screenshot.takeFullScreen).toHaveBeenCalledOnce();
     expect(mock.raw.computerUse.screenshot.takeRegion).not.toHaveBeenCalled();
-    const image = decodePng(Buffer.from(imageData(result), "base64"));
+    const image = decodePng(Buffer.from(imageData(result), "base64"), SCREENSHOT_BOUNDS);
     expect([image.width, image.height]).toEqual([1280, 640]);
 
     // The fixture encodes each source coordinate into its pixel, so the corners prove WHICH
@@ -118,6 +136,70 @@ describe("DaytonaComputer coordinates and screenshots", () => {
     expect(await Promise.race([result.then(() => "done"), Promise.resolve("waiting")])).toBe("waiting");
     await vi.advanceTimersByTimeAsync(1);
     await expect(result).resolves.toBeDefined();
+    await toolset.close();
+  });
+});
+
+describe("DaytonaComputer screenshot decoding bounds", () => {
+  it.each(["screenshot", "zoom"])("refuses an oversized IHDR from the sandbox before inflating, during %s", async (member) => {
+    // Given: a sandbox that answers with 33 header bytes claiming a 100000x100000 screen
+    const { mock, toolset } = await computer();
+    mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({ screenshot: pngHeader(100_000, 100_000) });
+    const inflate = vi.spyOn(PNG.sync, "read");
+
+    // When: the member that decodes a screenshot runs
+    const result = await callMember(toolset, member, member === "zoom" ? { region: [10, 20, 210, 120] } : {});
+
+    // Then: it fails with the fixed phrase and pngjs never allocated 40 GB from that header
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toBe(INVALID_SCREENSHOT_ERROR);
+    expect(inflate).not.toHaveBeenCalled();
+    await toolset.close();
+  });
+
+  it.each([
+    ["truncated PNG bytes", encodePng({ width: 8, height: 8, data: Buffer.alloc(8 * 8 * 4, 255) }).subarray(0, 40).toString("base64")],
+    ["bytes that are not a PNG at all", Buffer.alloc(64, 0x42).toString("base64")],
+    ["an empty screenshot", ""],
+  ])("refuses %s with the fixed phrase", async (_name, screenshot) => {
+    // Given: a sandbox answering with undecodable bytes
+    const { mock, toolset } = await computer();
+    mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({ screenshot });
+
+    // When: a screenshot is taken
+    const result = await callMember(toolset, "screenshot", {});
+
+    // Then: the model is told nothing the sandbox chose
+    expect(resultText(result)).toBe(INVALID_SCREENSHOT_ERROR);
+    await toolset.close();
+  });
+
+  it("refuses an over-cap screenshot before decoding the base64 into a Buffer", async () => {
+    // Given: a payload one character past ceil(64 MiB * 4 / 3), the longest base64 the cap admits
+    const { mock, toolset } = await computer();
+    mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({ screenshot: "A".repeat(Math.ceil((SCREENSHOT_BOUNDS.maxBytes * 4) / 3) + 1) });
+    const allocate = vi.spyOn(Buffer, "from");
+
+    // When: a screenshot is taken
+    const result = await callMember(toolset, "screenshot", {});
+
+    // Then: the cap applied to the length, so the oversized payload never reached an allocation
+    expect(resultText(result)).toBe(INVALID_SCREENSHOT_ERROR);
+    expect(allocate.mock.calls.some((call) => typeof call[0] === "string" && call[0].length > 1_000)).toBe(false);
+    await toolset.close();
+  });
+
+  it("refuses a zoom whose crop no longer fits the frame the sandbox returned", async () => {
+    // Given: a 1280x800 screen, and a sandbox that answers the zoom's screenshot with 100x100
+    const { mock, toolset } = await computer();
+    mock.raw.computerUse.screenshot.takeFullScreen.mockResolvedValue({ screenshot: encodePng({ width: 100, height: 100, data: Buffer.alloc(100 * 100 * 4, 255) }).toString("base64") });
+
+    // When: a region valid for 1280x800 is zoomed
+    const result = await callMember(toolset, "zoom", { region: [10, 20, 210, 120] });
+
+    // Then: the crop is refused rather than copied from outside the decoded image
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toBe(INVALID_SCREENSHOT_ERROR);
     await toolset.close();
   });
 });

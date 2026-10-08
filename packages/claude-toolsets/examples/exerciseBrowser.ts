@@ -39,7 +39,7 @@ import type {
 import type { Sandbox } from "@daytona/sdk";
 
 import { DaytonaBrowser, DaytonaFilePolicy } from "../src/index.js";
-import { decodePng } from "../src/png.js";
+import { SCREENSHOT_BOUNDS, decodePng } from "../src/png.js";
 import {
   blocksOf,
   borrowedSandbox,
@@ -286,7 +286,7 @@ export const exercise = async (browser: DaytonaBrowser): Promise<void> => {
   });
   assert.ok(Number(await calls.js("window.scrollY")) > 0, "expected the page to scroll");
   const zoomed = await calls.answered("zoom", { region: [1190, 10, 1270, 50] });
-  const image = decodePng(pngOf(zoomed));
+  const image = decodePng(pngOf(zoomed), SCREENSHOT_BOUNDS);
   const centre = (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
   assert.ok(
     image.width > 80 &&

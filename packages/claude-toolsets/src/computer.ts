@@ -31,7 +31,7 @@ import type { Daytona, Sandbox } from "@daytona/sdk";
 
 import { XKEYSYMS, desktopKey, parseChord, splitSequence } from "./keys.js";
 import { debug, errorName } from "./logging.js";
-import { decodePng, encodePng, resizePng, type PngImage } from "./png.js";
+import { SCREENSHOT_BOUNDS, decodePng, encodePng, resizePng, type PngImage } from "./png.js";
 import {
   SandboxLease,
   type CreateParams,
@@ -44,6 +44,7 @@ export const MAX_DURATION = 30;
 export const MAX_REPEAT = 100;
 export const MAX_SCROLL = 50;
 export const NATIVE_INPUT_FLOOR_ERROR = "This sandbox's platform does not support native held input; recreate the sandbox on a current Daytona version.";
+export const INVALID_SCREENSHOT_ERROR = "The sandbox desktop returned an invalid screenshot.";
 
 const WHEEL = {
   up: "up",
@@ -321,8 +322,20 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
   private async screenshotPng(): Promise<{ readonly png: Buffer; readonly image: PngImage }> {
     await this.settle();
     const response = await this.desktop("take a screenshot", false, () => this.sandbox.computerUse.screenshot.takeFullScreen());
-    const png = Buffer.from(response.screenshot ?? "", "base64");
-    const image = decodePng(png);
+    const encoded = response.screenshot ?? "";
+    // base64 spends 4 characters per 3 bytes, so the decoded payload is at most 3/4 of this.
+    // Checked BEFORE `Buffer.from` so the byte cap applies to the allocation, not after it.
+    if (encoded.length > Math.ceil((SCREENSHOT_BOUNDS.maxBytes * 4) / 3)) throw new ToolError(INVALID_SCREENSHOT_ERROR);
+    const png = Buffer.from(encoded, "base64");
+    let image: PngImage;
+    try {
+      image = decodePng(png, SCREENSHOT_BOUNDS);
+    } catch (error: unknown) {
+      // The bytes are sandbox-supplied, so the refusal is a fixed phrase: nothing derived from
+      // them reaches the model, and only the error's class name reaches the host's log.
+      debug(`screenshot decode refused: ${errorName(error)}`);
+      throw new ToolError(INVALID_SCREENSHOT_ERROR);
+    }
     if (image.width !== this.screen[0] || image.height !== this.screen[1]) this.setScreen(image.width, image.height);
     return { png, image };
   }
@@ -343,6 +356,10 @@ export class DaytonaComputer extends BetaAbstractComputerToolset20260801 {
     const right = Math.min(this.screen[0], Math.max(left + 1, Math.round(x1 / this.scale)));
     const bottom = Math.min(this.screen[1], Math.max(top + 1, Math.round(y1 / this.scale)));
     const { image } = await this.screenshotPng();
+    // The crop was computed from the screen size known BEFORE this screenshot. A desktop that
+    // shrank in between — or a sandbox answering with a frame smaller than the display it
+    // reported — would otherwise have the copy below read past the decoded image.
+    if (right > image.width || bottom > image.height) throw new ToolError(INVALID_SCREENSHOT_ERROR);
     const crop: PngImage = {
       width: right - left,
       height: bottom - top,

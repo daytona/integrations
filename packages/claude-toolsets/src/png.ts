@@ -3,10 +3,50 @@ import pngjs from "pngjs";
 const { PNG } = pngjs;
 const CHANNEL_COUNT = 4;
 
+/** `\x89PNG\r\n\x1a\n`, the 8 bytes every PNG stream starts with. */
+const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+/** Signature (8) + IHDR length (4) + IHDR type (4) + width (4) + height (4). */
+const HEADER_LENGTH = 24;
+/** IHDR always carries exactly 13 bytes: width, height, depth, colour, compression, filter, interlace. */
+const IHDR_DATA_LENGTH = 13;
+
 export type PngImage = {
   readonly width: number;
   readonly height: number;
   readonly data: Buffer;
+};
+
+/** What one decode may cost: input bytes, each dimension, and the pixel count behind them. */
+export type PngBounds = {
+  readonly maxBytes: number;
+  readonly maxWidth: number;
+  readonly maxHeight: number;
+  readonly maxPixels: number;
+};
+
+/**
+ * What a screenshot that came out of a sandbox may cost the host process to decode.
+ *
+ * These cannot be an equality check against the screen the driver last saw: a desktop may
+ * legitimately be resized mid-session, and `DaytonaComputer.screenshotPng` handles exactly that
+ * by calling `setScreen` with whatever the new frame reports. So they are a fixed ceiling —
+ * generous enough that no real desktop reaches one, tight enough that a compromised sandbox
+ * cannot turn a single screenshot into an out-of-memory kill of the process holding the API keys.
+ *
+ * - `maxBytes` 64 MiB — the compressed PNG the host will hold and hand to the inflater. A 4K
+ *   desktop screenshot is a few MB, so this is a decimal order of magnitude of headroom.
+ * - `maxWidth`/`maxHeight` 8192 — past any display a sandbox runs (the driver's own default is
+ *   1280x800 and its `maxScreenshotSize` default 1920x1200), and bounding each side separately
+ *   also refuses a degenerate 1x4294967295 header.
+ * - `maxPixels` 40M — about 8192x4883, and ~160 MB once pngjs expands it to RGBA: the largest
+ *   single allocation one frame is allowed to cause. Without it an attacker spends 25 header
+ *   bytes on a 100000x100000 IHDR and the host spends 40 GB.
+ */
+export const SCREENSHOT_BOUNDS: PngBounds = {
+  maxBytes: 64 * 1024 * 1024,
+  maxWidth: 8192,
+  maxHeight: 8192,
+  maxPixels: 40_000_000,
 };
 
 function assertDimensions(width: number, height: number): void {
@@ -22,7 +62,29 @@ function assertPixelData(image: PngImage): void {
   }
 }
 
-export function decodePng(data: Buffer): PngImage {
+/**
+ * The IHDR width and height, read from 24 bytes of header and inflating nothing.
+ *
+ * This exists so dimensions can be refused BEFORE {@link decodePng} reaches `PNG.sync.read`,
+ * which sizes its RGBA buffer from those same fields before it has verified a single pixel — so
+ * an oversized header alone, with no pixel data behind it, is enough to exhaust the host.
+ */
+export function pngDimensions(data: Buffer): { readonly width: number; readonly height: number } {
+  if (data.length < HEADER_LENGTH) throw new RangeError("PNG is too short to hold an IHDR header");
+  if (!data.subarray(0, SIGNATURE.length).equals(SIGNATURE)) throw new RangeError("PNG signature is missing");
+  if (data.readUInt32BE(8) !== IHDR_DATA_LENGTH) throw new RangeError("PNG IHDR chunk has the wrong length");
+  if (data.toString("latin1", 12, 16) !== "IHDR") throw new RangeError("PNG does not open with an IHDR chunk");
+  return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+}
+
+export function decodePng(data: Buffer, bounds: PngBounds): PngImage {
+  if (data.length > bounds.maxBytes) throw new RangeError(`PNG of ${data.length} bytes exceeds the ${bounds.maxBytes} byte budget`);
+  const { width, height } = pngDimensions(data);
+  if (width < 1 || height < 1 || width > bounds.maxWidth || height > bounds.maxHeight) {
+    throw new RangeError(`PNG ${width}x${height} is outside the accepted ${bounds.maxWidth}x${bounds.maxHeight}`);
+  }
+  if (width * height > bounds.maxPixels) throw new RangeError(`PNG ${width}x${height} exceeds the ${bounds.maxPixels} pixel budget`);
+
   const image = PNG.sync.read(data);
   return {
     width: image.width,
