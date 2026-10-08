@@ -31,7 +31,8 @@ export const blocksOf = (result: BetaToolResultBlockParam): readonly ResultBlock
 
 export const textOf = (result: BetaToolResultBlockParam): string =>
   blocksOf(result)
-    .map((block) => (block.type === "text" ? block.text : ""))
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
     .join("\n");
 
 export const pngOf = (result: BetaToolResultBlockParam): Buffer => {
