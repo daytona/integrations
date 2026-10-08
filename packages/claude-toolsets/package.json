@@ -47,7 +47,11 @@
     "clean": "rm -rf dist *.tsbuildinfo",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "example:run-computer": "tsx examples/runComputer.ts",
+    "example:run-browser": "tsx examples/runBrowser.ts",
+    "example:exercise-computer": "tsx examples/exerciseComputer.ts",
+    "example:exercise-browser": "tsx examples/exerciseBrowser.ts"
   },
   "dependencies": {
     "@daytona/sdk": "^0.223.0",
