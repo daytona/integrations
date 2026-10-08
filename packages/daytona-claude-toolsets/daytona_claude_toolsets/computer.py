@@ -5,10 +5,12 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import struct
 import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from anthropic.tools import ToolError
@@ -37,7 +39,7 @@ from anthropic.types.beta import (
     BetaComputerWaitInput,
     BetaComputerZoomInput,
 )
-from daytona import Daytona, DaytonaError, Sandbox, ScreenshotRegion
+from daytona import Daytona, DaytonaError, Sandbox
 from PIL import Image
 from typing_extensions import override
 
@@ -56,6 +58,30 @@ NATIVE_INPUT_FLOOR_ERROR = (
     "This sandbox's platform does not support native held input; recreate the sandbox on a current "
     "Daytona version."
 )
+INVALID_SCREENSHOT_ERROR = "The sandbox desktop returned an invalid screenshot."
+PUBLIC_SANDBOX = (
+    "the sandbox is public, so its preview URLs need no authentication: the desktop's noVNC port "
+    "is reachable by anyone who knows the sandbox id. Use a private sandbox."
+)
+
+
+@dataclass(frozen=True)
+class ScreenshotBounds:
+    max_bytes: int
+    max_width: int
+    max_height: int
+    max_pixels: int
+
+
+SCREENSHOT_BOUNDS = ScreenshotBounds(
+    max_bytes=64 * 1024 * 1024,
+    max_width=8192,
+    max_height=8192,
+    max_pixels=40_000_000,
+)
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_PNG_HEADER_LENGTH = 29
+_MAX_SCREENSHOT_BASE64 = ((SCREENSHOT_BOUNDS.max_bytes + 2) // 3) * 4
 
 
 class DaytonaComputer(BetaAbstractComputerToolset20260801):
@@ -114,6 +140,8 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
                 on_close=on_close,
                 create_timeout=create_timeout,
             )
+            if self.sandbox.public is True:
+                log.warning(PUBLIC_SANDBOX)
             self._xtest = XTest(self._lease.sandbox)
             self._start_desktop()
         except BaseException:
@@ -312,11 +340,27 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         self._settle()
         with self._desktop("take a screenshot", is_input=False):
             response = self.sandbox.computer_use.screenshot.take_full_screen()
-        png = base64.b64decode(response.screenshot or "")
-        image = Image.open(io.BytesIO(png))
+        encoded = response.screenshot or ""
+        try:
+            if len(encoded) > _MAX_SCREENSHOT_BASE64:
+                raise ValueError("encoded screenshot is too large")
+            png = base64.b64decode(encoded, validate=True)
+            image = decode_screenshot(png)
+        except Exception as exc:
+            log.debug("screenshot decode refused: %s", type(exc).__name__)
+            raise ToolError(INVALID_SCREENSHOT_ERROR) from exc
         if image.size != self._screen:
             self._set_screen(*image.size)  # the display changed size since the last look
         return png, image
+
+    def _region_fits(self, x0: int, y0: int, x1: int, y1: int) -> bool:
+        return 0 <= x0 < x1 <= self.width and 0 <= y0 < y1 <= self.height
+
+    def _region_rule(self) -> str:
+        return (
+            f"region must satisfy 0 <= x0 < x1 <= {self.width} and 0 <= y0 < y1 <= "
+            f"{self.height} (the screen in screenshot pixels)."
+        )
 
     # --- members ---------------------------------------------------------------------------------
 
@@ -334,19 +378,17 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
         self, context: BetaToolsetCallContext, input: BetaComputerZoomInput
     ) -> BetaScreenshotResult:
         x0, y0, x1, y1 = input.region
-        if not (0 <= x0 < x1 <= self.width and 0 <= y0 < y1 <= self.height):
-            raise ToolError(
-                f"region must satisfy 0 <= x0 < x1 <= {self.width} and 0 <= y0 < y1 <= "
-                f"{self.height} (the screen in screenshot pixels)."
-            )
+        if not self._region_fits(x0, y0, x1, y1):
+            raise ToolError(self._region_rule())
+        _, image = self._screenshot_png()
+        if not self._region_fits(x0, y0, x1, y1):
+            raise ToolError(f"The desktop changed size; {self._region_rule()}")
         left, top = (int(x0 / self._scale), int(y0 / self._scale))
-        right = min(self._screen[0], max(left + 1, round(x1 / self._scale)))
-        bottom = min(self._screen[1], max(top + 1, round(y1 / self._scale)))
-        region = ScreenshotRegion(x=left, y=top, width=right - left, height=bottom - top)
-        self._settle()  # a region is still a screenshot: it must not show the pre-input frame
-        with self._desktop("take a screenshot", is_input=False):
-            response = self.sandbox.computer_use.screenshot.take_region(region)
-        crop = Image.open(io.BytesIO(base64.b64decode(response.screenshot or "")))
+        right = min(image.width, max(left + 1, round(x1 / self._scale)))
+        bottom = min(image.height, max(top + 1, round(y1 / self._scale)))
+        if left >= right or top >= bottom:
+            raise ToolError(INVALID_SCREENSHOT_ERROR)
+        crop = image.crop((left, top, right, bottom))
         # Scaled up to fill a full screenshot's size, so small detail becomes legible.
         factor = min(self.width / crop.width, self.height / crop.height)
         size = (max(1, round(crop.width * factor)), max(1, round(crop.height * factor)))
@@ -516,11 +558,11 @@ class DaytonaComputer(BetaAbstractComputerToolset20260801):
                     pressed.append(name)
                 time.sleep(input.duration)
             finally:
-                release_error: DaytonaError | None = None
+                release_error: BaseException | None = None
                 for name in reversed(pressed):
                     try:
                         keyboard.up(name)
-                    except DaytonaError as exc:
+                    except BaseException as exc:
                         if release_error is None:
                             release_error = exc
                 if release_error is not None and sys.exc_info()[0] is None:
@@ -546,3 +588,24 @@ def encode_png(image: Image.Image) -> bytes:
     out = io.BytesIO()
     image.save(out, "PNG")
     return out.getvalue()
+
+
+def decode_screenshot(png: bytes) -> Image.Image:
+    """Validate screenshot cost from the PNG header before Pillow enters its lazy decoder."""
+    bounds = SCREENSHOT_BOUNDS
+    if len(png) > bounds.max_bytes or len(png) < _PNG_HEADER_LENGTH:
+        raise ValueError("PNG byte size is outside the screenshot bounds")
+    if png[:8] != _PNG_SIGNATURE or png[8:16] != b"\x00\x00\x00\rIHDR":
+        raise ValueError("PNG does not open with a valid IHDR")
+    width, height = struct.unpack(">II", png[16:24])
+    if not 0 < width <= bounds.max_width or not 0 < height <= bounds.max_height:
+        raise ValueError("PNG dimensions are outside the screenshot bounds")
+    if width * height > bounds.max_pixels:
+        raise ValueError("PNG pixel count is outside the screenshot bounds")
+    if png[26] != 0 or png[27] != 0 or png[28] != 0:
+        raise ValueError("PNG compression, filter, or interlace method is unsupported")
+    image = Image.open(io.BytesIO(png))
+    if image.size != (width, height):
+        raise ValueError("Pillow decoded different PNG dimensions")
+    image.load()
+    return image
