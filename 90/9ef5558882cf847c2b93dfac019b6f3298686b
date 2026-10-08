@@ -1,0 +1,16 @@
+packages/daytona-claude-toolsets/daytona_claude_toolsets/computer.py
+  h_634fa4b3782b12 8,13,42,61-84,143-144,343-351,356-364,381-385,387-391,561,565,591-611
+packages/daytona-claude-toolsets/tests/unit_tests/test_computer.py
+  h_634fa4b3782b12 6-7,21-23,33-46,86-87,94-156,462-481
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "909ef5558882cf847c2b93dfac019b6f3298686b",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
