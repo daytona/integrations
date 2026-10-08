@@ -15,14 +15,17 @@
   },
   "homepage": "https://github.com/daytona/integrations/tree/main/packages/claude-toolsets#readme",
   "keywords": [
+    "daytona",
+    "sandbox",
     "anthropic",
     "claude",
     "computer-use",
     "browser-use",
+    "cua",
+    "browser",
     "toolset",
-    "daytona",
-    "sandbox",
-    "ai-agents"
+    "agent",
+    "typescript"
   ],
   "files": [
     "dist",

@@ -1,8 +1,12 @@
 /**
  * Public entry point for `@daytona/claude-toolsets`.
  *
- * The Daytona computer and browser toolset drivers land here; for now this
- * module only carries the package identity so the ESM/NodeNext build, the
- * type declarations and the test runner all have something real to exercise.
+ * Error types (`ToolError`, `URLRefusedError`, `UploadRefusedError`, …) belong to
+ * the Anthropic SDK and are re-exported by it, not by this package. Only the
+ * Daytona drivers and their option types live here.
  */
-export const PACKAGE_NAME = "@daytona/claude-toolsets" as const;
+export { DaytonaComputer, type DaytonaComputerOptions } from "./computer.js";
+export { DaytonaBrowser, type DaytonaBrowserOptions } from "./browser.js";
+export { DaytonaFilePolicy, type DaytonaFilePolicyOptions } from "./files.js";
+export { BROWSER_MEMBERS, COMPUTER_MEMBERS } from "./members.js";
+export type { CreateParams, OnClose } from "./sandbox.js";
