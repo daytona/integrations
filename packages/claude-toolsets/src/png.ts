@@ -5,10 +5,14 @@ const CHANNEL_COUNT = 4;
 
 /** `\x89PNG\r\n\x1a\n`, the 8 bytes every PNG stream starts with. */
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-/** Signature (8) + IHDR length (4) + IHDR type (4) + width (4) + height (4). */
-const HEADER_LENGTH = 24;
+/** Signature (8) + IHDR length (4) + IHDR type (4) + all 13 IHDR bytes, the last being interlace. */
+const HEADER_LENGTH = 29;
 /** IHDR always carries exactly 13 bytes: width, height, depth, colour, compression, filter, interlace. */
 const IHDR_DATA_LENGTH = 13;
+/** Offsets of the three IHDR method bytes, which PNG defines only value 0 for (interlace also 1). */
+const COMPRESSION_METHOD = 26;
+const FILTER_METHOD = 27;
+const INTERLACE_METHOD = 28;
 
 export type PngImage = {
   readonly width: number;
@@ -34,7 +38,10 @@ export type PngBounds = {
  * cannot turn a single screenshot into an out-of-memory kill of the process holding the API keys.
  *
  * - `maxBytes` 64 MiB — the compressed PNG the host will hold and hand to the inflater. A 4K
- *   desktop screenshot is a few MB, so this is a decimal order of magnitude of headroom.
+ *   desktop screenshot is a few MB, so this is a decimal order of magnitude of headroom. It caps
+ *   the input, not what the input inflates to; that is bounded instead by {@link pngDimensions}
+ *   refusing interlace, which leaves pngjs on the path where it caps inflation at the image's own
+ *   expected size — and the dimensions below cap that.
  * - `maxWidth`/`maxHeight` 8192 — past any display a sandbox runs (the driver's own default is
  *   1280x800 and its `maxScreenshotSize` default 1920x1200), and bounding each side separately
  *   also refuses a degenerate 1x4294967295 header.
@@ -63,17 +70,33 @@ function assertPixelData(image: PngImage): void {
 }
 
 /**
- * The IHDR width and height, read from 24 bytes of header and inflating nothing.
+ * The IHDR width and height, read from 29 bytes of header and inflating nothing.
  *
- * This exists so dimensions can be refused BEFORE {@link decodePng} reaches `PNG.sync.read`,
- * which sizes its RGBA buffer from those same fields before it has verified a single pixel — so
- * an oversized header alone, with no pixel data behind it, is enough to exhaust the host.
+ * This exists so a header can be refused BEFORE {@link decodePng} reaches `PNG.sync.read`, which
+ * sizes its RGBA buffer from those same fields before it has verified a single pixel — so an
+ * oversized header alone, with no pixel data behind it, is enough to exhaust the host.
+ *
+ * The three IHDR method bytes are checked here for the same reason, and the interlace one is not
+ * cosmetic. pngjs bounds its own inflation only on the straight-laced path: `parser-sync` passes
+ * `maxLength: rowSize * height` to its inflater for a plain image, but hands an interlaced one to
+ * a bare `zlib.inflateSync`, whose default output ceiling is `buffer.kMaxLength`. The dimension
+ * bounds below therefore do not contain an interlaced frame at all — measured on pngjs 7.0.0 and
+ * Node 22, an 8.3 MB IDAT of deflated zeros behind an in-bounds 1000x1000 interlaced IHDR peaks at
+ * 16.6 GiB of RSS before pngjs rejects the (now fully materialised) data, while the byte-identical
+ * header with interlace 0 peaks at 56 MiB. `--max-old-space-size` does not help: the inflated
+ * bytes are external buffer memory, not V8 heap. Sandbox screenshots are never interlaced, so the
+ * cheap fix is to refuse the method outright and leave every decode that proceeds on the path
+ * pngjs already bounds to the image's own expected size. pngjs exposes no option to set that
+ * ceiling from the outside, so refusing here is the whole of the defence.
  */
 export function pngDimensions(data: Buffer): { readonly width: number; readonly height: number } {
   if (data.length < HEADER_LENGTH) throw new RangeError("PNG is too short to hold an IHDR header");
   if (!data.subarray(0, SIGNATURE.length).equals(SIGNATURE)) throw new RangeError("PNG signature is missing");
   if (data.readUInt32BE(8) !== IHDR_DATA_LENGTH) throw new RangeError("PNG IHDR chunk has the wrong length");
   if (data.toString("latin1", 12, 16) !== "IHDR") throw new RangeError("PNG does not open with an IHDR chunk");
+  if (data.readUInt8(COMPRESSION_METHOD) !== 0) throw new RangeError("PNG declares an unknown compression method");
+  if (data.readUInt8(FILTER_METHOD) !== 0) throw new RangeError("PNG declares an unknown filter method");
+  if (data.readUInt8(INTERLACE_METHOD) !== 0) throw new RangeError("PNG is interlaced, whose inflation pngjs does not bound");
   return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
 }
 

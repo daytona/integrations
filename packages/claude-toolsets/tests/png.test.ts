@@ -1,3 +1,5 @@
+import zlib from "node:zlib";
+
 import pngjs from "pngjs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,6 +31,51 @@ const header = (width: number, height: number): Buffer => {
 
 const opaque = (width: number, height: number): Buffer =>
   encodePng({ width, height, data: Buffer.alloc(width * height * 4, 255) });
+
+const CRC_TABLE = Int32Array.from({ length: 256 }, (_unused, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) value = (value & 1) === 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  return value;
+});
+
+const crc32 = (buffer: Buffer): number => {
+  let value = 0xffffffff;
+  for (const byte of buffer) value = (CRC_TABLE[(value ^ byte) & 0xff] ?? 0) ^ (value >>> 8);
+  return (value ^ 0xffffffff) >>> 0;
+};
+
+const chunk = (type: string, data: Buffer): Buffer => {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body), 0);
+  return Buffer.concat([length, body, crc]);
+};
+
+/**
+ * A decompression bomb: an in-bounds 1000x1000 IHDR with an IDAT of deflated zeros behind it that
+ * inflates to `inflatedBytes`, which is nothing like the ~4 MB the header promises.
+ *
+ * With `interlace` 1 this is the shape the dimension bounds alone do not contain, because pngjs's
+ * sync parser skips its own `maxLength` on the interlaced path; see {@link pngDimensions}. 64 MiB
+ * is deflated zeros' worth about 64 GiB, so the ceiling here is the host's memory, not the bounds.
+ * The test size is kept to tens of MB so the suite itself allocates nothing dangerous.
+ */
+const bomb = (inflatedBytes: number, interlace: number): Buffer => {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(1000, 0);
+  ihdr.writeUInt32BE(1000, 4);
+  ihdr.writeUInt8(8, 8);  // bit depth
+  ihdr.writeUInt8(6, 9);  // colour type: RGBA
+  ihdr.writeUInt8(interlace, 12);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", zlib.deflateSync(Buffer.alloc(inflatedBytes), { level: 9 })),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+};
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -99,22 +146,26 @@ describe("pngDimensions", () => {
   });
 
   it("agrees with the dimensions pngjs decodes from a real image", () => {
-    // Given: a genuinely encoded 7x5 PNG
+    // Given: a genuinely encoded PNG of a size neither side has hardcoded
     const encoded = opaque(7, 5);
 
-    // When: the header alone is read
+    // When: the header alone is read, and pngjs decodes the whole image
     const dimensions = pngDimensions(encoded);
+    const decoded = PNG.sync.read(encoded);
 
-    // Then: it reports what the full decode reports
-    expect(dimensions).toEqual({ width: 7, height: 5 });
+    // Then: the 29-byte read reports exactly what the full decode reports
+    expect(dimensions).toEqual({ width: decoded.width, height: decoded.height });
   });
 
   it.each([
     ["an empty buffer", Buffer.alloc(0)],
-    ["a buffer shorter than the header", opaque(2, 2).subarray(0, 23)],
+    ["a buffer shorter than the header", opaque(2, 2).subarray(0, 28)],
     ["a buffer with no PNG signature", Buffer.alloc(64, 0x42)],
     ["an IHDR chunk of the wrong length", (() => { const b = header(4, 4); b.writeUInt32BE(12, 8); return b; })()],
     ["a first chunk that is not IHDR", (() => { const b = header(4, 4); b.write("IDAT", 12, "latin1"); return b; })()],
+    ["an unknown compression method", (() => { const b = header(4, 4); b.writeUInt8(1, 26); return b; })()],
+    ["an unknown filter method", (() => { const b = header(4, 4); b.writeUInt8(1, 27); return b; })()],
+    ["an interlaced header", (() => { const b = header(4, 4); b.writeUInt8(1, 28); return b; })()],
   ])("refuses %s", (_name, buffer) => {
     // Given: malformed input       When: the header is read      Then: it throws rather than guessing
     expect(() => pngDimensions(buffer)).toThrow(RangeError);
@@ -129,6 +180,9 @@ describe("decodePng bounds", () => {
     ["a pixel count past the budget", header(8192, 8192)],
     ["a zero width", header(0, 800)],
     ["a zero height", header(1280, 0)],
+    ["an interlaced header of a legal size", (() => { const b = header(1280, 800); b.writeUInt8(1, 28); return b; })()],
+    ["an unknown compression method", (() => { const b = header(1280, 800); b.writeUInt8(1, 26); return b; })()],
+    ["an unknown filter method", (() => { const b = header(1280, 800); b.writeUInt8(1, 27); return b; })()],
   ])("refuses %s before reaching the inflater", (_name, buffer) => {
     // Given: a header-only PNG whose claimed dimensions violate the screenshot bounds
     const inflate = vi.spyOn(PNG.sync, "read");
@@ -162,6 +216,33 @@ describe("decodePng bounds", () => {
     // Given: input that is not a decodable PNG   When: decoded   Then: it throws rather than
     // returning a half-read image — the header guard catches one, pngjs's own parser the other.
     expect(() => decodePng(buffer, SCREENSHOT_BOUNDS)).toThrow();
+  });
+
+  it("refuses an interlaced deflate bomb whose header is inside every bound", () => {
+    // Given: a 1000x1000 IHDR — well inside maxWidth, maxHeight and maxPixels — with an IDAT
+    // of deflated zeros behind it that inflates to ~1000x what the header promises
+    const encoded = bomb(16 * 1024 * 1024, 1);
+    const inflate = vi.spyOn(PNG.sync, "read");
+    expect(encoded.length).toBeLessThan(SCREENSHOT_BOUNDS.maxBytes);
+    expect(pngDimensions(bomb(0, 0))).toEqual({ width: 1000, height: 1000 });
+
+    // When: it is decoded under the screenshot bounds
+    const decode = (): PngImage => decodePng(encoded, SCREENSHOT_BOUNDS);
+
+    // Then: the interlace byte alone refuses it, and the unbounded inflate is never entered —
+    // every other bound passes, so without that check this is tens of GB of host memory.
+    expect(decode).toThrow(RangeError);
+    expect(inflate).not.toHaveBeenCalled();
+  });
+
+  it("leaves the same bomb's bounded path to pngjs when it is not interlaced", () => {
+    // Given: the byte-identical bomb with interlace 0, which pngjs inflates under its own
+    // `maxLength: rowSize * height` ceiling rather than into a buffer the size of the bomb
+    const encoded = bomb(16 * 1024 * 1024, 0);
+
+    // When: it is decoded      Then: pngjs refuses the truncated-looking result it got instead,
+    // and the memory it spent is the 1000x1000 image's own, not the bomb's.
+    expect(() => decodePng(encoded, SCREENSHOT_BOUNDS)).toThrow();
   });
 
   it.each([[1280, 800], [1920, 1080]])("decodes a real %sx%s screenshot", (width, height) => {
