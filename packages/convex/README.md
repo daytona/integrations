@@ -253,7 +253,9 @@ app.use(daytona, {
 - **Endpoint URL**: `https://<your-deployment>.convex.site/daytona/webhook` (your deployment's HTTP actions URL, plus the prefix above)
 - **Events**: subscribe to `sandbox.state.updated`. The component ignores every other event, so subscribing to anything else only creates extra deliveries.
 
-**3. Copy the endpoint's signing secret into your deployment.** Daytona generates a signing secret (starting with `whsec_`) for each endpoint you create and signs every delivery with it. Open the endpoint in the Daytona Dashboard's **Webhooks** page, copy its signing secret, and set it on your Convex deployment:
+Create the endpoint in the **same Daytona organization as your `DAYTONA_API_KEY`**: webhooks are per organization, so an endpoint in another org never receives your sandboxes' events.
+
+**3. Copy the endpoint's signing secret into your deployment.** Daytona generates a signing secret (starting with `whsec_`) for each endpoint you create and signs every delivery with it. In the Daytona Dashboard's **Webhooks** page, click your endpoint in the endpoints table; its details show the signing secret, ready to copy. Set it on your Convex deployment:
 
 ```bash
 npx convex env set DAYTONA_WEBHOOK_SECRET whsec_...
