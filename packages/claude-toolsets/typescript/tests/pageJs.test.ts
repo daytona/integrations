@@ -10,7 +10,7 @@ function sha256(value: string): string {
 
 function pythonToolkit(): string {
   const source = readFileSync(
-    new URL("../../daytona-claude-toolsets/daytona_claude_toolsets/_page_js.py", import.meta.url),
+    new URL("../../python/daytona_claude_toolsets/_page_js.py", import.meta.url),
     "utf8",
   );
   const marker = 'TOOLKIT = r"""';

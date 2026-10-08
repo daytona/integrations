@@ -58,9 +58,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/daytona/integrations/tree/main/packages/daytona-claude-toolsets#readme"
+Homepage = "https://github.com/daytona/integrations/tree/main/packages/claude-toolsets/python#readme"
 Repository = "https://github.com/daytona/integrations"
-Documentation = "https://github.com/daytona/integrations/tree/main/packages/daytona-claude-toolsets#readme"
+Documentation = "https://github.com/daytona/integrations/tree/main/packages/claude-toolsets/python#readme"
 Issues = "https://github.com/daytona/integrations/issues"
 
 [tool.setuptools]

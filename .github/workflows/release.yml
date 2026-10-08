@@ -53,12 +53,12 @@ jobs:
       opencode_tag: ${{ steps.release.outputs['packages/opencode-plugin--tag_name'] }}
       pydantic_ai_released: ${{ steps.release.outputs['packages/pydantic-ai-daytona--release_created'] }}
       pydantic_ai_tag: ${{ steps.release.outputs['packages/pydantic-ai-daytona--tag_name'] }}
-      daytona_claude_toolsets_released: ${{ steps.release.outputs['packages/daytona-claude-toolsets--release_created'] }}
-      daytona_claude_toolsets_tag: ${{ steps.release.outputs['packages/daytona-claude-toolsets--tag_name'] }}
+      daytona_claude_toolsets_released: ${{ steps.release.outputs['packages/claude-toolsets/python--release_created'] }}
+      daytona_claude_toolsets_tag: ${{ steps.release.outputs['packages/claude-toolsets/python--tag_name'] }}
       convex_released: ${{ steps.release.outputs['packages/convex--release_created'] }}
       convex_tag: ${{ steps.release.outputs['packages/convex--tag_name'] }}
-      claude_toolsets_released: ${{ steps.release.outputs['packages/claude-toolsets--release_created'] }}
-      claude_toolsets_tag: ${{ steps.release.outputs['packages/claude-toolsets--tag_name'] }}
+      claude_toolsets_released: ${{ steps.release.outputs['packages/claude-toolsets/typescript--release_created'] }}
+      claude_toolsets_tag: ${{ steps.release.outputs['packages/claude-toolsets/typescript--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -134,14 +134,14 @@ jobs:
         with:
           python-version: "3.x"
       - name: Build sdist + wheel
-        working-directory: packages/daytona-claude-toolsets
+        working-directory: packages/claude-toolsets/python
         run: |
           python -m pip install --upgrade build
           python -m build
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: packages/daytona-claude-toolsets/dist
+          packages-dir: packages/claude-toolsets/python/dist
 
   # ---- PyPI: langchain-daytona-data-analysis (Poetry) ---------------------
   publish-langchain:
@@ -309,7 +309,7 @@ jobs:
       # `npm run build` compiles src/ to the ESM-only dist/ that the package's
       # exports map points at — nothing else ships.
       - name: Install, build, publish
-        working-directory: packages/claude-toolsets
+        working-directory: packages/claude-toolsets/typescript
         run: |
           # --ignore-scripts: this job holds `id-token: write`, and the build is just tsc, so no
           # dependency's install script (protobufjs' postinstall, via @daytona/sdk) needs to run.
