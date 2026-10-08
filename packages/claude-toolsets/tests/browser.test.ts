@@ -138,6 +138,55 @@ describe("DaytonaBrowser construction and completeness", () => {
   it("keeps exactly the SDK default-off set", async () => { const { browser } = await makeBrowser(); const defaults = ["read_console", "read_network", "javascript_exec", "file_upload"]; for (const name of defaults) expect((await callMember(browser, name, {})).is_error).toBe(true); expect((await callMember(browser, "screenshot", {})).is_error).not.toBe(true); await browser.close(); });
 });
 
+describe("browser dialog handling", () => {
+  const fireDialog = async (contextRaw: ReturnType<typeof harness>["contextRaw"], dialog: object): Promise<void> => {
+    const handler = contextRaw.on.mock.calls.find(([name]) => name === "dialog")?.[1];
+    if (handler === undefined) throw new Error("no dialog listener was registered");
+    handler(dialog);
+    await drain();
+  };
+
+  it("dismisses and reports confirm dialogs", async () => {
+    const { browser, contextRaw } = await makeBrowser();
+    const dismiss = vi.fn(async () => undefined);
+    const accept = vi.fn(async () => undefined);
+    await fireDialog(contextRaw, { type: () => "confirm", message: () => "Delete everything?", dismiss, accept });
+
+    expect(dismiss).toHaveBeenCalledOnce();
+    expect(accept).not.toHaveBeenCalled();
+    const result = await callMember(browser, "screenshot", {});
+    expect(resultText(result)).toContain('A confirm dialog "Delete everything?" was dismissed.');
+    await browser.close();
+  });
+
+  it("accepts beforeunload dialogs without reporting a change", async () => {
+    const { browser, contextRaw } = await makeBrowser();
+    const dismiss = vi.fn(async () => undefined);
+    const accept = vi.fn(async () => undefined);
+    await fireDialog(contextRaw, { type: () => "beforeunload", message: () => "", dismiss, accept });
+
+    expect(accept).toHaveBeenCalledOnce();
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(resultText(await callMember(browser, "screenshot", {}))).not.toContain("dialog_dismissed");
+    await browser.close();
+  });
+
+  it("caps dialog messages at MAX_TEXT", async () => {
+    const { browser, contextRaw } = await makeBrowser();
+    const dismiss = vi.fn(async () => undefined);
+    await fireDialog(contextRaw, { type: () => "alert", message: () => "x".repeat(10_000), dismiss, accept: vi.fn() });
+
+    const change = browser["changes"][0];
+    expect(change?.type).toBe("dialog_dismissed");
+    if (change?.type !== "dialog_dismissed") throw new Error("dialog change was not recorded");
+    expect(change?.message).toHaveLength(MAX_TEXT);
+    expect(change?.message).toBe("x".repeat(MAX_TEXT));
+    await callMember(browser, "screenshot", {});
+    expect(dismiss).toHaveBeenCalledOnce();
+    await browser.close();
+  });
+});
+
 describe("urlPolicy tri-state and interception", () => {
   it("omitted policy installs no interception", async () => { const { browser } = await makeBrowser(); expect(mocks.routes).toHaveLength(0); expect(mocks.sockets).toHaveLength(0); await browser.close(); });
   it("explicit undefined installs no interception", async () => { const { browser } = await makeBrowser({ urlPolicy: undefined }); expect(mocks.routes).toHaveLength(0); await browser.close(); });
