@@ -167,7 +167,8 @@ describe("browser dialog handling", () => {
 
     expect(accept).toHaveBeenCalledOnce();
     expect(dismiss).not.toHaveBeenCalled();
-    expect(resultText(await callMember(browser, "screenshot", {}))).not.toContain("dialog_dismissed");
+    expect(browser["changes"]).toEqual([]);
+    await callMember(browser, "screenshot", {});
     await browser.close();
   });
 
