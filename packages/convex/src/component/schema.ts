@@ -23,8 +23,13 @@ export const sandboxFields = {
   userKey: v.optional(v.string()),
   lastError: v.optional(v.string()),
   /**
-   * Daytona's timestamp (ms) of the last webhook state event applied. Events
-   * can arrive duplicated or out of order; older ones are discarded.
+   * Ordering watermark (ms) for `state`: the time of the newest state
+   * observation, from either source — Daytona's event `updatedAt` when a
+   * webhook is applied, or Convex's clock when the component observes state
+   * through the API (create/start/stop/refresh/remove). Webhook events at or
+   * older than it are discarded, so duplicate and out-of-order deliveries
+   * can't overwrite newer state. Not purely provider-sourced: comparisons
+   * across the two clocks are subject to clock skew.
    */
   remoteUpdatedAt: v.optional(v.number()),
   createdAt: v.number(),
