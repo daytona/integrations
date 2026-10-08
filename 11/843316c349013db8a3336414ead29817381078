@@ -1,0 +1,21 @@
+.github/workflows/release.yml
+  s_620c1a3a1b2ee4::t_4e5735267c485e 314-316
+.github/workflows/ci.yml
+  s_620c1a3a1b2ee4::t_c478ccd1c6c49e 310-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "11843316c349013db8a3336414ead29817381078",
+  "prompts": {},
+  "sessions": {
+    "s_620c1a3a1b2ee4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee32ea5ffffeUdQwwexXey1ffr",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
