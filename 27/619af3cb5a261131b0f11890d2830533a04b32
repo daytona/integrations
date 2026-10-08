@@ -1,0 +1,22 @@
+packages/claude-toolsets/tests/computer.test.ts
+  s_d2821d2dfb09d3::t_936afce42cad46 204
+packages/claude-toolsets/tests/png.test.ts
+  s_d2821d2dfb09d3::t_3f2198ff53fed6 223-224
+  s_d2821d2dfb09d3::t_8031b34da45bcc 233-237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "27619af3cb5a261131b0f11890d2830533a04b32",
+  "prompts": {},
+  "sessions": {
+    "s_d2821d2dfb09d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee309d1adffehUHlFJWM1gmZ2A",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
