@@ -1,0 +1,21 @@
+packages/claude-toolsets/src/text.ts
+  s_5b42ced7b28270::t_7045e0f0e6a881 84-86
+  s_5b42ced7b28270::t_cef3de7bedad32 106
+  s_5b42ced7b28270::t_1987195355c667 126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "78bef2705f72b5ddb283c65cf20c98dfbf7bbfc9",
+  "prompts": {},
+  "sessions": {
+    "s_5b42ced7b28270": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ee6ccea94ffe3UOzC3lSIrAtTa",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
