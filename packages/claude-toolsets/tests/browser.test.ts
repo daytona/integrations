@@ -245,6 +245,32 @@ describe("members and bounds", () => {
     await browser.close();
   });
 
+  it("caps page-controlled titles and URLs in member results, not only the state", async () => {
+    // Given: a page whose own URL and title are far longer than the limit. navigate, list_tabs
+    // and switch_tab build their results from `page.url()`/`page.title()` directly, so they
+    // bypassed the cap that `entry()` applies to the browser state.
+    const { browser, pages } = await makeBrowser();
+    const longPath = "u".repeat(MAX_TEXT * 2);
+    const longTitle = "T".repeat(MAX_TEXT * 2);
+    const titleMock = pages[0]?.title as unknown as ReturnType<typeof vi.fn<() => Promise<string>>>;
+    titleMock.mockResolvedValue(longTitle);
+
+    // When: each member that returns a tab entry of its own is called.
+    const rendered = [
+      await callMember(browser, "navigate", { url: `https://evil.test/${longPath}` }),
+      await callMember(browser, "list_tabs", {}),
+      await callMember(browser, "switch_tab", { tab_id: "tab_1" }),
+    ].map((result) => JSON.stringify(result.content));
+
+    // Then: none of them carries more than the limit.
+    for (const text of rendered) {
+      expect(text).not.toContain("u".repeat(MAX_TEXT + 1));
+      expect(text).not.toContain("T".repeat(MAX_TEXT + 1));
+    }
+    expect(rendered[0]).toContain("u".repeat(100));
+    await browser.close();
+  });
+
   it("caps a page-controlled download URL in the browser state", async () => {
     // Given: a download whose source URL is far longer than the text limit.
     const { browser, browserCdp } = await makeBrowser();

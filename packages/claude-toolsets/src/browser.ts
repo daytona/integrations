@@ -539,7 +539,9 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
     } finally { this.navigatingTabs.delete(tab.id); }
     tab.world = null; await this.checkLanded(tab, before);
     let title = ""; try { title = await page.title(); } catch { /* closed page has no title */ }
-    return { url: page.url(), ...(response === null ? {} : { status: response.status() }), ...(title ? { title } : {}) };
+    // Page-controlled, so capped exactly like the browser-state entries in `entry()`.
+    const landedUrl = page.url().slice(0, MAX_TEXT); const pageTitle = title.slice(0, MAX_TEXT);
+    return { url: landedUrl, ...(response === null ? {} : { status: response.status() }), ...(pageTitle ? { title: pageTitle } : {}) };
   }
   private async checkLanded(tab: Tab, before: string): Promise<void> {
     const landed = tab.page.url(); if (this.urlPolicy === undefined || landed === before || landed === "about:blank" || !(await this.refuses(landed, tab.id))) return;
@@ -655,10 +657,10 @@ export class DaytonaBrowser extends BetaAbstractBrowserToolset20260801 {
 
   protected override async new_tab(_ctx: BetaToolsetCallContext, _input: BetaBrowserNewTabInput): Promise<BetaBrowserStateTabEntry> {
     if (this.disconnected || this.context === undefined) throw new ToolError("The browser in the sandbox is no longer connected."); if (this.tabs.size >= MAX_TABS) throw new ToolError(`${MAX_TABS} tabs are open; close one first.`);
-    const page = await this.context.newPage(); await this.onPage(page); const tab = this.tabOf(page); if (tab === undefined) throw new ToolError("The new tab could not be opened."); this.activate(tab.id); return { tab_id: tab.id, title: "", url: page.url(), active: true };
+    const page = await this.context.newPage(); await this.onPage(page); const tab = this.tabOf(page); if (tab === undefined) throw new ToolError("The new tab could not be opened."); this.activate(tab.id); return { tab_id: tab.id, title: "", url: page.url().slice(0, MAX_TEXT), active: true };
   }
-  protected override async list_tabs(_ctx: BetaToolsetCallContext, _input: BetaBrowserListTabsInput): Promise<BetaBrowserStateTabEntry[]> { return [...this.tabs.values()].map((tab) => ({ tab_id: tab.id, title: tab.title, url: tab.page.url(), active: tab.id === this.active })); }
-  protected override async switch_tab(_ctx: BetaToolsetCallContext, input: BetaBrowserSwitchTabInput): Promise<BetaBrowserStateTabEntry> { const tab = this.tab(input.tab_id); await tab.page.bringToFront(); this.activate(tab.id); return { tab_id: tab.id, title: tab.title, url: tab.page.url(), active: true }; }
+  protected override async list_tabs(_ctx: BetaToolsetCallContext, _input: BetaBrowserListTabsInput): Promise<BetaBrowserStateTabEntry[]> { return [...this.tabs.values()].map((tab) => ({ tab_id: tab.id, title: tab.title.slice(0, MAX_TEXT), url: tab.page.url().slice(0, MAX_TEXT), active: tab.id === this.active })); }
+  protected override async switch_tab(_ctx: BetaToolsetCallContext, input: BetaBrowserSwitchTabInput): Promise<BetaBrowserStateTabEntry> { const tab = this.tab(input.tab_id); await tab.page.bringToFront(); this.activate(tab.id); return { tab_id: tab.id, title: tab.title.slice(0, MAX_TEXT), url: tab.page.url().slice(0, MAX_TEXT), active: true }; }
   protected override async close_tab(_ctx: BetaToolsetCallContext, input: BetaBrowserCloseTabInput): Promise<void> { const tab = this.tab(input.tab_id); await tab.page.close({ runBeforeUnload: false }); this.forget(tab.page); }
   protected override async wait(_ctx: BetaToolsetCallContext, input: BetaBrowserWaitInput): Promise<void> { if (!(0 <= input.duration && input.duration <= MAX_DURATION)) throw new ToolError(`duration must be between 0 and ${MAX_DURATION} seconds.`); const tab = this.active === undefined ? undefined : this.tabs.get(this.active); if (tab === undefined) await new Promise<void>((resolve) => setTimeout(resolve, input.duration * 1000)); else await tab.page.waitForTimeout(input.duration * 1000); }
 }

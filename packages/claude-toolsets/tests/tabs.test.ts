@@ -52,7 +52,20 @@ describe("tab records", () => {
     const lines = tab.takeNetwork().split("\n");
     expect(lines[0]).toBe("[1 earlier requests were dropped]");
     expect(lines[1]).toContain("/request-1");
-    expect(lines).not.toContain(expect.stringContaining("/request-0"));
+    // `toContain` compares array entries by equality and never unwraps an asymmetric
+    // matcher, so the matcher form of this assertion could never fail. Join and search.
+    expect(lines.join("\n")).not.toContain("/request-0");
     expect(lines).toHaveLength(MAX_ENTRIES + 1);
+  });
+
+  it("caps a server-controlled content type", () => {
+    // The request URL on the adjacent line is already capped; the response's content type is
+    // just as server-controlled and reaches the model through the same read_network output.
+    const tab = new Tab("tab_1", {});
+    const oversized = request("/typed");
+    tab.startRequest(oversized);
+    tab.answerRequest(response(oversized, 200, "x".repeat(MAX_TEXT + 100)));
+    tab.finishRequest(oversized, null);
+    expect(tab.takeNetwork()).toBe(`GET 200 ${"x".repeat(MAX_TEXT)} /typed`);
   });
 });

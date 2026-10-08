@@ -74,7 +74,8 @@ export class Tab<PageType = Page, CdpType = CDPSession> {
     const entry = this.network.get(response.request());
     if (entry === undefined) return;
     entry.status = String(response.status());
-    entry.type = (response.headers()["content-type"] ?? "").split(";")[0] ?? "";
+    // Server-controlled, so capped like the request URL on the line above.
+    entry.type = ((response.headers()["content-type"] ?? "").split(";")[0] ?? "").slice(0, MAX_TEXT);
   }
 
   finishRequest(request: TabRequest, failure: string | null | undefined): void {
