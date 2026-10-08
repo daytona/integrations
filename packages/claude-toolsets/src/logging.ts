@@ -29,5 +29,9 @@ export const debug = (message: string): void => {
  *
  * Only the class name is logged, never the message: an exception text can carry the signed preview
  * URL, a sandbox path or a page's own string, and none of those belong in a host's log.
+ * `error.name` is a plain writable instance property reachable by anything holding the error,
+ * including a page's own thrown value in the browser driver, so it cannot be trusted to remain the
+ * real class name; `error.constructor.name` reads the class identity instead.
  */
-export const errorName = (error: unknown): string => (error instanceof Error ? error.name : "UnknownError");
+export const errorName = (error: unknown): string =>
+  error instanceof Error ? error.constructor.name : "UnknownError";

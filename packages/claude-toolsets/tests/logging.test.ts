@@ -152,6 +152,15 @@ describe("log line shape", () => {
     expect(errorName(new DaytonaError("boom"))).toBe("DaytonaError");
     expect(errorName("not an error")).toBe("UnknownError");
   });
+
+  it("resists a tampered error.name and still returns the real class name", () => {
+    // Given: an error whose writable name is replaced with a signed URL-looking string.
+    const error = new TypeError("boom");
+    error.name = "https://fake-signed-url.example/leaked-secret";
+
+    // When / Then: the class identity is used instead of the mutable instance name.
+    expect(errorName(error)).toBe("TypeError");
+  });
 });
 
 describe("browser teardown logging", () => {
