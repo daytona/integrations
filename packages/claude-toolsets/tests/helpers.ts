@@ -5,8 +5,26 @@ import { vi } from "vitest";
 import { encodePng } from "../src/png.js";
 import type { Action } from "../src/xtest.js";
 
-const png = (width: number, height: number): string =>
-  encodePng({ width, height, data: Buffer.alloc(width * height * 4, 255) }).toString("base64");
+/**
+ * A coordinate-coded fixture: pixel (x, y) is `rgb(x & 0xff, y & 0xff, ((x >> 8) << 4) | (y >> 8))`.
+ *
+ * A flat fill cannot tell a correct crop from a wrong one — every region of it looks the same —
+ * so a zoom that copied the wrong rectangle still passed. Encoding the coordinates into the
+ * pixels lets a test read a decoded pixel back and prove which part of the screen it came from.
+ */
+const png = (width: number, height: number): string => {
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const at = (y * width + x) * 4;
+      data[at] = x & 0xff;
+      data[at + 1] = y & 0xff;
+      data[at + 2] = ((x >> 8) << 4) | (y >> 8);
+      data[at + 3] = 255;
+    }
+  }
+  return encodePng({ width, height, data }).toString("base64");
+};
 
 export const daytonaMethod = <TArgs extends readonly unknown[], TResult>(result: TResult) =>
   vi.fn<(...args: TArgs) => Promise<TResult>>(async (..._args) => result);

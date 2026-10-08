@@ -87,6 +87,17 @@ describe("DaytonaComputer coordinates and screenshots", () => {
     expect(mock.raw.computerUse.screenshot.takeRegion).not.toHaveBeenCalled();
     const image = decodePng(Buffer.from(imageData(result), "base64"));
     expect([image.width, image.height]).toEqual([1280, 640]);
+
+    // The fixture encodes each source coordinate into its pixel, so the corners prove WHICH
+    // rectangle was copied — not just that something 1280x640 came back. The region is
+    // [10, 20, 210, 120] in model space on a 1280x800 display (scale 1), so the crop's
+    // top-left is source (10, 20) and its bottom-right is source (209, 119).
+    const pixelAt = (x: number, y: number): ReadonlyArray<number | undefined> => {
+      const at = (y * image.width + x) * 4;
+      return [image.data[at], image.data[at + 1], image.data[at + 2]];
+    };
+    expect(pixelAt(0, 0)).toEqual([10, 20, 0]);
+    expect(pixelAt(image.width - 1, image.height - 1)).toEqual([209, 119, 0]);
     await toolset.close();
   });
 
@@ -293,6 +304,18 @@ describe("DaytonaComputer keyboard, bounds and errors", () => {
     const result = await callMember(toolset, "hold_key", { text: "ctrl+a", duration: 1 });
     expect(resultText(result)).toBe("The sandbox desktop could not hold the key.");
     expect(mock.raw.computerUse.keyboard.up).toHaveBeenCalledWith("ctrl");
+    await toolset.close();
+  });
+
+  it("releases every held key when one release throws a non-Daytona error", async () => {
+    // A non-DaytonaError used to propagate out of the cleanup loop immediately, leaving the
+    // rest of the chord held down on the desktop.
+    const { mock, toolset } = await computer();
+    mock.raw.computerUse.mouse.down.mockRejectedValueOnce(new DaytonaError("probe", 400));
+    mock.raw.computerUse.keyboard.up.mockRejectedValueOnce(new TypeError("transport exploded"));
+    const result = await callMember(toolset, "hold_key", { text: "ctrl+shift", duration: 0 });
+    expect(result.is_error).toBe(true);
+    expect(mock.raw.computerUse.keyboard.up.mock.calls).toEqual([["shift"], ["ctrl"]]);
     await toolset.close();
   });
 

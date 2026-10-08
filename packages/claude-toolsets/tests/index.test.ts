@@ -53,11 +53,15 @@ describe("README routing tables", () => {
     for (const member of named) expect(BROWSER_MEMBERS).toContain(member);
   });
 
-  it("covers every computer member somewhere in the README", () => {
-    for (const member of COMPUTER_MEMBERS) expect(README).toContain(`\`${member}\``);
+  // Searching the whole README would let a member drop out of its routing table and still pass
+  // on a mention in prose, so each table must itself list every member of its toolset.
+  it("routes every computer member in the DaytonaComputer table", () => {
+    const named = readmeMembers("### `DaytonaComputer`");
+    for (const member of COMPUTER_MEMBERS) expect(named).toContain(member);
   });
 
-  it("covers every browser member somewhere in the README", () => {
-    for (const member of BROWSER_MEMBERS) expect(README).toContain(`\`${member}\``);
+  it("routes every browser member in the DaytonaBrowser table", () => {
+    const named = readmeMembers("### `DaytonaBrowser`");
+    for (const member of BROWSER_MEMBERS) expect(named).toContain(member);
   });
 });

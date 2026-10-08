@@ -109,8 +109,10 @@ describe("Chromium launcher", () => {
     expect(sandbox.process.executeCommand.mock.calls[1]?.[0]).toBe(
       `mkdir -p -m 700 ${shellQuote(launchOptions.profile)} ${shellQuote(launchOptions.downloadDir)} && rm -f -- ${shellQuote(`${launchOptions.profile}/DevToolsActivePort`)}`,
     );
-    expect(sandbox.process.executeCommand.mock.calls.map(([command]) => command)).not.toContain(
-      expect.stringContaining(launchOptions.chromium),
+    // `toContain` never unwraps an asymmetric matcher, so the matcher form of this
+    // assertion could never fail. `toEqual(arrayContaining(...))` does unwrap it.
+    expect(sandbox.process.executeCommand.mock.calls.map(([command]) => command)).not.toEqual(
+      expect.arrayContaining([expect.stringContaining(launchOptions.chromium)]),
     );
   });
 
