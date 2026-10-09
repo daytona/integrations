@@ -6,8 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DaytonaBrowser, KEEP_ALIVE } from "../src/browser.js";
 import { DaytonaFilePolicy } from "../src/files.js";
 import { BROWSER_MEMBERS, COMPUTER_MEMBERS } from "../src/members.js";
+import { PAGE_JS } from "../src/pageJs.js";
 import { MAX_TEXT } from "../src/text.js";
-import { callMember, mockSandbox, resultText, type MockSandbox } from "./helpers.js";
+import { browserState, callMember, imageData, mockSandbox, resultText, type MockSandbox } from "./helpers.js";
 
 const mocks = vi.hoisted(() => ({
   connectOverCDP: vi.fn(),
@@ -26,39 +27,86 @@ vi.mock("playwright-core", async (original) => {
 });
 
 type EventHandler = (value: unknown) => void;
+type MouseDouble = {
+  readonly click: ReturnType<typeof vi.fn<(x: number, y: number, options?: object) => Promise<void>>>;
+  readonly move: ReturnType<typeof vi.fn<(x: number, y: number, options?: object) => Promise<void>>>;
+  readonly down: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  readonly up: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  readonly wheel: ReturnType<typeof vi.fn<(dx: number, dy: number) => Promise<void>>>;
+};
+type KeyboardDouble = {
+  readonly down: ReturnType<typeof vi.fn<(key: string) => Promise<void>>>;
+  readonly up: ReturnType<typeof vi.fn<(key: string) => Promise<void>>>;
+  readonly press: ReturnType<typeof vi.fn<(key: string) => Promise<void>>>;
+  readonly type: ReturnType<typeof vi.fn<(text: string) => Promise<void>>>;
+};
 type PageDouble = Page & {
   readonly urlMock: ReturnType<typeof vi.fn<() => string>>;
   readonly gotoMock: ReturnType<typeof vi.fn>;
   readonly cdpSend: ReturnType<typeof vi.fn>;
+  readonly closeMock: ReturnType<typeof vi.fn<(options?: object) => Promise<void>>>;
+  readonly waitMock: ReturnType<typeof vi.fn<(ms: number) => Promise<void>>>;
+  readonly scrollMock: ReturnType<typeof vi.fn<() => Promise<readonly [number, number]>>>;
+  readonly mouseMock: MouseDouble;
+  readonly keyboardMock: KeyboardDouble;
+  /**
+   * What `globalThis.__dt.<name>(...)` answers in the page's isolated world, keyed by the `__dt`
+   * function name; each value is CDP's `result` payload, so a test can hand back a by-value
+   * result (`{ type, value }`) or the remote object `file_upload` asks for (`{ subtype, objectId }`).
+   */
+  readonly world: Map<string, unknown>;
+  /** The whole `Runtime.evaluate` reply for a script that is not a `__dt` call — what `javascript_exec` runs. */
+  readonly script: { reply: Record<string, unknown> };
 };
+
+/** `inWorld` builds exactly this expression, so the mock reads the `__dt` function name back out of it. */
+const DT_CALL = /^globalThis\.__dt\["([^"]+)"\]/u;
 
 const pageDouble = (): PageDouble => {
   let url = "about:blank";
   const handlers = new Map<string, EventHandler>();
-  const cdpSend = vi.fn(async (method: string) => {
+  const world = new Map<string, unknown>();
+  const script = { reply: { result: { type: "undefined" } } as Record<string, unknown> };
+  const cdpSend = vi.fn(async (method: string, params?: Record<string, unknown>) => {
     switch (method) {
       case "Target.getTargetInfo": return { targetInfo: { targetId: "target-1", browserContextId: "context-1" } };
       case "Page.getFrameTree": return { frameTree: { frame: { id: "frame-1" } } };
       case "Page.createIsolatedWorld": return { executionContextId: 7 };
       case "Page.captureScreenshot": return { data: "png-data" };
-      case "Runtime.evaluate": return { result: { type: "string", value: "" } };
+      case "Runtime.evaluate": {
+        const expression = String(params?.["expression"] ?? "");
+        const called = DT_CALL.exec(expression)?.[1];
+        if (called === undefined) return expression === PAGE_JS ? {} : script.reply;
+        return { result: world.get(called) ?? { type: "string", value: "" } };
+      }
       default: return {};
     }
   });
+  const closeMock = vi.fn(async (_options?: object) => { handlers.get("close")?.(page); });
+  const waitMock = vi.fn(async (_ms: number) => undefined);
+  const scrollMock = vi.fn(async (): Promise<readonly [number, number]> => [0, 0]);
+  const mouse: MouseDouble = {
+    click: vi.fn(async () => undefined), move: vi.fn(async () => undefined),
+    down: vi.fn(async () => undefined), up: vi.fn(async () => undefined), wheel: vi.fn(async () => undefined),
+  };
+  const keyboard: KeyboardDouble = {
+    down: vi.fn(async () => undefined), up: vi.fn(async () => undefined),
+    press: vi.fn(async () => undefined), type: vi.fn(async () => undefined),
+  };
   const page = {
     urlMock: vi.fn(() => url),
     gotoMock: vi.fn(async (next: string, _options?: object) => { url = next; return { status: () => 200 }; }),
-    cdpSend,
+    cdpSend, closeMock, waitMock, scrollMock, world, script,
+    mouseMock: mouse, keyboardMock: keyboard,
     on: vi.fn((name: string, handler: EventHandler) => { handlers.set(name, handler); }),
     url: () => url,
     title: vi.fn(async () => ""),
     goto: (next: string, options?: object) => page.gotoMock(next, options),
     goBack: vi.fn(async () => null), goForward: vi.fn(async () => null), reload: vi.fn(async () => null),
-    waitForLoadState: vi.fn(async () => undefined), waitForTimeout: vi.fn(async () => undefined),
-    bringToFront: vi.fn(async () => undefined), close: vi.fn(async () => { handlers.get("close")?.(page); }),
-    evaluate: vi.fn(async () => [0, 0]),
-    keyboard: { down: vi.fn(async () => undefined), up: vi.fn(async () => undefined), press: vi.fn(async () => undefined), type: vi.fn(async () => undefined) },
-    mouse: { click: vi.fn(async () => undefined), move: vi.fn(async () => undefined), down: vi.fn(async () => undefined), up: vi.fn(async () => undefined), wheel: vi.fn(async () => undefined) },
+    waitForLoadState: vi.fn(async () => undefined), waitForTimeout: waitMock,
+    bringToFront: vi.fn(async () => undefined), close: closeMock,
+    evaluate: scrollMock,
+    keyboard, mouse,
   };
   return page as unknown as PageDouble;
 };
@@ -103,6 +151,13 @@ const navigate = (page: PageDouble, url: string): void => {
 
 /** Runs every pending microtask and immediate, so a settled promise cannot be mistaken for a pending one. */
 const drain = (): Promise<void> => new Promise((resolve) => { setImmediate(resolve); });
+
+/** The first page the harness opened — the tab every member drives unless it is given a `tab_id`. */
+const firstPage = (pages: readonly PageDouble[]): PageDouble => {
+  const page = pages[0];
+  if (page === undefined) throw new Error("the harness opened no page");
+  return page;
+};
 
 const blanked = (page: PageDouble): boolean =>
   page.gotoMock.mock.calls.some(([url]) => url === "about:blank");
@@ -349,4 +404,548 @@ describe("lifecycle and activity", () => {
   it("refreshes activity before a member after a quiet period", async () => { const { browser, sandbox } = await makeBrowser(); browser["lastActivity"] -= 61; await callMember(browser, "wait", { duration: 0 }); expect(sandbox.raw.refreshActivity).toHaveBeenCalled(); await browser.close(); });
   it("survives a failed keep-alive", async () => { const { browser, sandbox } = await makeBrowser(); sandbox.raw.refreshActivity.mockRejectedValueOnce(new Error("gone")); browser["lastActivity"] -= 61; const result = await callMember(browser, "wait", { duration: 0 }); expect(result.is_error).not.toBe(true); await browser.close(); });
   it("redacts signed credentials from connection errors", async () => { const sandbox: MockSandbox = mockSandbox(); mocks.connectOverCDP.mockRejectedValue(new Error("https://signed.test/token")); await expect(DaytonaBrowser.create({ sandbox: sandbox.sandbox })).rejects.not.toThrow("signed.test"); });
+});
+
+/**
+ * Every member below is one the rest of the suite never dispatched through `toolResult()`. Each
+ * asserts both halves of what the README's "What's implemented" table promises: the Playwright or
+ * CDP call the driver makes, with its arguments, AND the result the model is handed back.
+ *
+ * Nothing here reads a tab inventory out of `resultText()`: that data lives in the `browser_state`
+ * block, which carries no text, so such an assertion compares against "" and passes regardless.
+ * `browserState()` reads it instead.
+ */
+describe("dispatching the mouse and keyboard members", () => {
+  it.each([
+    ["right_click", "right", 1, "Right-clicked."],
+    ["middle_click", "middle", 1, "Middle-clicked."],
+    ["double_click", "left", 2, "Double-clicked."],
+    ["triple_click", "left", 3, "Triple-clicked."],
+  ])("dispatches %s as a %s Playwright click of %i", async (name, button, clickCount, reply) => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, name, { target: { type: "coordinate", x: 11, y: 22 } });
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result)).toContain(reply);
+    expect(page.mouseMock.click).toHaveBeenCalledWith(11, 22, { button, clickCount });
+    await browser.close();
+  });
+
+  it("holds a modifier chord across a click and releases it in reverse order", async () => {
+    // README: "Modifier chords are held during clicks."
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    await callMember(browser, "middle_click", { target: { type: "coordinate", x: 4, y: 5 }, modifiers: "ctrl+shift" });
+
+    expect(page.keyboardMock.down.mock.calls).toEqual([["Control"], ["Shift"]]);
+    expect(page.mouseMock.click).toHaveBeenCalledWith(4, 5, { button: "middle", clickCount: 1 });
+    expect(page.keyboardMock.up.mock.calls).toEqual([["Shift"], ["Control"]]);
+    await browser.close();
+  });
+
+  it("refuses a chord holding a non-modifier key before touching the mouse", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "right_click", { target: { type: "coordinate", x: 1, y: 1 }, modifiers: "ctrl+a" });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("modifiers takes modifier keys only, such as shift or ctrl+shift.");
+    expect(page.mouseMock.click).not.toHaveBeenCalled();
+    expect(page.keyboardMock.down).not.toHaveBeenCalled();
+    await browser.close();
+  });
+
+  it("resolves a ref target in the isolated world and aims at the centre it reports", async () => {
+    // README: "ref targets are scrolled into view first" — `center` is the function that does it.
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("center", { type: "object", value: { x: 120, y: 240 } });
+
+    const result = await callMember(browser, "hover", { target: { type: "ref", ref: "ref_7" } });
+
+    expect(resultText(result)).toContain("Hovered.");
+    expect(page.cdpSend).toHaveBeenCalledWith("Runtime.evaluate", expect.objectContaining({
+      expression: 'globalThis.__dt["center"](...["ref_7"])', contextId: 7, returnByValue: true,
+    }));
+    expect(page.mouseMock.move).toHaveBeenCalledWith(120, 240);
+    expect(page.mouseMock.click).not.toHaveBeenCalled();
+    await browser.close();
+  });
+
+  it("refuses a ref the page no longer shows", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("center", { type: "object", value: { error: "invisible" } });
+
+    const result = await callMember(browser, "hover", { target: { type: "ref", ref: "ref_9" } });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("The element ref_9 is not visible.");
+    expect(page.mouseMock.move).not.toHaveBeenCalled();
+    await browser.close();
+  });
+
+  it("refuses a coordinate outside the viewport instead of clamping it", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "middle_click", { target: { type: "coordinate", x: 1280, y: 0 } });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("(1280, 0) is outside the 1280x800 viewport.");
+    expect(page.mouseMock.click).not.toHaveBeenCalled();
+    await browser.close();
+  });
+
+  it("moves the mouse without waiting for the page to settle", async () => {
+    // `mouse_move` is the one pointer member with no settle: it is how the model aims, not acts.
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "mouse_move", { target: { type: "coordinate", x: 30, y: 40 } });
+
+    expect(resultText(result)).toContain("Moved the mouse.");
+    expect(page.mouseMock.move).toHaveBeenCalledWith(30, 40);
+    expect(page.mouseMock.down).not.toHaveBeenCalled();
+    expect(page.waitMock).not.toHaveBeenCalled();
+    await browser.close();
+  });
+
+  it("settles after a hover, unlike mouse_move", async () => {
+    const { browser, pages } = await makeBrowser({ settleDelay: 0.25 });
+    const page = firstPage(pages);
+
+    await callMember(browser, "hover", { target: { type: "coordinate", x: 30, y: 40 } });
+
+    expect(page.waitMock).toHaveBeenCalledWith(250);
+    await browser.close();
+  });
+
+  it("presses the left button down and leaves it down", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "left_mouse_down", { target: { type: "coordinate", x: 60, y: 70 } });
+
+    expect(resultText(result)).toContain("Mouse button pressed.");
+    expect(page.mouseMock.move).toHaveBeenCalledWith(60, 70);
+    expect(page.mouseMock.down).toHaveBeenCalledOnce();
+    expect(page.mouseMock.up).not.toHaveBeenCalled();
+    await browser.close();
+  });
+
+  it("releases the left button where it is told to", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "left_mouse_up", { target: { type: "coordinate", x: 80, y: 90 } });
+
+    expect(resultText(result)).toContain("Mouse button released.");
+    expect(page.mouseMock.move).toHaveBeenCalledWith(80, 90);
+    expect(page.mouseMock.up).toHaveBeenCalledOnce();
+    expect(page.mouseMock.down).not.toHaveBeenCalled();
+    await browser.close();
+  });
+
+  it("drags in steps between the two points, pressing before and releasing after", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "left_click_drag", {
+      from: { type: "coordinate", x: 10, y: 20 },
+      target: { type: "coordinate", x: 110, y: 120 },
+    });
+
+    expect(resultText(result)).toContain("Dragged.");
+    // Order matters: a press before the first move, or a move after the release, drops the drag.
+    expect(page.mouseMock.move.mock.calls).toEqual([[10, 20], [110, 120, { steps: 10 }]]);
+    expect(page.mouseMock.down).toHaveBeenCalledOnce();
+    expect(page.mouseMock.up).toHaveBeenCalledOnce();
+    await browser.close();
+  });
+
+  it("types text through the Playwright keyboard", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "type", { text: "hello world" });
+
+    expect(resultText(result)).toContain("Typed.");
+    expect(page.keyboardMock.type).toHaveBeenCalledWith("hello world");
+    expect(page.keyboardMock.press).not.toHaveBeenCalled();
+    await browser.close();
+  });
+});
+
+describe("dispatching the page-reading members", () => {
+  /** Every `__dt` call the driver made, in order, with the bootstrap of the toolkit itself left out. */
+  const worldCalls = (page: PageDouble): string[] =>
+    page.cdpSend.mock.calls
+      .filter((call): call is [string, { readonly expression: string }] => call[0] === "Runtime.evaluate")
+      .map(([, params]) => params.expression)
+      .filter((expression) => expression.startsWith("globalThis.__dt["));
+
+  it("reads the page with the filter and depth the model asked for", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("readPage", { type: "object", value: { text: 'heading "Daytona" [ref_1]\n  link "Docs" [ref_2]' } });
+
+    const result = await callMember(browser, "read_page", { depth: 3, filter: "interactive" });
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result)).toContain('heading "Daytona" [ref_1]');
+    expect(resultText(result)).toContain('link "Docs" [ref_2]');
+    expect(worldCalls(page)).toEqual(['globalThis.__dt["readPage"](...[{"depth":3,"all":false,"interactive":true}])']);
+    await browser.close();
+  });
+
+  it("passes filter=all through as the all flag, not the interactive one", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    await callMember(browser, "read_page", { ref: "ref_5", filter: "all" });
+
+    expect(worldCalls(page)).toEqual(['globalThis.__dt["readPage"](...[{"ref":"ref_5","depth":15,"all":true,"interactive":false}])']);
+    await browser.close();
+  });
+
+  it("refuses a read_page depth below one before reaching the page", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "read_page", { depth: 0 });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("depth must be at least 1.");
+    expect(worldCalls(page)).toEqual([]);
+    await browser.close();
+  });
+
+  it("refuses a read_page ref the page has forgotten", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("readPage", { type: "object", value: { error: "stale" } });
+
+    const result = await callMember(browser, "read_page", { ref: "ref_1" });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("Unknown or stale ref ref_1; call read_page or find for current refs.");
+    await browser.close();
+  });
+
+  it("ranks find candidates by keyword over role, name and attributes", async () => {
+    // README: "`find` is keyword matching over role, name and attributes, not a semantic search."
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("candidates", { type: "object", value: [
+      { line: 'paragraph "Signing in is easy" [ref_6]', role: "paragraph", name: "signing in is easy", attrs: "", interactive: false, visible: true },
+      { line: 'link "Sign up" [ref_5]', role: "link", name: "sign up", attrs: "", interactive: true, visible: true },
+      { line: 'button "Sign in" [ref_4]', role: "button", name: "sign in", attrs: "id=signin", interactive: true, visible: true },
+      { line: 'heading "Pricing" [ref_7]', role: "heading", name: "pricing", attrs: "", interactive: false, visible: true },
+    ]});
+
+    const result = await callMember(browser, "find", { query: "sign in button" });
+
+    // The button outranks the link because "button" matched its role as well as "sign" matching
+    // its name; the link beats the paragraph because "sign" is a whole word in "sign up" but only
+    // a prefix in "signing"; and "Pricing" matched nothing at all, so it is not offered.
+    expect(resultText(result).trimEnd().split("\n")).toEqual([
+      'button "Sign in" [ref_4]',
+      'link "Sign up" [ref_5]',
+      'paragraph "Signing in is easy" [ref_6]',
+    ]);
+    expect(worldCalls(page)).toEqual(['globalThis.__dt["candidates"](...[])']);
+    await browser.close();
+  });
+
+  it("tells the model to read the page when find matches nothing", async () => {
+    const { browser, pages } = await makeBrowser();
+    firstPage(pages).world.set("candidates", { type: "object", value: [
+      { line: 'heading "Pricing" [ref_7]', role: "heading", name: "pricing", attrs: "", interactive: false, visible: true },
+    ]});
+
+    const result = await callMember(browser, "find", { query: "checkout" });
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result)).toContain('No element matched "checkout". Try read_page.');
+    await browser.close();
+  });
+
+  it("returns the page's rendered text", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("pageText", { type: "string", value: "Daytona\n\nSandboxes for agents" });
+
+    const result = await callMember(browser, "get_page_text", {});
+
+    expect(resultText(result).trimEnd()).toBe("Daytona\n\nSandboxes for agents");
+    expect(worldCalls(page)).toEqual(['globalThis.__dt["pageText"](...[])']);
+    await browser.close();
+  });
+
+  it("scrolls a ref into view", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("scrollTo", { type: "object", value: {} });
+
+    const result = await callMember(browser, "scroll_to", { target: { type: "ref", ref: "ref_3" } });
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result)).toContain("Scrolled to ref_3.");
+    expect(worldCalls(page)).toEqual(['globalThis.__dt["scrollTo"](...["ref_3"])']);
+    await browser.close();
+  });
+
+  it("refuses a scroll_to ref the page has forgotten", async () => {
+    const { browser, pages } = await makeBrowser();
+    firstPage(pages).world.set("scrollTo", { type: "object", value: { error: "stale" } });
+
+    const result = await callMember(browser, "scroll_to", { target: { type: "ref", ref: "ref_3" } });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("Unknown or stale ref ref_3; call read_page or find for current refs.");
+    await browser.close();
+  });
+
+  it("sets a form value through the isolated world", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.world.set("setValue", { type: "object", value: {} });
+
+    const result = await callMember(browser, "form_input", { target: { type: "ref", ref: "ref_2" }, value: "Ada" });
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result)).toContain("Set the value of ref_2.");
+    expect(worldCalls(page)).toEqual(['globalThis.__dt["setValue"](...["ref_2","Ada"])']);
+    await browser.close();
+  });
+
+  it.each([
+    ["no-option", "The select ref_2 has no option with that value or text."],
+    ["want-boolean", "ref_2 is a checkbox or radio button; set it to true or false."],
+    ["file-input", "ref_2 is a file input; use file_upload."],
+    ["not-a-field", "ref_2 is not a form field."],
+  ])("turns the form_input %s refusal into its own sentence", async (error, message) => {
+    const { browser, pages } = await makeBrowser();
+    firstPage(pages).world.set("setValue", { type: "object", value: { error } });
+
+    const result = await callMember(browser, "form_input", { target: { type: "ref", ref: "ref_2" }, value: "Ada" });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain(message);
+    await browser.close();
+  });
+
+  it("re-renders a zoom region at a real higher scale, in document coordinates", async () => {
+    // README: "`zoom` re-renders the region at a higher scale, so its detail is real." The clip is
+    // in DOCUMENT coordinates while the model's region is in viewport ones, so the scroll offset
+    // is added — a region below the fold is correct, not out of bounds.
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+    page.scrollMock.mockResolvedValue([40, 25]);
+
+    const result = await callMember(browser, "zoom", { region: [10, 20, 210, 120] });
+
+    expect(result.is_error).not.toBe(true);
+    expect(imageData(result)).toBe("png-data");
+    expect(page.cdpSend).toHaveBeenCalledWith("Page.captureScreenshot", {
+      format: "png",
+      // 1280/200 = 6.4 is the smaller of the two fits, and below the cap of 8.
+      clip: { x: 50, y: 45, width: 200, height: 100, scale: 6.4 },
+    });
+    await browser.close();
+  });
+
+  it("refuses a zoom region outside the viewport before capturing anything", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "zoom", { region: [0, 0, 1281, 10] });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("region must satisfy 0 <= x0 < x1 <= 1280 and 0 <= y0 < y1 <= 800 (viewport pixels).");
+    expect(page.cdpSend).not.toHaveBeenCalledWith("Page.captureScreenshot", expect.anything());
+    await browser.close();
+  });
+});
+
+describe("dispatching close_tab", () => {
+  it("closes the tab without running beforeunload and drops it from the browser state", async () => {
+    const { browser, pages } = await makeBrowser();
+    await callMember(browser, "new_tab", {});
+    const second = pages[1];
+    if (second === undefined) throw new Error("the harness opened too few pages");
+
+    const result = await callMember(browser, "close_tab", { tab_id: "tab_2" });
+
+    expect(result.is_error).not.toBe(true);
+    // README: `beforeunload` is accepted elsewhere so navigation goes ahead, but closing a tab the
+    // model asked to close must not be stoppable by the page.
+    expect(second.closeMock).toHaveBeenCalledWith({ runBeforeUnload: false });
+    const state = browserState(result);
+    expect(state.tabs.map((tab) => tab.tab_id)).toEqual(["tab_1"]);
+    expect(state.tabs.filter((tab) => tab.active).map((tab) => tab.tab_id)).toEqual(["tab_1"]);
+    await browser.close();
+  });
+
+  it("refuses to close a tab that is not open", async () => {
+    const { browser, pages } = await makeBrowser();
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "close_tab", { tab_id: "tab_9" });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("The requested tab is not open.");
+    expect(page.closeMock).not.toHaveBeenCalled();
+    await browser.close();
+  });
+});
+
+/**
+ * The four members the SDK ships disabled. Each is dispatched the way an application that wants it
+ * must configure it — `configs: { <member>: { enabled: true } }` plus a `confirm` — so these are
+ * the only tests that reach their bodies at all; the committed suite only ever called them
+ * disabled, which the SDK refuses before the driver sees the call.
+ */
+describe("dispatching the default-off members", () => {
+  const enabled = (member: string, extra: Parameters<typeof makeBrowser>[0] = {}) =>
+    makeBrowser({ configs: { [member]: { enabled: true } }, confirm: () => true, ...extra });
+
+  /** Hands the context listener the driver registered the event Playwright would. */
+  const fire = (contextRaw: ReturnType<typeof harness>["contextRaw"], name: string, value: unknown): void => {
+    const handler = contextRaw.on.mock.calls.find(([event]) => event === name)?.[1];
+    if (handler === undefined) throw new Error(`no ${name} listener was registered`);
+    handler(value);
+  };
+
+  it("collects console entries per tab and drains them on read", async () => {
+    // README: "Entries collected per tab since the last read".
+    const { browser, contextRaw, pages } = await enabled("read_console");
+    const page = firstPage(pages);
+    fire(contextRaw, "console", { page: () => page, type: () => "error", text: () => "boom" });
+    fire(contextRaw, "console", { page: () => page, type: () => "log", text: () => "hello" });
+
+    const first = await callMember(browser, "read_console", {});
+    const second = await callMember(browser, "read_console", {});
+
+    expect(first.is_error).not.toBe(true);
+    expect(resultText(first).trimEnd().split("\n")).toEqual(["[error] boom", "[log] hello"]);
+    // Drained, not repeated: the second read must not hand the model the same two lines again.
+    expect(resultText(second)).toContain("(empty)");
+    await browser.close();
+  });
+
+  it("reports a finished request with its method, status, type and timing", async () => {
+    const { browser, contextRaw, pages } = await enabled("read_network");
+    const page = firstPage(pages);
+    const request = {
+      method: () => "GET", url: () => "https://a.test/app.js",
+      timing: () => ({ responseEnd: 12.4 }), frame: () => ({ page: () => page }),
+    };
+    fire(contextRaw, "request", request);
+    fire(contextRaw, "response", { request: () => request, status: () => 200, headers: () => ({ "content-type": "application/javascript; charset=utf-8" }) });
+    fire(contextRaw, "requestfinished", request);
+
+    const result = await callMember(browser, "read_network", {});
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result).trimEnd()).toBe("GET 200 application/javascript 12ms https://a.test/app.js");
+    await browser.close();
+  });
+
+  it("runs javascript_exec in the page's own world with the ten-second CDP timeout", async () => {
+    // README: "CDP `Runtime.evaluate` in the page's own world, stopped after 10 s". The page's own
+    // world, not the isolated one: no `contextId` is sent.
+    const { browser, pages } = await enabled("javascript_exec");
+    const page = firstPage(pages);
+    page.script.reply = { result: { type: "string", value: "Daytona" } };
+
+    const result = await callMember(browser, "javascript_exec", { text: "document.title" });
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result).trimEnd()).toBe("Daytona");
+    expect(page.cdpSend).toHaveBeenCalledWith("Runtime.evaluate", {
+      expression: "document.title", returnByValue: true, awaitPromise: true,
+      userGesture: true, replMode: true, timeout: 10_000,
+    });
+    await browser.close();
+  });
+
+  it("reports a javascript_exec script V8 terminated as the ten-second limit", async () => {
+    const { browser, pages } = await enabled("javascript_exec");
+    const page = firstPage(pages);
+    page.script.reply = { exceptionDetails: { text: "Uncaught", exception: { description: "Execution terminated." } } };
+
+    const result = await callMember(browser, "javascript_exec", { text: "while (true) {}" });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("The script did not finish within 10 seconds.");
+    await browser.close();
+  });
+
+  it("refuses javascript_exec when confirm says no", async () => {
+    const { browser, pages } = await makeBrowser({ configs: { javascript_exec: { enabled: true } }, confirm: () => false });
+    const page = firstPage(pages);
+
+    const result = await callMember(browser, "javascript_exec", { text: "document.cookie" });
+
+    expect(result.is_error).toBe(true);
+    expect(page.cdpSend).not.toHaveBeenCalledWith("Runtime.evaluate", expect.objectContaining({ expression: "document.cookie" }));
+    await browser.close();
+  });
+
+  it("uploads a sandbox path the file policy admits through CDP", async () => {
+    // README: "CDP `DOM.setFileInputFiles` with paths inside the sandbox".
+    const { browser, pages, sandbox } = await enabled("file_upload", { filePolicy: new DaytonaFilePolicy({ uploadRoots: ["/up"] }) });
+    const page = firstPage(pages);
+    // `/up/link.txt` is a symlink the sandbox resolves to `/up/real.txt`, still inside the root.
+    sandbox.raw.process.executeCommand.mockImplementation(async (command: string) =>
+      command.startsWith("realpath -e") ? { exitCode: 0, result: "/up/real.txt\n" } : { exitCode: 0, result: "/up\n" });
+    page.world.set("fileInput", { type: "object", subtype: "node", objectId: "node-9" });
+
+    const result = await callMember(browser, "file_upload", { target: { type: "ref", ref: "ref_1" }, paths: ["/up/link.txt"] });
+
+    expect(result.is_error).not.toBe(true);
+    expect(resultText(result)).toContain("Uploaded.");
+    // The RESOLVED path is uploaded, not the one the model wrote: the driver resolves symlinks in
+    // the sandbox and re-checks the result against the roots, so the path CDP gets is the real one.
+    expect(page.cdpSend).toHaveBeenCalledWith("DOM.setFileInputFiles", { files: ["/up/real.txt"], objectId: "node-9" });
+    expect(sandbox.raw.process.executeCommand).toHaveBeenCalledWith("realpath -e -- '/up/link.txt'");
+    await browser.close();
+  });
+
+  it("refuses an upload whose resolved path leaves the upload roots", async () => {
+    // README: "a link planted in an upload directory cannot carry the upload out of it."
+    const { browser, pages, sandbox } = await enabled("file_upload", { filePolicy: new DaytonaFilePolicy({ uploadRoots: ["/up"] }) });
+    const page = firstPage(pages);
+    sandbox.raw.process.executeCommand.mockImplementation(async (command: string) =>
+      command.startsWith("realpath -e") ? { exitCode: 0, result: "/etc/shadow\n" } : { exitCode: 0, result: "/up\n" });
+    page.world.set("fileInput", { type: "object", subtype: "node", objectId: "node-9" });
+
+    const result = await callMember(browser, "file_upload", { target: { type: "ref", ref: "ref_1" }, paths: ["/up/link"] });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("An upload path is outside the upload directory.");
+    expect(page.cdpSend).not.toHaveBeenCalledWith("DOM.setFileInputFiles", expect.anything());
+    await browser.close();
+  });
+
+  it("refuses an upload aimed at something that is not a file input", async () => {
+    const { browser, pages, sandbox } = await enabled("file_upload", { filePolicy: new DaytonaFilePolicy({ uploadRoots: ["/up"] }) });
+    const page = firstPage(pages);
+    sandbox.raw.process.executeCommand.mockImplementation(async (command: string) =>
+      command.startsWith("realpath -e") ? { exitCode: 0, result: "/up/a.txt\n" } : { exitCode: 0, result: "/up\n" });
+    page.world.set("fileInput", { type: "object", value: { error: "not-file" } });
+
+    const result = await callMember(browser, "file_upload", { target: { type: "ref", ref: "ref_1" }, paths: ["/up/a.txt"] });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("ref_1 is not a file input.");
+    expect(page.cdpSend).not.toHaveBeenCalledWith("DOM.setFileInputFiles", expect.anything());
+    await browser.close();
+  });
 });

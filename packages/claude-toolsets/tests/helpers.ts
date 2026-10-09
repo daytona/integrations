@@ -1,4 +1,4 @@
-import type { BetaToolResultBlockParam, BetaToolUseBlock } from "@anthropic-ai/sdk/resources/beta";
+import type { BetaBrowserStateBlockParam, BetaToolResultBlockParam, BetaToolUseBlock } from "@anthropic-ai/sdk/resources/beta";
 import type { Sandbox } from "@daytona/sdk";
 import { vi } from "vitest";
 
@@ -151,6 +151,21 @@ export const callMember = async (
 export const resultText = (result: BetaToolResultBlockParam): string => {
   if (typeof result.content === "string") return result.content;
   return (result.content ?? []).map((block) => "text" in block ? block.text : "").join("\n");
+};
+
+/**
+ * The `browser_state` block of a browser member's result — the tab inventory and the
+ * `state_changes` delta.
+ *
+ * That block carries no `text`, so {@link resultText} cannot see any of it: a tab list, an active
+ * tab or a `tab_opened` change asserted through `resultText` is asserted against the empty string
+ * and passes whatever the driver did. Everything the browser state reports is read from here.
+ */
+export const browserState = (result: BetaToolResultBlockParam): BetaBrowserStateBlockParam => {
+  if (!Array.isArray(result.content)) throw new Error("tool result did not contain blocks");
+  const state = result.content.find((block) => block.type === "browser_state");
+  if (state === undefined) throw new Error("tool result did not contain a browser_state block");
+  return state;
 };
 
 export const imageData = (result: BetaToolResultBlockParam): string => {
