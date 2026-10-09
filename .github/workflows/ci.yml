@@ -127,7 +127,7 @@ jobs:
       - name: Install
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/n8n-nodes-daytona
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Lint
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/n8n-nodes-daytona
@@ -153,7 +153,7 @@ jobs:
       - name: Install
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/pi-extension
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Typecheck
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/pi-extension
@@ -179,7 +179,7 @@ jobs:
       - name: Install
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/opencode-plugin
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Typecheck
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/opencode-plugin
@@ -235,7 +235,7 @@ jobs:
       - name: Install
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/convex
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Typecheck
         if: steps.guard.outputs.ready == 'true'
         working-directory: packages/convex
