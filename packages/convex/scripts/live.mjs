@@ -12,7 +12,8 @@
  */
 
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { createHmac, randomBytes } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -55,6 +56,10 @@ if (!existsSync(".env.local")) {
   convex("init");
 }
 convex("env", "set", "DAYTONA_API_KEY", apiKey);
+// A throwaway webhook secret: the suite signs deliveries itself (Daytona can't
+// reach a local backend), exercising the mounted route in the real runtime.
+const webhookSecret = `whsec_${randomBytes(24).toString("base64")}`;
+convex("env", "set", "DAYTONA_WEBHOOK_SECRET", webhookSecret);
 if (process.env.DAYTONA_API_URL) {
   convex("env", "set", "DAYTONA_API_URL", process.env.DAYTONA_API_URL);
 }
@@ -162,6 +167,55 @@ try {
   assert(
     cancelNote?.status === "cancelled",
     "onComplete fired for the cancelled execution too",
+  );
+
+  const siteUrlMatch = readFileSync(".env.local", "utf8").match(
+    /CONVEX_SITE_URL=(\S+)/,
+  );
+  assert(
+    siteUrlMatch?.[1],
+    ".env.local provides CONVEX_SITE_URL for the webhook route",
+  );
+  const siteUrl = siteUrlMatch[1];
+  const deliverStateEvent = async (newState, secret = webhookSecret) => {
+    const now = new Date().toISOString();
+    const body = JSON.stringify({
+      event: "sandbox.state.updated",
+      timestamp: now,
+      id: sandboxId,
+      organizationId: "live-test",
+      oldState: "started",
+      newState,
+      updatedAt: now,
+    });
+    const msgId = `msg_live_${Date.now()}`;
+    const ts = String(Math.floor(Date.now() / 1000));
+    const key = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
+    const signature = createHmac("sha256", key)
+      .update(`${msgId}.${ts}.${body}`)
+      .digest("base64");
+    return fetch(`${siteUrl}/daytona/webhook`, {
+      method: "POST",
+      headers: {
+        "svix-id": msgId,
+        "svix-timestamp": ts,
+        "svix-signature": `v1,${signature}`,
+      },
+      body,
+    });
+  };
+  const forged = await deliverStateEvent(
+    "archived",
+    `whsec_${randomBytes(24).toString("base64")}`,
+  );
+  assert(forged.status === 401, "webhook route rejects a wrongly-signed delivery");
+  const delivered = await deliverStateEvent("stopped");
+  const synced = run("example:sandboxes", {}).find(
+    (s) => s.sandboxId === sandboxId,
+  );
+  assert(
+    delivered.status === 200 && synced?.state === "stopped",
+    "signed sandbox.state.updated webhook synced the sandbox record",
   );
 
   const preview = run("example:previewUrl", { sandboxId, port: 3000 });
