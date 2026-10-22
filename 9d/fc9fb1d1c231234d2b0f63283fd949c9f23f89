@@ -1,0 +1,99 @@
+packages/agentenv-daytona/agentenv_daytona/sandbox.py
+  s_a665a83f33e72c::t_b10ebb62a3872c 118-133
+  s_a665a83f33e72c::t_a4e37c463b454b 89-90
+  s_a665a83f33e72c::t_cf4ab94e3efc6e 34
+packages/agentenv-daytona/agentenv_daytona/provider.py
+  s_a665a83f33e72c::t_04a3f824dba847 43-45
+  s_a665a83f33e72c::t_cb3fb7c8452431 196-197
+  s_a665a83f33e72c::t_03ccd62b32b556 173
+  s_42dc286b9d68d2::t_624ffc4bb3b4ce 198-199
+packages/agentenv-daytona/tests/integration_tests/test_live_provider.py
+  s_a665a83f33e72c::t_949f2d0c1c42c2 40
+  s_a665a83f33e72c::t_2ede2758bf6d7f 103-104
+  s_a665a83f33e72c::t_d6557fc8d81ecb 87
+  s_a665a83f33e72c::t_90b88c72574a16 122-123
+  s_a665a83f33e72c::t_c41dc93662e818 111
+  s_a665a83f33e72c::t_a89e894e9350d0 16,20
+packages/agentenv-daytona/tests/unit_tests/test_provider_config.py
+  s_a665a83f33e72c::t_e0283b34b3d5fe 95-97,107-116,118
+packages/agentenv-daytona/agentenv_daytona/config.py
+  s_a665a83f33e72c::t_5ed4367e4ef34a 108-115,117-118
+  s_42dc286b9d68d2::t_a8e7e6dfb173f4 119-122
+packages/agentenv-daytona/tests/unit_tests/test_provider_create.py
+  s_a665a83f33e72c::t_6ee9435d7f14d9 110
+  s_a665a83f33e72c::t_dfc0dbbad1ec7d 184
+  s_a665a83f33e72c::t_a619f3004a732d 18-19
+  s_a665a83f33e72c::t_c1d173dce05f2e 418-498
+  s_a665a83f33e72c::t_a3fe2d23ae7054 286-296,298,302-314
+.github/workflows/ci.yml
+  s_a665a83f33e72c::t_2f2577d7c1a23a 231-234
+packages/agentenv-daytona/agentenv_daytona/image.py
+  s_a665a83f33e72c::t_07dc817f9cb4cb 15
+  s_a665a83f33e72c::t_0fd6cf1ed0fa01 23
+packages/agentenv-daytona/tests/unit_tests/test_sandbox_exec.py
+  s_a665a83f33e72c::t_5820fb5298b028 86,88,95-122,126
+  s_42dc286b9d68d2::t_64620692bf94b2 123-125,127
+packages/agentenv-daytona/tests/integration_tests/conftest.py
+  s_a665a83f33e72c::t_8e3c82bcd0d471 16
+  s_a665a83f33e72c::t_910df946100e53 4-6,13,24-25,28-34,36-38,41-43,45,48-55,57-62,68,72,82-87
+  s_a665a83f33e72c::t_fb87355a0ba588 46
+  s_42dc286b9d68d2::t_573d714d4883c7 88-89
+packages/agentenv-daytona/README.md
+  s_a665a83f33e72c::t_e8b0f1d4d54a9f 165-167
+  s_a665a83f33e72c::t_cc7b6939eed3eb 177-179
+packages/agentenv-daytona/agentenv_daytona/lifecycle.py
+  s_a665a83f33e72c::t_e5ddbeae48a223 14
+  s_a665a83f33e72c::t_755b7a3a6508c1 185-186,192,194-198
+  s_a665a83f33e72c::t_0352b9b968e8d1 82,88-89,91,98-108,112
+  s_a665a83f33e72c::t_18a80dbf3fa9a7 32
+  s_42dc286b9d68d2::t_904efccba0798a 137-180,199,206-207,209,229
+packages/agentenv-daytona/tests/unit_tests/test_preview_domain.py
+  s_a665a83f33e72c::t_e7400b8125566e 53,59-70
+  s_a665a83f33e72c::t_50f0de4688963c 3,8
+  s_42dc286b9d68d2::t_292588a04a6ced 71-72
+packages/agentenv-daytona/tests/unit_tests/fakes.py
+  s_a665a83f33e72c::t_d2ed232fbd8090 105-106,109-110
+  s_a665a83f33e72c::t_6995e5fde8b163 88
+packages/agentenv-daytona/agentenv_daytona/preview_domain.py
+  s_a665a83f33e72c::t_36a686bcadb203 20-21,27-32
+  s_a665a83f33e72c::t_65b9d76182ae49 12,17
+  s_42dc286b9d68d2::t_297237fa6c4ae4 18,33
+packages/agentenv-daytona/tests/unit_tests/test_sandbox_files.py
+  s_a665a83f33e72c::t_c3bab7274b1493 101-104
+  s_a665a83f33e72c::t_872457cad70f12 8
+packages/agentenv-daytona/tests/integration_tests/test_live_cli.py
+  s_a665a83f33e72c::t_74748cc05bf969 32
+  s_a665a83f33e72c::t_66542a6e089199 10
+  s_a665a83f33e72c::t_29a62d056ce928 40,45,50
+packages/agentenv-daytona/agentenv_daytona/network.py
+  s_a665a83f33e72c::t_9dbaee5a402676 37
+packages/agentenv-daytona/tests/unit_tests/test_image.py
+  s_a665a83f33e72c::t_a312fa51b56032 26
+  s_a665a83f33e72c::t_2f5ba2cd31c8ac 54-57
+packages/agentenv-daytona/tests/unit_tests/test_lifecycle_clients.py
+  s_a665a83f33e72c::t_c1d173dce05f2e 4-5,70-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9dfc9fb1d1c231234d2b0f63283fd949c9f23f89",
+  "prompts": {},
+  "sessions": {
+    "s_42dc286b9d68d2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_eca09d5bfffeVMY7fNQ5My3Yyy",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_a665a83f33e72c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_eca09d5bfffeVMY7fNQ5My3Yyy",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
