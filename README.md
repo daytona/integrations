@@ -8,6 +8,7 @@ Packages published to **a package registry** live in [`packages/`](packages/):
 
 | Package | Published as |
 |---|---|
+| [`agentenv-daytona`](packages/agentenv-daytona) — AgentEnv (Scale AI) sandbox provider | PyPI · [`agentenv-daytona`](https://pypi.org/project/agentenv-daytona/) |
 | [`adk-plugin`](packages/adk-plugin) — Google ADK plugin | PyPI · [`daytona-adk`](https://pypi.org/project/daytona-adk/) |
 | [`langchain-data-analysis`](packages/langchain-data-analysis) — LangChain data-analysis tool | PyPI · [`langchain-daytona-data-analysis`](https://pypi.org/project/langchain-daytona-data-analysis/) |
 | [`convex`](packages/convex) — Convex sandbox component | npm · [`@daytona/convex`](https://www.npmjs.com/package/@daytona/convex) |

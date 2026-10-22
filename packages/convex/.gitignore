@@ -4,3 +4,12 @@ dist
 *.tgz
 *.log
 .env.local
+
+# AI assistant files the Convex CLI installs/regenerates for each contributor
+# (`npx convex ai-files install`) — local tooling, not part of the package
+/AGENTS.md
+/CLAUDE.md
+/skills-lock.json
+/.agents/
+/.claude/
+/example/convex/_generated/ai/

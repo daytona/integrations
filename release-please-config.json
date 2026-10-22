@@ -33,6 +33,11 @@
       "package-name": "pydantic-ai-daytona",
       "component": "pydantic-ai-daytona"
     },
+    "packages/agentenv-daytona": {
+      "release-type": "python",
+      "package-name": "agentenv-daytona",
+      "component": "agentenv-daytona"
+    },
     "packages/convex": {
       "release-type": "node",
       "package-name": "@daytona/convex",
