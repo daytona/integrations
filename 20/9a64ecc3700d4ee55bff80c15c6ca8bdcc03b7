@@ -1,0 +1,23 @@
+packages/agentenv-daytona/tests/unit_tests/fakes.py
+  s_a665a83f33e72c::t_1275ccecbdb752 116
+packages/agentenv-daytona/README.md
+  s_a665a83f33e72c::t_4458bedd7d2c03 199-201
+packages/agentenv-daytona/tests/unit_tests/test_sandbox_exec.py
+  s_a665a83f33e72c::t_716754c9ace321 107-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "209a64ecc3700d4ee55bff80c15c6ca8bdcc03b7",
+  "prompts": {},
+  "sessions": {
+    "s_a665a83f33e72c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_eca09d5bfffeVMY7fNQ5My3Yyy",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
