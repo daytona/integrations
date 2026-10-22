@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
+import shlex
 from typing import Any
 
 import pytest
@@ -97,14 +98,10 @@ async def test_download_hosts_widen_an_allowlist_once_and_wait_for_them() -> Non
     assert raw.network_updates == [
         {"network_block_all": False, "domain_allow_list": "pypi.org,bucket.s3.amazonaws.com"}
     ]
-    assert (
-        sandbox.network_policy is not None
-        and "bucket.s3.amazonaws.com" in sandbox.network_policy.allow_hosts
-    )
-    assert any(
-        cmd[:2] == ["sh", "-c"] and "https://bucket.s3.amazonaws.com/" in cmd[2]
-        for cmd in raw.process.commands
-    )
+    assert sandbox.network_policy is not None
+    assert {"bucket.s3.amazonaws.com"} <= set(sandbox.network_policy.allow_hosts)
+    probes = [shlex.split(cmd[2]) for cmd in raw.process.commands if cmd[:2] == ["sh", "-c"]]
+    assert any(probe[-1] == "https://bucket.s3.amazonaws.com/" for probe in probes)
 
 
 async def test_concurrent_widenings_keep_every_host() -> None:

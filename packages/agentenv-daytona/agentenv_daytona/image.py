@@ -12,7 +12,7 @@ from __future__ import annotations
 from daytona import Image
 
 # Bump when the recipe changes; it is written into the image so a sandbox shows which recipe it has.
-HOST_IMAGE_VERSION = "v1"
+HOST_IMAGE_VERSION = "v2"
 # Daytona's own sandbox image: the toolbox user ``daytona`` with passwordless sudo and the usual tools.
 DEFAULT_BASE_IMAGE = "daytonaio/sandbox:0.9.0"
 SANDBOX_USER = "daytona"
@@ -20,7 +20,7 @@ SANDBOX_USER = "daytona"
 _RECIPE = (
     "apt-get update",
     "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends"
-    " ca-certificates curl gnupg sudo",
+    " ca-certificates curl procps sudo",
     "install -m 0755 -d /etc/apt/keyrings",
     ". /etc/os-release && curl -fsSL https://download.docker.com/linux/$ID/gpg"
     " -o /etc/apt/keyrings/docker.asc && chmod a+r /etc/apt/keyrings/docker.asc",

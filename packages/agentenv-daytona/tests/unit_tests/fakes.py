@@ -85,6 +85,7 @@ class FakeRaw:
     name: str = ""
     labels: dict[str, str] = field(default_factory=dict)
     state: str = "started"
+    desired_state: str = "started"
     domain_allow_list: str | None = None
     network_allow_list: str | None = None
     network_block_all: bool = False
@@ -101,8 +102,12 @@ class FakeRaw:
     delete_failures: list[BaseException] = field(default_factory=list)
     # Raised by the next network updates, one each, before they succeed.
     network_update_failures: list[BaseException] = field(default_factory=list)
+    # When set, a delete waits for it before doing anything.
+    delete_gate: asyncio.Event | None = None
 
     async def delete(self, timeout: float | None = 60, wait: bool = False) -> None:
+        if self.delete_gate is not None:
+            await self.delete_gate.wait()
         self.deletes += 1
         if self.delete_failures:
             raise self.delete_failures.pop(0)

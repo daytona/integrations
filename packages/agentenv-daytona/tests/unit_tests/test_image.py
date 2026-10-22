@@ -23,7 +23,7 @@ def test_install_runs_as_root_and_the_image_ends_as_the_sudo_capable_daytona_use
 
     assert lines[1] == "USER root"
     assert lines[-1] == "USER daytona"
-    assert "NOPASSWD" in "\n".join(lines)
+    assert "daytona ALL=(ALL) NOPASSWD:ALL" in "\n".join(lines)
 
 
 def test_docker_storage_is_left_empty_so_dockerd_prepares_it_at_boot() -> None:
@@ -51,3 +51,7 @@ def test_recipe_is_one_layer_and_versioned() -> None:
 def test_docker_start_script_detaches_dockerd_and_skips_a_running_daemon() -> None:
     assert "setsid dockerd" in DOCKER_START_SCRIPT
     assert DOCKER_START_SCRIPT.startswith("pgrep -x dockerd >/dev/null ||")
+
+
+def test_the_image_installs_procps_for_the_start_scripts_pgrep_on_slim_bases() -> None:
+    assert "procps" in host_image().dockerfile()

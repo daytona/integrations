@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import weakref
-from collections.abc import Callable, Hashable, Mapping
+from collections.abc import Callable, Coroutine, Hashable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,7 +29,7 @@ from daytona import (
 
 logger = logging.getLogger(__name__)
 
-_reapers: set[asyncio.Task[None]] = set()
+_reapers: set[asyncio.Future[Any]] = set()
 # The API refused the request itself, so no sandbox exists to clean up.
 _REJECTED = (
     DaytonaAuthenticationError,
@@ -79,24 +79,37 @@ class Clients:
         clients = _shared.setdefault(loop, {})
         if self._key not in clients:
             client = clients[self._key] = _Client(self._factory())
-            client.keeper = loop.create_task(_close_at_shutdown(client))
+            client.keeper = loop.create_task(_close_at_shutdown(client, self._key))
             _keepers.add(client.keeper)
             client.keeper.add_done_callback(_keepers.discard)
         return clients[self._key].sdk
 
     async def close(self) -> None:
-        client = _shared.get(asyncio.get_running_loop(), {}).pop(self._key, None)
+        loop = asyncio.get_running_loop()
+        client = _shared.get(loop, {}).get(self._key)
         if client is not None:
+            _forget(loop, self._key, client)
             if client.keeper is not None:
                 client.keeper.cancel()
                 await asyncio.gather(client.keeper, return_exceptions=True)
             await client.close()
 
 
-async def _close_at_shutdown(client: _Client) -> None:
+def _forget(loop: asyncio.AbstractEventLoop, key: Hashable, client: _Client) -> None:
+    """Drop ``client`` from the registry. The loop's entry goes with its last client: the client's keeper task
+    refers to the loop, so an entry left behind would keep a finished loop alive."""
+    clients = _shared.get(loop)
+    if clients is not None and clients.get(key) is client:
+        del clients[key]
+        if not clients:
+            del _shared[loop]
+
+
+async def _close_at_shutdown(client: _Client, key: Hashable) -> None:
     try:
         await asyncio.Event().wait()
     finally:
+        _forget(asyncio.get_running_loop(), key, client)
         await client.close()
 
 
@@ -121,29 +134,79 @@ def _retry_after(headers: Mapping[str, Any] | None) -> float | None:
     return None
 
 
+async def being_destroyed(raw: Any) -> bool:
+    """Whether Daytona is already deleting ``raw``, or has. A delete answered 409 means "done" only then: any
+    state change in progress answers 409."""
+    try:
+        await raw.refresh_data()
+    except DaytonaNotFoundError:
+        return True
+    except (
+        Exception
+    ):  # noqa: BLE001 - unknown counts as "not yet", which only costs another attempt
+        return False
+    return str(getattr(raw.desired_state, "value", raw.desired_state)) == "destroyed"
+
+
+async def delete_sandbox(raw: Any, name: str, retry: Retry) -> bool:
+    """Delete ``raw``, retrying through brief API failures and other state changes in progress; whether it is
+    gone or being deleted."""
+    for attempt in range(retry.reclaim_attempts):
+        try:
+            await raw.delete()
+            return True
+        except DaytonaNotFoundError:
+            return True
+        except DaytonaConflictError as exc:
+            if await being_destroyed(raw):
+                return True
+            logger.warning(
+                "Deleting Daytona sandbox %s waits out another change (attempt %s): %s",
+                name,
+                attempt + 1,
+                exc,
+            )
+        except Exception as exc:  # noqa: BLE001 - retried, then reported; the TTL is the backstop
+            logger.warning(
+                "Deleting Daytona sandbox %s failed (attempt %s): %s", name, attempt + 1, exc
+            )
+        if attempt + 1 < retry.reclaim_attempts:
+            await asyncio.sleep(retry.reclaim_delay * 2**attempt)
+    logger.error(
+        "Daytona sandbox %s could not be deleted and runs until its TTL; delete it by name", name
+    )
+    return False
+
+
 async def delete_named(client: Any, name: str, retry: Retry) -> None:
     """Delete the sandbox called ``name`` if Daytona made one; logged by name if that can't be confirmed."""
     for attempt in range(retry.reclaim_attempts):
         try:
-            await (await client.get(name)).delete()
-            logger.info("Deleted Daytona sandbox %s, made by a create that did not complete", name)
-            return
-        except (DaytonaNotFoundError, DaytonaConflictError):
+            raw = await client.get(name)
+        except DaytonaNotFoundError:
             return
         except (
             Exception
         ) as exc:  # noqa: BLE001 - retried, then reported; never masks the caller's error
             logger.warning(
-                "Cleaning up Daytona sandbox %s failed (attempt %s): %s", name, attempt + 1, exc
+                "Looking up Daytona sandbox %s failed (attempt %s): %s", name, attempt + 1, exc
             )
-            await asyncio.sleep(retry.reclaim_delay * 2**attempt)
+            if attempt + 1 < retry.reclaim_attempts:
+                await asyncio.sleep(retry.reclaim_delay * 2**attempt)
+            continue
+        if await delete_sandbox(raw, name, retry):
+            logger.info("Deleted Daytona sandbox %s, made by a create that did not complete", name)
+        return
     logger.error(
         "A Daytona sandbox named %s may be left running until its TTL; delete it by name", name
     )
 
 
 def _reap_when_done(client: Any, task: asyncio.Future[Any], name: str, retry: Retry) -> None:
+    """Once ``task``, a create nothing awaits anymore, settles, delete the sandbox it made."""
+
     def reap(done: asyncio.Future[Any]) -> None:
+        cleanup: Coroutine[Any, Any, object]
         if done.cancelled() or done.exception() is not None:
             cleanup = delete_named(client, name, retry)
         else:
@@ -155,24 +218,6 @@ def _reap_when_done(client: Any, task: asyncio.Future[Any], name: str, retry: Re
     task.add_done_callback(reap)
 
 
-async def delete_sandbox(raw: Any, name: str, retry: Retry) -> None:
-    """Delete ``raw``, retrying through brief API failures; gone or already going counts as deleted."""
-    for attempt in range(retry.reclaim_attempts):
-        try:
-            await raw.delete()
-            return
-        except (DaytonaNotFoundError, DaytonaConflictError):
-            return
-        except Exception as exc:  # noqa: BLE001 - retried, then reported; the TTL is the backstop
-            logger.warning(
-                "Deleting Daytona sandbox %s failed (attempt %s): %s", name, attempt + 1, exc
-            )
-            await asyncio.sleep(retry.reclaim_delay * 2**attempt)
-    logger.error(
-        "Daytona sandbox %s could not be deleted and runs until its TTL; delete it by name", name
-    )
-
-
 async def create(client: Any, params: Any, *, timeout: float, retry: Retry) -> Any:
     """``client.create(params)``, retried while rate limited, leaving no sandbox behind on failure."""
     name = params.name
@@ -181,10 +226,7 @@ async def create(client: Any, params: Any, *, timeout: float, retry: Retry) -> A
         try:
             return await asyncio.shield(task)
         except asyncio.CancelledError:
-            if task.done() and not task.cancelled() and task.exception() is None:
-                await delete_sandbox(task.result(), name, retry)
-            elif not task.done():
-                _reap_when_done(client, task, name, retry)
+            _reap_when_done(client, task, name, retry)
             raise
         except DaytonaRateLimitError as exc:
             if attempt + 1 == retry.attempts:

@@ -162,8 +162,9 @@ no change here.
   Docker-in-Docker floor of 2 vCPU, 4 GiB memory and 10 GiB disk. With `snapshot`, the snapshot fixes the size.
 - **Lifetime:** the sandbox's `timeout` becomes Daytona's hard time-to-live, in whole minutes. Sandboxes are
   ephemeral: they are deleted when they stop, and never auto-stop on idleness before that.
-- **Cleanup:** a create that fails, is rate-limited, or whose caller is cancelled leaves no sandbox behind.
-  Rate-limited creates are retried up to 5 times with backoff.
+- **Cleanup:** when a create fails or its caller is cancelled, the provider deletes any sandbox it made, retrying
+  through brief Daytona API errors; if Daytona stays unreachable, the sandbox runs until its time-to-live. A
+  rate-limited create gets up to 5 attempts with backoff.
 
 ## Networking
 
@@ -173,7 +174,9 @@ no change here.
   restricted sandbox, and from every sandbox's own preview URLs. It differs between organizations and regions
   (e.g. `daytonaproxy01.net`, `daytonaproxy01.eu`) and `/config` only knows the default, so a sandbox's own URL is
   what settles it. Each domain seen is added to every restricted sandbox's allowlist and published in the
-  provider's `EGRESS_HOSTS`, so restricted workloads reach each other's ports.
+  provider's `EGRESS_HOSTS`, so restricted workloads reach each other's ports. As with every AgentEnv platform's
+  domain (`*.e2b.app`, `*.modal.host`, …), the wildcard admits any public Daytona sandbox on that domain, not
+  only the run's own.
 - **Egress:** allow-all, or an allowlist of up to 100 hostnames with `*.` wildcards. Daytona keeps hostnames and
   CIDRs in separate, mutually exclusive lists, and AgentEnv always adds its platforms' hostnames to an
   allowlist, so policies with CIDRs or IP addresses are refused before any sandbox is created. An empty allowlist

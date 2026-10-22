@@ -40,8 +40,9 @@ from agentenv_daytona.sandbox import DaytonaSandbox
 logger = logging.getLogger(__name__)
 
 SANDBOX_STARTED_EVENT = "agent_env.daytona_sandbox_started"
-# Words in a create refusal that mean Daytona refused the egress settings, not something else.
-_POLICY_WORDS = ("network", "domain", "allow", "egress")
+# Phrases of Daytona's refusals of a sandbox's egress lists (a Tier 1-2 organization, a list too long or
+# malformed), as opposed to any other reason a create is refused.
+_POLICY_REFUSALS = ("network access is restricted", "allow list", "allowlist", "invalid domain")
 
 
 def forget_preview_hosts() -> None:
@@ -169,7 +170,7 @@ class DaytonaSandboxProvider(SandboxProvider):
         resources = sandbox_resources(cpu=cpu, memory_mb=memory, disk_gb=disk_size_gb)
         common = {
             "name": sandbox_name(resolved),
-            "labels": sandbox_labels(resolved, ports),
+            "labels": sandbox_labels(resolved, ports, host_image=self._settings.snapshot is None),
             "public": True,
             "ephemeral": True,
             "auto_stop_interval": 0,
@@ -192,7 +193,10 @@ class DaytonaSandboxProvider(SandboxProvider):
         try:
             raw = await lifecycle.create(self._clients.current(), params, timeout=wait, retry=retry)
         except (DaytonaForbiddenError, DaytonaBadRequestError) as exc:
-            if policy.restricts_egress and any(word in str(exc).lower() for word in _POLICY_WORDS):
+            refusal_text = str(exc).lower()
+            if policy.restricts_egress and any(
+                phrase in refusal_text for phrase in _POLICY_REFUSALS
+            ):
                 raise NetworkPolicyUnsupportedError(
                     f"Daytona refused the egress policy: {exc}"
                 ) from exc

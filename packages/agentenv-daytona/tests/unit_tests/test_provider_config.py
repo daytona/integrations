@@ -92,7 +92,9 @@ def test_timeout_seconds_become_whole_ttl_minutes(timeout: int, minutes: int) ->
 
 
 def test_labels_carry_attribution_ports_and_the_managed_marker() -> None:
-    labels = sandbox_labels({"run_id": "run 42/x", "team": "env-pod", "skip": None}, [8080, 5432])
+    attribution = {"run_id": "run 42/x", "team": "env-pod", "skip": None}
+
+    labels = sandbox_labels(attribution, [8080, 5432], host_image=True)
 
     assert labels[MANAGED_LABEL] == "true"
     assert labels[PORTS_LABEL] == "8080,5432"
@@ -102,8 +104,18 @@ def test_labels_carry_attribution_ports_and_the_managed_marker() -> None:
     assert "agentenv.attr.skip" not in labels
 
 
+def test_a_sandbox_booted_from_a_snapshot_carries_no_host_image_label() -> None:
+    assert "agentenv.host-image" not in sandbox_labels({}, [], host_image=False)
+
+
+def test_attribution_keys_with_nothing_label_safe_are_skipped() -> None:
+    labels = sandbox_labels({"!!!": "x", "team": "env-pod"}, [], host_image=True)
+
+    assert [key for key in labels if key.startswith("agentenv.attr.")] == ["agentenv.attr.team"]
+
+
 def test_label_values_are_bounded() -> None:
-    labels = sandbox_labels({"long": "v" * 1000}, [])
+    labels = sandbox_labels({"long": "v" * 1000}, [], host_image=True)
 
     assert len(labels["agentenv.attr.long"]) == LABEL_VALUE_MAX
 

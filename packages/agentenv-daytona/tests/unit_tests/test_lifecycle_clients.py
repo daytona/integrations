@@ -1,6 +1,8 @@
 """SDK clients are per event loop and closed when the loop shuts down, even if nobody calls close()."""
 
 import asyncio
+import gc
+import weakref
 
 from agentenv_daytona.lifecycle import Clients
 from tests.unit_tests.fakes import FakeDaytona
@@ -65,3 +67,17 @@ def test_a_client_outlives_the_provider_that_made_it_and_closes_at_loop_shutdown
     asyncio.run(use())
 
     assert len(made) == 1 and made[0].closed
+
+
+def test_a_finished_event_loop_is_not_kept_alive() -> None:
+    clients = Clients(FakeDaytona, key="loop-leak")
+    loops: list[weakref.ref[asyncio.AbstractEventLoop]] = []
+
+    async def use() -> None:
+        loops.append(weakref.ref(asyncio.get_running_loop()))
+        clients.current()
+
+    asyncio.run(use())
+    gc.collect()
+
+    assert loops[0]() is None

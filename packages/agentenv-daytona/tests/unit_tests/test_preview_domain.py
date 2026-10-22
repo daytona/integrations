@@ -1,9 +1,11 @@
 """Learning the preview proxy domain from what Daytona returns, never from a constant."""
 
+import logging
 from pathlib import Path
 
 import pytest
 
+from agentenv_daytona import preview_domain
 from agentenv_daytona.preview_domain import pattern_from_template, preview_host_pattern
 
 
@@ -48,9 +50,23 @@ def test_unrecognized_template_is_refused() -> None:
         pattern_from_template("https://proxy.example/{{PORT}}/{{sandboxId}}")
 
 
-def test_no_proxy_domain_is_hardcoded_in_the_package() -> None:
+def test_no_daytonaproxy_domain_is_hardcoded_in_the_package() -> None:
     package = Path(__file__).resolve().parents[2] / "agentenv_daytona"
 
     offenders = [p.name for p in package.rglob("*.py") if "daytonaproxy" in p.read_text()]
 
     assert offenders == []
+
+
+def test_a_domain_beyond_the_cap_is_skipped_with_a_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    preview_domain.forget()
+    try:
+        for i in range(preview_domain._MAX_LEARNED):
+            assert preview_domain.learn(f"*.d{i}.example")
+        with caplog.at_level(logging.WARNING, logger="agentenv_daytona.preview_domain"):
+            assert preview_domain.learn("*.one-too-many.example") is False
+        assert [record.levelno for record in caplog.records] == [logging.WARNING]
+    finally:
+        preview_domain.forget()

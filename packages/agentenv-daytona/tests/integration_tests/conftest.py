@@ -1,16 +1,19 @@
 """Live-test plumbing: a config file naming the provider, and a sweep of anything the run left.
 
 Every module here skips without ``DAYTONA_API_KEY``. The key is read by agent-env through the
-config's ``env:`` reference and never printed.
+config's ``env:`` reference and never printed. Every sandbox a session creates carries that session's
+own attribution label, so the sweep only ever touches this session's sandboxes, never those of a
+concurrent run or a teammate sharing the account.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import uuid
 from collections.abc import Iterator
-from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -18,58 +21,70 @@ LIVE = pytest.mark.skipif(
     not os.environ.get("DAYTONA_API_KEY"),
     reason="DAYTONA_API_KEY not set; these tests require a live Daytona backend",
 )
-CONFIG = '[sandbox.providers.daytona.config]\napi_key = "env:DAYTONA_API_KEY"\n'
+SESSION = uuid.uuid4().hex
+SESSION_LABEL = "agentenv.attr.agentenv_test_session"
 
 
-async def managed_since(started: datetime) -> list[str]:
-    """Ids of agent-env sandboxes created since ``started`` that still exist."""
-    from daytona import AsyncDaytona, ListSandboxesQuery
+def config_toml(*, daytona_by_default: bool = False, key_env: str = "DAYTONA_API_KEY") -> str:
+    """A config with the daytona provider table that labels every sandbox with this session."""
+    defaults = 'default = "daytona"\nagent_default = "daytona"\n' if daytona_by_default else ""
+    return (
+        f'[sandbox]\n{defaults}attribution = {{ agentenv_test_session = "{SESSION}" }}\n\n'
+        f'[sandbox.providers.daytona.config]\napi_key = "env:{key_env}"\n'
+    )
 
-    query = ListSandboxesQuery(labels={"agentenv.managed": "true"}, created_at_after=started)
+
+def _state(value: object) -> str:
+    return str(getattr(value, "value", value))
+
+
+async def _sweep() -> tuple[list[str], list[str]]:
+    """Delete this session's sandboxes still running: (ids left running, ids that could not be deleted)."""
+    from daytona import AsyncDaytona, DaytonaError, DaytonaNotFoundError, ListSandboxesQuery
+
+    query = ListSandboxesQuery(labels={SESSION_LABEL: SESSION})
+    left: list[Any] = []
     async with AsyncDaytona() as client:
-        return [
-            sandbox.id
-            async for sandbox in client.list(query)
-            # A delete returns before the sandbox is gone; one being deleted wants "destroyed".
-            if getattr(sandbox.desired_state, "value", sandbox.desired_state) != "destroyed"
-        ]
-
-
-async def _sweep(started: datetime) -> list[str]:
-    from daytona import AsyncDaytona, DaytonaError
-
-    # The list lags a delete by a few seconds, so give in-flight deletes time to show.
-    left: list[str] = []
-    for _ in range(15):
-        if not (left := await managed_since(started)):
-            return []
-        await asyncio.sleep(2)
-    async with AsyncDaytona() as client:
-        for sandbox_id in left:
+        # The list lags a delete by a few seconds, so give in-flight deletes time to show.
+        for _ in range(15):
+            left = [s async for s in client.list(query) if _state(s.desired_state) != "destroyed"]
+            if not left:
+                return [], []
+            await asyncio.sleep(2)
+        failed = []
+        for sandbox in left:
             try:
-                await (await client.get(sandbox_id)).delete()
-            except DaytonaError as exc:  # gone or going meanwhile: reported below either way
-                print(f"sweep could not delete {sandbox_id}: {exc}")
-    return left
+                await sandbox.delete()
+            except DaytonaNotFoundError:
+                continue
+            except DaytonaError as exc:
+                failed.append(f"{sandbox.id}: {exc}")
+        return [sandbox.id for sandbox in left], failed
 
 
 @pytest.fixture(scope="session")
 def live_config(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
     """``AGENT_ENV_CONFIG`` pointing at a config with the daytona table, for the whole session; at the
-    end, anything agent-env created during the session and left running is deleted and reported."""
+    end, any of this session's sandboxes still running is deleted, and the session fails."""
     from agent_env.config import reset_config
 
     path = tmp_path_factory.mktemp("agentenv") / "config.toml"
-    path.write_text(CONFIG)
+    path.write_text(config_toml())
     previous = os.environ.get("AGENT_ENV_CONFIG")
     os.environ["AGENT_ENV_CONFIG"] = str(path)
     reset_config()
-    started = datetime.now(timezone.utc)
     yield path
     if previous is None:
         os.environ.pop("AGENT_ENV_CONFIG", None)
     else:
         os.environ["AGENT_ENV_CONFIG"] = previous
     reset_config()
-    if os.environ.get("DAYTONA_API_KEY") and (left := asyncio.run(_sweep(started))):
+    if not os.environ.get("DAYTONA_API_KEY"):
+        return
+    left, failed = asyncio.run(_sweep())
+    if failed:
+        pytest.fail(
+            f"live tests left Daytona sandboxes running, and these could not be deleted: {failed}"
+        )
+    if left:
         pytest.fail(f"live tests left Daytona sandboxes running (now deleted): {left}")

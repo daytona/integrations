@@ -105,16 +105,21 @@ def _slug(value: object) -> str:
     return _UNSAFE.sub("-", str(value)).strip("-")
 
 
-def sandbox_labels(attribution: Mapping[str, Any], ports: Iterable[int]) -> dict[str, str]:
-    """Labels for attribution (cost joins), reconnect (ports) and sweeping (the managed marker)."""
-    labels = {
-        MANAGED_LABEL: "true",
-        PORTS_LABEL: ",".join(str(port) for port in ports),
-        HOST_IMAGE_LABEL: HOST_IMAGE_VERSION,
-    }
+def sandbox_labels(
+    attribution: Mapping[str, Any], ports: Iterable[int], *, host_image: bool
+) -> dict[str, str]:
+    """Labels for attribution (cost joins), reconnect (ports), sweeping (the managed marker) and, on a
+    sandbox booted from the host image, the recipe version that built it."""
+    labels = {MANAGED_LABEL: "true", PORTS_LABEL: ",".join(str(port) for port in ports)}
+    if host_image:
+        labels[HOST_IMAGE_LABEL] = HOST_IMAGE_VERSION
     for key, value in attribution.items():
-        if value is not None and (slug := _slug(value)[:LABEL_VALUE_MAX]):
-            labels[f"{ATTRIBUTION_LABEL_PREFIX}{_slug(key)}"] = slug
+        if (
+            value is not None
+            and (key_slug := _slug(key))
+            and (slug := _slug(value)[:LABEL_VALUE_MAX])
+        ):
+            labels[f"{ATTRIBUTION_LABEL_PREFIX}{key_slug}"] = slug
     return labels
 
 

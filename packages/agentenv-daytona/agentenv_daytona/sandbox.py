@@ -31,7 +31,7 @@ from daytona import (
     SessionExecuteRequest,
 )
 
-from agentenv_daytona import transfer
+from agentenv_daytona import lifecycle, transfer
 from agentenv_daytona.image import DOCKER_START_SCRIPT
 from agentenv_daytona.network import policy_from_sandbox, update_fields
 
@@ -86,6 +86,8 @@ class DaytonaSandbox(VmSandbox):
     # Daytona refuses (409) a network update while it still applies the previous one, about 0.3 s.
     _NETWORK_UPDATE_ATTEMPTS = 10
     _NETWORK_UPDATE_RETRY_DELAY = 0.5
+    _DELETE_ATTEMPTS = 5
+    _DELETE_RETRY_DELAY = 1.0
 
     def __init__(
         self,
@@ -113,11 +115,22 @@ class DaytonaSandbox(VmSandbox):
         return await self._read_raw()
 
     async def terminate(self) -> None:
-        """Delete the sandbox; one already gone, or already being deleted, is not an error."""
-        try:
-            await self._raw.delete()
-        except (DaytonaNotFoundError, DaytonaConflictError) as exc:
-            logger.info("Daytona sandbox %s was already gone or going: %s", self.sandbox_id, exc)
+        """Delete the sandbox; one already gone, or already being deleted, is not an error. A 409 for any
+        other state change in progress is retried."""
+        for attempt in range(1, self._DELETE_ATTEMPTS + 1):
+            try:
+                await self._raw.delete()
+                return
+            except DaytonaNotFoundError:
+                logger.info("Daytona sandbox %s was already gone", self.sandbox_id)
+                return
+            except DaytonaConflictError:
+                if await lifecycle.being_destroyed(self._raw):
+                    logger.info("Daytona sandbox %s is already being deleted", self.sandbox_id)
+                    return
+                if attempt == self._DELETE_ATTEMPTS:
+                    raise
+                await asyncio.sleep(self._DELETE_RETRY_DELAY)
 
     async def exec(self, *command: str) -> _CompletedProcess:
         """Run argv in a session of its own; the inherited ``sudo`` prefixes stay, as commands run

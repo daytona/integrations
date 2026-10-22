@@ -83,18 +83,46 @@ async def test_a_missing_exit_code_reads_as_minus_one() -> None:
     assert (await sandbox.exec_with_output("true"))[0] == -1
 
 
-@pytest.mark.parametrize(
-    "error", [DaytonaNotFoundError("gone"), DaytonaConflictError("state change in progress")]
-)
-async def test_terminate_of_a_gone_or_already_deleting_sandbox_is_not_an_error(
-    error: Exception,
-) -> None:
+async def test_terminate_of_a_gone_sandbox_is_not_an_error() -> None:
     sandbox, raw = sandbox_with(lambda argv: (0, "", ""))
-    raw.delete_error = error
+    raw.delete_error = DaytonaNotFoundError("gone")
 
     await sandbox.terminate()
 
     assert raw.deletes == 1
+
+
+async def test_terminate_of_a_sandbox_daytona_is_already_deleting_is_not_an_error() -> None:
+    sandbox, raw = sandbox_with(lambda argv: (0, "", ""))
+    raw.delete_error, raw.desired_state = (
+        DaytonaConflictError("state change in progress"),
+        "destroyed",
+    )
+
+    await sandbox.terminate()
+
+    assert raw.deletes == 1
+
+
+async def test_terminate_retries_a_409_for_another_state_change_in_progress() -> None:
+    sandbox, raw = sandbox_with(lambda argv: (0, "", ""))
+    raw.delete_failures = [DaytonaConflictError("state change in progress")]
+    sandbox._DELETE_RETRY_DELAY = 0
+
+    await sandbox.terminate()
+
+    assert (raw.deletes, raw.state) == (2, "destroyed")
+
+
+async def test_terminate_gives_up_on_a_409_that_never_clears() -> None:
+    sandbox, raw = sandbox_with(lambda argv: (0, "", ""))
+    raw.delete_error = DaytonaConflictError("state change in progress")
+    sandbox._DELETE_RETRY_DELAY = 0
+
+    with pytest.raises(DaytonaConflictError):
+        await sandbox.terminate()
+
+    assert raw.deletes == sandbox._DELETE_ATTEMPTS
 
 
 async def test_terminate_surfaces_other_failures() -> None:

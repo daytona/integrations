@@ -14,8 +14,9 @@ from agent_env.providers.sandbox_providers.sandbox import (
 from daytona import (
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
-    DaytonaBadRequestError,
     DaytonaAuthenticationError,
+    DaytonaBadRequestError,
+    DaytonaConflictError,
     DaytonaRateLimitError,
     DaytonaTimeoutError,
 )
@@ -106,6 +107,7 @@ async def test_a_configured_snapshot_is_used_instead_of_the_image() -> None:
     params = fake.created_params[0]
     assert isinstance(params, CreateSandboxFromSnapshotParams) and params.snapshot == "my-dind"
     assert fake.create_timeouts == [SNAPSHOT_CREATE_TIMEOUT]
+    assert params.labels is not None and "agentenv.host-image" not in params.labels
 
 
 async def test_create_sandbox_is_a_bare_vm_exposing_the_port() -> None:
@@ -179,7 +181,7 @@ async def test_a_sandbox_served_on_another_proxy_domain_widens_its_own_allowlist
 
     raw = fake.sandboxes[sandbox.sandbox_id]
     assert len(raw.network_updates) == 1
-    assert "*.eu.proxy-y.example" in raw.network_updates[0]["domain_allow_list"].split(",")
+    assert {"*.eu.proxy-y.example"} <= set(raw.network_updates[0]["domain_allow_list"].split(","))
     assert (
         "*.eu.proxy-y.example"
         in DaytonaSandboxProvider.effective_network_policy(allow("x.example")).allow_hosts
@@ -281,13 +283,35 @@ async def test_rate_limiting_that_never_clears_gives_up() -> None:
     assert len(fake.created_params) == provider._RATE_LIMIT_ATTEMPTS
 
 
-async def test_an_org_that_may_not_restrict_egress_gets_a_policy_error() -> None:
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Failed to create sandbox: Network access is restricted and cannot be overridden at the "
+        "sandbox level. Remove domainAllowList from the request.",
+        "Failed to create sandbox: Domain allow list cannot contain more than 100 domains",
+        "Failed to create sandbox: networkAllowList and domainAllowList are mutually exclusive",
+        'Failed to create sandbox: Invalid domain: "x_y.example". Must be a valid ASCII domain',
+    ],
+)
+async def test_daytona_refusing_the_egress_lists_is_a_policy_error(message: str) -> None:
     def refuse(params: object, raw: FakeRaw) -> None:
-        raise DaytonaBadRequestError("Organization is not allowed to set domain allow list")
+        raise DaytonaBadRequestError(message)
 
     provider, _ = make(FakeDaytona(create_hook=refuse))
 
-    with pytest.raises(NetworkPolicyUnsupportedError, match="not allowed"):
+    with pytest.raises(NetworkPolicyUnsupportedError):
+        await provider.create_vm(network_policy=allow("pypi.org"), setup_for_gateway=False)
+
+
+async def test_an_unrelated_refusal_of_a_restricted_create_keeps_its_own_error() -> None:
+    def refuse(params: object, raw: FakeRaw) -> None:
+        raise DaytonaBadRequestError(
+            "Failed to create sandbox: 64 CPUs is more than the maximum allowed"
+        )
+
+    provider, _ = make(FakeDaytona(create_hook=refuse))
+
+    with pytest.raises(DaytonaBadRequestError):
         await provider.create_vm(network_policy=allow("pypi.org"), setup_for_gateway=False)
 
 
@@ -391,3 +415,84 @@ async def test_reconnect_widens_a_restricted_allowlist_to_a_new_preview_domain()
     assert again.network_policy is not None
     assert "*.moved.proxy-z.example" in again.network_policy.allow_hosts
     assert "*.moved.proxy-z.example" in (raw.domain_allow_list or "").split(",")
+
+
+CONFLICT = DaytonaConflictError("Sandbox state change in progress")
+
+
+async def test_cleanup_waits_out_a_409_from_another_state_change_and_still_deletes() -> None:
+    provider, fake = make()
+    fake.make_raw = lambda: FakeRaw(process=_failing_process(), delete_failures=[CONFLICT])
+
+    with pytest.raises(RuntimeError):
+        await provider.create_vm(exposed_ports=[8080])
+
+    (raw,) = fake.sandboxes.values()
+    assert (raw.deletes, raw.state) == (2, "destroyed")
+
+
+async def test_cleanup_takes_a_409_for_a_sandbox_already_being_deleted_as_done() -> None:
+    provider, fake = make()
+    fake.make_raw = lambda: FakeRaw(
+        process=_failing_process(), delete_failures=[CONFLICT], desired_state="destroyed"
+    )
+
+    with pytest.raises(RuntimeError):
+        await provider.create_vm(exposed_ports=[8080])
+
+    (raw,) = fake.sandboxes.values()
+    assert raw.deletes == 1
+
+
+async def test_cleanup_by_name_waits_out_a_409_too() -> None:
+    async def made_then_failed(params: object, raw: FakeRaw) -> None:
+        raw.delete_failures.append(CONFLICT)
+        fake.sandboxes[raw.id] = raw
+        raise DaytonaTimeoutError("Sandbox failed to become ready within the timeout period")
+
+    provider, fake = make(FakeDaytona(create_hook=made_then_failed))
+
+    with pytest.raises(DaytonaTimeoutError):
+        await provider.create_vm(setup_for_gateway=False)
+
+    (raw,) = fake.sandboxes.values()
+    assert (raw.deletes, raw.state) == (2, "destroyed")
+
+
+async def test_a_caller_cancelled_as_the_create_finishes_is_not_held_up_by_the_cleanup() -> None:
+    gate = asyncio.Event()
+    caller: list[asyncio.Task[DaytonaSandbox]] = []
+
+    async def cancel_the_caller(params: object, raw: FakeRaw) -> None:
+        raw.delete_gate = gate
+        caller[0].cancel()
+
+    provider, fake = make(FakeDaytona(create_hook=cancel_the_caller))
+    caller.append(asyncio.ensure_future(provider.create_vm(setup_for_gateway=False)))
+
+    done, _ = await asyncio.wait(caller, timeout=1)
+
+    assert done and caller[0].cancelled()
+    gate.set()
+    for _ in range(50):
+        await asyncio.sleep(0)
+    assert [raw.deletes for raw in fake.sandboxes.values()] == [1]
+
+
+async def test_a_caller_cancelled_as_the_create_fails_still_gets_the_sandbox_cleaned_up() -> None:
+    caller: list[asyncio.Task[DaytonaSandbox]] = []
+
+    async def cancel_then_fail(params: object, raw: FakeRaw) -> None:
+        fake.sandboxes[raw.id] = raw
+        caller[0].cancel()
+        raise DaytonaTimeoutError("Sandbox failed to become ready within the timeout period")
+
+    provider, fake = make(FakeDaytona(create_hook=cancel_then_fail))
+    caller.append(asyncio.ensure_future(provider.create_vm(setup_for_gateway=False)))
+
+    with pytest.raises(asyncio.CancelledError):
+        await caller[0]
+    for _ in range(50):
+        await asyncio.sleep(0)
+
+    assert [raw.deletes for raw in fake.sandboxes.values()] == [1]

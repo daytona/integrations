@@ -9,19 +9,28 @@ allowlist entry that lets restricted sandboxes reach each other's ports.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import urllib.request
 from urllib.parse import urlparse
 
+logger = logging.getLogger(__name__)
+
 _PORT_AND_ID = re.compile(r"^\d+-[A-Za-z0-9][A-Za-z0-9-]*$")
-# Preview domains seen by this process, allowed in later allowlists; capped well inside 100 entries.
+# Preview domains seen by this process, added to every restricted sandbox's allowlist. They count toward
+# Daytona's 100-hostname limit, so only a handful are kept; one or two is the norm.
 _learned: set[str] = set()
 _MAX_LEARNED = 16
 
 
 def learn(pattern: str) -> bool:
-    """Remember ``pattern``; whether it was new (and fit under the cap)."""
-    if pattern in _learned or len(_learned) >= _MAX_LEARNED:
+    """Remember ``pattern``; whether it was new. Past the cap a new domain is skipped, with a warning."""
+    if pattern in _learned:
+        return False
+    if len(_learned) >= _MAX_LEARNED:
+        logger.warning(
+            "Not allowing Daytona preview domain %s: %s are already allowed", pattern, _MAX_LEARNED
+        )
         return False
     _learned.add(pattern)
     return True

@@ -34,7 +34,7 @@ def policy_problem(policy: NetworkPolicy) -> str | None:
             "Daytona's domain and CIDR allowlists are mutually exclusive; allow hostnames or CIDRs"
         )
     if ips := [host for host in hosts if _is_ip(host)]:
-        return f"Daytona allows hostnames, not IP addresses, as hosts: {ips}; use allow_cidrs"
+        return f"Daytona allows hostnames, not IP addresses, as hosts: {ips}"
     if len(hosts) > MAX_DOMAIN_ENTRIES:
         return f"Daytona allows at most {MAX_DOMAIN_ENTRIES} hostnames, got {len(hosts)}"
     if len(cidrs) > MAX_CIDR_ENTRIES:
