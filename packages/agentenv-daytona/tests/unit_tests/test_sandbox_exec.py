@@ -104,6 +104,17 @@ async def test_terminate_of_a_sandbox_daytona_is_already_deleting_is_not_an_erro
     assert raw.deletes == 1
 
 
+async def test_a_second_terminate_after_a_completed_delete_is_not_an_error() -> None:
+    sandbox, raw = sandbox_with(lambda argv: (0, "", ""))
+    sandbox._DELETE_RETRY_DELAY = 0
+    await sandbox.terminate()
+    raw.delete_failures = [DaytonaConflictError("Sandbox state change in progress")]
+
+    await sandbox.terminate()
+
+    assert raw.deletes == 2
+
+
 async def test_terminate_retries_a_409_for_another_state_change_in_progress() -> None:
     sandbox, raw = sandbox_with(lambda argv: (0, "", ""))
     raw.delete_failures = [DaytonaConflictError("state change in progress")]

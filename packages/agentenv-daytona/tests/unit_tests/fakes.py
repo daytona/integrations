@@ -113,7 +113,7 @@ class FakeRaw:
             raise self.delete_failures.pop(0)
         if self.delete_error is not None:
             raise self.delete_error
-        self.state = "destroyed"
+        self.state = self.desired_state = "destroyed"
 
     async def get_preview_link(self, port: int, request_timeout: float | None = None) -> Any:
         return _Preview(url=f"https://{port}-{self.id}.{self.preview_domain}", token="tok")

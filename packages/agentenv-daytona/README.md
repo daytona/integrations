@@ -196,8 +196,9 @@ no change here.
 
 ## Attribution and cost
 
-Each sandbox carries labels: `agentenv.managed=true`, `agentenv.ports`, `agentenv.host-image`, and one
-`agentenv.attr.<key>` per attribution value (values slugged, at most 255 characters). Its name is
+Each sandbox carries labels: `agentenv.managed=true`, `agentenv.ports`, one `agentenv.attr.<key>` per
+attribution value (values slugged, at most 255 characters) and, when it boots from the host image rather than a
+`snapshot`, `agentenv.host-image` with the recipe version. Its name is
 `ae-<random>-<attribution values>`. The provider logs one `agent_env.daytona_sandbox_started` event per sandbox
 with its id, size and attribution. Running sandboxes can be filtered by these labels in the Daytona dashboard or
 with `AsyncDaytona.list(ListSandboxesQuery(labels=...))`; deleted ones are no longer listed.
