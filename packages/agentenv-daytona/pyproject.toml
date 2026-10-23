@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentenv-daytona"
-version = "0.0.0"
+version = "0.1.0"
 description = "Daytona sandbox provider for Scale AI's AgentEnv framework"
 readme = "README.md"
 requires-python = ">=3.11.4"
