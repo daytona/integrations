@@ -71,7 +71,7 @@ class Tab:
         entry = self.network.get(response.request)
         if entry is not None:
             entry["status"] = str(response.status)
-            entry["type"] = response.headers.get("content-type", "").split(";")[0]
+            entry["type"] = response.headers.get("content-type", "").split(";")[0][:MAX_TEXT]
 
     def finish_request(self, request: Request, failure: Optional[str]) -> None:
         entry = self.network.get(request)

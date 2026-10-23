@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import re
 import subprocess
 from collections.abc import Callable, Iterator, Sequence
@@ -181,6 +182,8 @@ def test_file_policy_checks_its_arguments() -> None:
         DaytonaFilePolicy(upload_roots=["relative"])
     with pytest.raises(ValueError):
         DaytonaFilePolicy(upload_roots=["/"])
+    with pytest.raises(ValueError, match="download_dir cannot be the filesystem root"):
+        DaytonaFilePolicy(download_dir="/")
     with pytest.raises(TypeError):
         DaytonaFilePolicy(upload_roots="/task")
 
@@ -522,6 +525,62 @@ def test_a_page_started_navigation_the_policy_allows_is_left_alone(
     assert state(browser)["changes"] == []
 
 
+def test_navigate_only_suppresses_the_observer_for_its_own_tab(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def policy(context: BetaURLContext, url: str) -> None:
+        if "evil" in url:
+            raise ToolError("blocked")
+
+    browser = make_browser(monkeypatch, url_policy=policy)
+    call(browser, "new_tab", {})
+    first = browser._tabs["tab_1"].page
+    second = browser._tabs["tab_2"].page
+
+    def navigate_first(url: str, **kwargs: object) -> MagicMock:
+        first.url = url
+        browser._on_navigated(
+            SimpleNamespace(parent_frame=None, page=second, url="https://evil.test/landing")  # type: ignore[arg-type]
+        )
+        return MagicMock(status=200)
+
+    first.goto.side_effect = navigate_first
+    call(browser, "navigate", {"url": "https://good.test", "tab_id": "tab_1"})
+    assert second.goto.call_args_list[-1].args[0] == "about:blank"
+
+
+def test_navigate_only_suppresses_blocked_requests_for_its_own_tab(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    browser = make_browser(monkeypatch, url_policy=lambda context, url: None)
+    call(browser, "new_tab", {})
+    first = browser._tabs["tab_1"].page
+    second = browser._tabs["tab_2"].page
+    browser._refuses = MagicMock(side_effect=lambda url, tab_id: "blocked" in url)  # type: ignore[method-assign]
+
+    def blocked_request(page: FakePage) -> MagicMock:
+        route = MagicMock()
+        route.request.url = "https://blocked.test/"
+        route.request.frame.page = page
+        route.request.frame.parent_frame = None
+        route.request.is_navigation_request.return_value = True
+        return route
+
+    own = blocked_request(first)
+    other = blocked_request(second)
+
+    def navigate_first(url: str, **kwargs: object) -> MagicMock:
+        first.url = url
+        browser._guard(own)
+        browser._guard(other)
+        return MagicMock(status=200)
+
+    first.goto.side_effect = navigate_first
+    result = call(browser, "navigate", {"url": "https://good.test", "tab_id": "tab_1"})
+    assert own.abort.call_count == other.abort.call_count == 1
+    assert blocks_of(result).count({"type": "text", "text": "A navigation was refused."}) == 1
+
+
 def test_state_never_raises(browser: DaytonaBrowser) -> None:
     cdp: Any = browser._browser_cdp
     cdp.send.side_effect = RuntimeError("connection lost")
@@ -551,6 +610,27 @@ def test_page_supplied_text_is_bounded(browser: DaytonaBrowser) -> None:
     assert browser._tabs["tab_1"].console[-1] == "y" * MAX_TEXT
 
 
+def test_tab_and_download_strings_are_bounded_in_state_and_member_results(
+    browser: DaytonaBrowser,
+) -> None:
+    tab = browser._tabs["tab_1"]
+    tab.title = "T" * (MAX_TEXT * 2)
+    tab.page.url = "https://a.test/" + "u" * (MAX_TEXT * 2)
+    entries = [
+        browser._entry(tab, {}),
+        browser.list_tabs(MagicMock(), MagicMock()),
+        browser.switch_tab(MagicMock(), SimpleNamespace(tab_id="tab_1")),  # type: ignore[arg-type]
+    ]
+    for value in entries:
+        rendered = str(value)
+        assert "T" * (MAX_TEXT + 1) not in rendered
+        assert "u" * (MAX_TEXT + 1) not in rendered
+
+    browser._on_download_begin({"guid": "g-long", "url": "https://a.test/" + "d" * 10_000})
+    assert len(browser._downloads["g-long"]) == MAX_TEXT
+    assert state(browser)["changes"][-1]["url"] == browser._downloads["g-long"]
+
+
 def test_a_recorded_request_url_is_bounded(browser: DaytonaBrowser) -> None:
     """A page chooses the URLs it requests and can make them any length. `read_network` hands
     back up to 1,000 of them at once, so an uncapped one is both per-tab memory and tool output."""
@@ -559,6 +639,43 @@ def test_a_recorded_request_url_is_bounded(browser: DaytonaBrowser) -> None:
     tab.start_request(MagicMock(url=long_url, method="GET"))
     assert tab.network[next(iter(tab.network))]["url"] == long_url[:MAX_TEXT]
     assert len(tab.take_network()) < MAX_TEXT + 100
+
+
+def test_a_server_controlled_content_type_is_bounded(browser: DaytonaBrowser) -> None:
+    tab = browser._tabs["tab_1"]
+    request = MagicMock(url="https://a.test/", method="GET")
+    tab.start_request(request)
+    response = MagicMock(request=request, status=200)
+    response.headers = {"content-type": "x" * (MAX_TEXT + 100)}
+    tab.answer_request(response)
+    assert tab.network[request]["type"] == "x" * MAX_TEXT
+
+
+def test_construction_warnings_are_precise(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.WARNING, logger="daytona_claude_toolsets")
+    unchecked = (
+        "no url_policy was given, so navigate and page requests are not checked; anything the "
+        "sandbox network can reach is reachable, including local services. Pass url_policy (or "
+        "None to refuse everything) to restrict it."
+    )
+    public_browser = (
+        "the sandbox is public, so its preview URLs need no authentication: anyone who knows the "
+        "sandbox id can reach Chromium's debugging port and control the browser. Use a private "
+        "sandbox."
+    )
+    public = fake_sandbox()
+    public.public = True
+    make_browser(monkeypatch, sandbox=public)
+    assert [record.message for record in caplog.records] == [unchecked, public_browser]
+
+    caplog.clear()
+    private = fake_sandbox()
+    private.public = False
+    make_browser(monkeypatch, sandbox=private, url_policy=None)
+    make_browser(monkeypatch, sandbox=private, url_policy=lambda context, url: None)
+    assert caplog.records == []
 
 
 def test_interception_applies_the_url_policy(monkeypatch: pytest.MonkeyPatch) -> None:
