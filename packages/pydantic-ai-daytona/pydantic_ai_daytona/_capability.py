@@ -75,8 +75,8 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
     sandbox_id: str | None = None
     """Attach to an existing sandbox by id instead of creating one.
 
-    Attached sandboxes are started if stopped, and are never deleted by the capability.
-    The settings that only apply when creating a sandbox (`snapshot`, `image`, `env`,
+    Attached sandboxes are resumed if stopped, archived, or paused, and are never deleted.
+    The settings that only apply when creating a sandbox (`snapshot`, `image`,
     `auto_stop_interval`, `auto_delete_interval`) cannot be combined with `sandbox_id`.
     """
 
@@ -90,10 +90,9 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
     """
 
     env: Mapping[str, str] | None = None
-    """Environment variables to set in an owned sandbox.
+    """Environment variables applied to every command, including attached sandboxes.
 
-    Owned sandboxes only. For an attached or injected sandbox, set variables when you
-    create that sandbox yourself.
+    Also set at creation for owned sandboxes. An injected session supplies its own env.
     """
 
     workdir: str | None = None
@@ -249,7 +248,6 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
             for name, value in (
                 ("snapshot", self.snapshot),
                 ("image", self.image),
-                ("env", self.env),
                 ("labels", self.labels),
                 ("os_user", self.os_user),
                 ("network_allow_list", self.network_allow_list),
@@ -272,6 +270,7 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
     def _non_default_reused_settings(self) -> list[str]:
         conflicts = self._non_default_owned_settings()
         for name, value in (
+            ("env", self.env),
             ("sandbox_id", self.sandbox_id),
             ("workdir", self.workdir),
             ("api_key", self.api_key),
@@ -294,7 +293,9 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
         default_timeout = min(
             max(1, math.ceil(self.default_command_timeout)), self.max_command_timeout
         )
-        return template.format(default_timeout=default_timeout, max_timeout=self.max_command_timeout)
+        return template.format(
+            default_timeout=default_timeout, max_timeout=self.max_command_timeout
+        )
 
     def get_toolset(self) -> AgentToolset[AgentDepsT]:
         """Build and return the Daytona sandbox toolset."""

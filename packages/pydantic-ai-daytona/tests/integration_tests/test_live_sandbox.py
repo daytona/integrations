@@ -1,15 +1,32 @@
 """Live integration tests against a real Daytona backend (needs DAYTONA_API_KEY)."""
 
 import asyncio
+import json
 import os
+import shlex
+import statistics
 import time
 import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
+from daytona import (
+    AsyncDaytona,
+    AsyncSandbox,
+    CreateSandboxFromSnapshotParams,
+    DaytonaGoneError,
+    DaytonaNotFoundError,
+    ListSandboxesQuery,
+    SandboxState,
+)
 
-from pydantic_ai_daytona import DaytonaSandboxError, DaytonaSandboxSession
+from pydantic_ai_daytona import (
+    DaytonaSandbox,
+    DaytonaSandboxError,
+    DaytonaSandboxSession,
+    DaytonaSandboxTerminalError,
+)
 from pydantic_ai_daytona._toolset import DaytonaSandboxToolset
 
 # One sandbox is shared across this module's tests, so every test must run on the
@@ -21,11 +38,48 @@ pytestmark = [
     ),
     pytest.mark.asyncio(loop_scope="module"),
 ]
+LABELS = {"pai-upgrade": os.environ.get("PAI_UPGRADE_RUN", uuid.uuid4().hex)}
+
+
+async def listed_sandboxes(client: AsyncDaytona, labels: dict[str, str]) -> list[AsyncSandbox]:
+    # Label-filtered lists can retain deleted records after delete(wait=True), verified live.
+    sandboxes = []
+    async for listed in client.list(ListSandboxesQuery(labels=labels)):
+        try:
+            current = await client.get(listed.id)
+        except (DaytonaNotFoundError, DaytonaGoneError):
+            continue
+        if current.state != SandboxState.DESTROYED:
+            sandboxes.append(current)
+    return sandboxes
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
+async def backend() -> AsyncGenerator[AsyncDaytona, None]:
+    client = AsyncDaytona()
+    print(f"\nLive sandbox labels: {LABELS}")
+    try:
+        yield client
+    finally:
+        try:
+            leftovers = await listed_sandboxes(client, LABELS)
+            for sandbox in leftovers:
+                try:
+                    await sandbox.delete(wait=True)
+                except (DaytonaNotFoundError, DaytonaGoneError):
+                    continue
+            remaining = [sandbox.id for sandbox in await listed_sandboxes(client, LABELS)]
+            assert not remaining, f"Live sandboxes remain: {remaining}"
+            print(f"\nLabel-filtered cleanup: {len(remaining)} sandboxes remain")
+        finally:
+            await client.close()
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def session() -> AsyncGenerator[DaytonaSandboxSession, None]:
-    async with DaytonaSandboxSession(env={"MARKER": "pydantic-ai-daytona"}) as live_session:
+async def session(backend: AsyncDaytona) -> AsyncGenerator[DaytonaSandboxSession, None]:
+    async with DaytonaSandboxSession(
+        env={"MARKER": "pydantic-ai-daytona"}, labels=LABELS
+    ) as live_session:
         yield live_session
 
 
@@ -74,8 +128,10 @@ async def test_exec_sees_sandbox_env(session: DaytonaSandboxSession) -> None:
 async def test_exec_timeout_is_reported_and_next_command_is_not_blocked(
     session: DaytonaSandboxSession,
 ) -> None:
-    result = await session.exec("sleep 30", timeout=1)
+    result = await session.exec("echo before; echo warning >&2; sleep 30", timeout=1)
     assert result.timed_out
+    assert result.stdout == "before\n"
+    assert result.stderr == "warning\n"
     after = await session.exec("echo recovered", timeout=30)
     assert "recovered" in after.stdout
 
@@ -106,19 +162,15 @@ async def test_attach_by_sandbox_id_reuses_sandbox_and_leaves_it_running(
     assert "alive" in still_alive.stdout
 
 
-async def test_attach_starts_a_stopped_sandbox() -> None:
-    from daytona import AsyncDaytona
-
-    daytona = AsyncDaytona()
-    sandbox = await daytona.create(timeout=120)
+async def test_attach_starts_a_stopped_sandbox(backend: AsyncDaytona) -> None:
+    sandbox = await backend.create(CreateSandboxFromSnapshotParams(labels=LABELS), timeout=120)
     try:
         await sandbox.stop()
         async with DaytonaSandboxSession(sandbox_id=sandbox.id) as attached:
             result = await attached.exec("echo restarted", timeout=30)
             assert "restarted" in result.stdout
     finally:
-        await sandbox.delete()
-        await daytona.close()
+        await sandbox.delete(wait=True)
 
 
 async def test_file_roundtrip(session: DaytonaSandboxSession) -> None:
@@ -170,3 +222,83 @@ async def test_toolset_end_to_end_with_injected_session(session: DaytonaSandboxS
         assert f"{marker}.txt" in await toolset.list_directory(".")
         out = await toolset.run_command(f"cat {marker}.txt")
         assert "from the toolset" in out
+
+
+async def test_stdin_is_closed(session: DaytonaSandboxSession) -> None:
+    started = time.monotonic()
+    result = await session.exec("cat", timeout=5)
+    assert result.exit_code == 0
+    assert not result.timed_out
+    assert result.stdout == ""
+    assert time.monotonic() - started < 5
+
+
+async def test_attached_env_preserves_tricky_values(session: DaytonaSandboxSession) -> None:
+    env = {"SPECIAL": "spaces 'single' \"double\" $HOME\nsecond line", "-dashed-name": "-literal"}
+    assert session.sandbox_id is not None
+    capability: DaytonaSandbox[None] = DaytonaSandbox(sandbox_id=session.sandbox_id, env=env)
+    toolset = capability.get_toolset()
+    assert isinstance(toolset, DaytonaSandboxToolset)
+    toolset._run_scoped = True
+    code = (
+        "import os,json; print(json.dumps({k:os.environ[k] for k in ['SPECIAL','-dashed-name']}))"
+    )
+    async with toolset:
+        output = await toolset.run_command(f"python3 -c {shlex.quote(code)}")
+    assert json.loads(output.removeprefix("[stdout]\n")) == env
+
+
+async def test_large_output_is_bounded_before_transfer(session: DaytonaSandboxSession) -> None:
+    cap = 64 * 1024
+    result = await session.exec(
+        "head -c 10485760 /dev/zero | tr '\\0' x; printf 'stdout-tail'; "
+        "head -c 10485760 /dev/zero | tr '\\0' y >&2; printf 'stderr-tail' >&2",
+        timeout=30,
+        max_output_bytes=cap,
+    )
+    assert len(result.stdout.encode()) == cap
+    assert len(result.stderr.encode()) == cap
+    assert result.stdout.endswith("stdout-tail")
+    assert result.stderr.endswith("stderr-tail")
+    assert result.stdout_truncated and result.stderr_truncated
+
+
+async def test_cancelled_creation_leaves_no_orphan(backend: AsyncDaytona) -> None:
+    labels = {**LABELS, "case": f"cancel-{uuid.uuid4().hex}"}
+    entering = asyncio.create_task(DaytonaSandboxSession(labels=labels).__aenter__())
+    await asyncio.sleep(0.5)
+    assert not entering.done(), "Creation finished before cancellation could exercise it"
+    entering.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await entering
+    remaining = [sandbox.id for sandbox in await listed_sandboxes(backend, labels)]
+    assert not remaining
+
+
+async def test_out_of_band_deletion_is_terminal(backend: AsyncDaytona) -> None:
+    async with DaytonaSandboxSession(labels=LABELS) as session:
+        assert session.sandbox_id is not None
+        sandbox = await backend.get(session.sandbox_id)
+        await sandbox.delete(wait=True)
+        with pytest.raises(DaytonaSandboxTerminalError):
+            await session.exec("echo cannot-run", timeout=5)
+
+
+async def test_workdir_anchors_commands_and_files(session: DaytonaSandboxSession) -> None:
+    directory = f"/tmp/pai-workdir-{uuid.uuid4().hex}"
+    await session.exec(f"mkdir -p {directory}", timeout=30)
+    async with DaytonaSandboxSession(sandbox_id=session.sandbox_id, workdir=directory) as attached:
+        await attached.write_bytes("anchored.txt", b"anchored\n")
+        result = await attached.exec("pwd; cat anchored.txt", timeout=30)
+        assert result.stdout == f"{directory}\nanchored\n"
+        assert await attached.read_bytes("anchored.txt") == b"anchored\n"
+
+
+async def test_command_latency(session: DaytonaSandboxSession) -> None:
+    times = []
+    for _ in range(5):
+        started = time.perf_counter()
+        result = await session.exec("echo hi", timeout=30)
+        times.append(time.perf_counter() - started)
+        assert result.stdout == "hi\n"
+    print(f"\nAfter echo hi seconds: {times}; median={statistics.median(times):.6f}")
