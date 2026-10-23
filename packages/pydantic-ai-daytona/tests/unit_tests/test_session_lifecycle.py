@@ -102,3 +102,21 @@ async def test_owned_delete_failure_is_reported_not_raised(
     assert [r.getMessage() for r in caplog.records] == [
         f"Could not delete Daytona sandbox {sdk.sandbox.id}: destroy failed"
     ]
+
+
+async def test_owned_deletion_completes_when_teardown_is_cancelled(sdk: FakeDaytona) -> None:
+    # Given an owned session whose deletion is in flight.
+    session = await DaytonaSandboxSession().__aenter__()
+    sdk.sandbox.delete_release.clear()
+    exiting = asyncio.create_task(session.__aexit__(None, None, None))
+    await sdk.sandbox.delete_started.wait()
+
+    # When cancellation arrives before the deletion completes.
+    exiting.cancel()
+    asyncio.get_running_loop().call_soon(sdk.sandbox.delete_release.set)
+
+    # Then deletion completes before cancellation reaches the caller.
+    with pytest.raises(asyncio.CancelledError):
+        await exiting
+    assert sdk.sandbox.deleted
+    assert sdk.closed

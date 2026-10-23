@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 import shlex
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import uuid4
@@ -19,6 +21,8 @@ from daytona import (
 
 from ._asyncio import run_to_completion
 from ._errors import DaytonaSandboxError, operation_error
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True, frozen=True, slots=True)
@@ -74,6 +78,7 @@ class CapturedCommand:
         try:
             timed_out = False
             exit_code = -1
+            started = time.monotonic()
             try:
                 response = await self.sandbox.process.execute_session_command(
                     self.session_id,
@@ -83,8 +88,12 @@ class CapturedCommand:
                 if response.exit_code is None:
                     raise DaytonaSandboxError("The command did not report an exit code.")
                 exit_code = response.exit_code
-            except (DaytonaProcessExecutionTimeoutError, DaytonaConnectionTimeoutError):
+            except DaytonaProcessExecutionTimeoutError:
+                timed_out = True
+            except DaytonaConnectionTimeoutError:
                 # Daytona session deadlines arrive as connection timeouts (verified live).
+                if time.monotonic() - started < timeout - 0.1:
+                    raise
                 timed_out = True
             finally:
                 await run_to_completion(self._delete_session())
@@ -108,11 +117,11 @@ class CapturedCommand:
         # Base64 frames arbitrary bytes without delimiter collisions or broken UTF-8.
         script = "; ".join(
             f"if [ -f {path} ]; then wc -c < {path}; "
-            f"tail -c {self.max_bytes} -- {path} | base64 -w0; "
+            f"tail -c {self.max_bytes} {path} | base64 | tr -d '\\n'; "
             f'else printf "0\\n"; fi; printf "\\n"'
             for path in self.paths
         )
-        script = f"set -e; {script}; rm -f -- {' '.join(self.paths)} || :"
+        script = f"set -e; {script}; rm -f {' '.join(self.paths)} || :"
         response = await self.sandbox.process.exec(script, timeout=30)
         if response.exit_code != 0:
             raise DaytonaSandboxError("Could not collect the command output.")
@@ -135,14 +144,13 @@ class CapturedCommand:
 
     async def _delete_session(self) -> None:
         try:
-            await self.sandbox.process.delete_session(self.session_id)
-        except DaytonaError:
-            # Best-effort teardown must not replace the command's outcome.
-            return
+            await self.sandbox.process.delete_session(self.session_id, request_timeout=30)
+        except DaytonaError as error:
+            logger.warning("Could not delete Daytona process session %s: %s", self.session_id, error)
 
     async def _remove_files(self) -> None:
         try:
-            await self.sandbox.process.exec(f"rm -f -- {' '.join(self.paths)}", timeout=30)
+            await self.sandbox.process.exec(f"rm -f {' '.join(self.paths)}", timeout=30)
         except DaytonaError:
             # Only scratch files in the sandbox are left behind on cleanup failure.
             return

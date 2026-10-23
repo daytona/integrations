@@ -14,6 +14,7 @@ class FakeProcess:
         self.running: dict[str, asyncio.subprocess.Process] = {}
         self.created: list[str] = []
         self.deleted: list[str] = []
+        self.killed: list[str] = []
         self.transferred: list[int] = []
         self.setup_error: DaytonaError | None = None
         self.execute_error: DaytonaError | None = None
@@ -37,11 +38,11 @@ class FakeProcess:
         process = await self._spawn(request.command)
         self.running[session_id] = process
         try:
+            if self.force_timeout:
+                await asyncio.wait_for(process.wait(), timeout)
             out, err = await asyncio.wait_for(process.communicate(), timeout)
         except asyncio.TimeoutError:
             raise DaytonaConnectionTimeoutError("command deadline") from None
-        if self.force_timeout:
-            raise DaytonaConnectionTimeoutError("command deadline")
         return SimpleNamespace(
             exit_code=process.returncode, stdout=out.decode(), stderr=err.decode()
         )
@@ -67,13 +68,15 @@ class FakeProcess:
         self.transferred.append(len(out) + len(err))
         return SimpleNamespace(exit_code=process.returncode, result=out.decode())
 
-    async def delete_session(self, session_id: str) -> None:
+    async def delete_session(self, session_id: str, *, request_timeout: float = 30) -> None:
+        assert request_timeout == 30
         self.deleted.append(session_id)
         process = self.running.pop(session_id, None)
         if process is not None:
             if process.returncode is None:
                 assert process.pid is not None
                 os.killpg(process.pid, signal.SIGKILL)
+                self.killed.append(session_id)
             await process.wait()
 
 
@@ -111,8 +114,9 @@ class FakeSandbox:
         if self.refresh_error:
             raise self.refresh_error
 
-    async def delete(self, *, wait: bool) -> None:
+    async def delete(self, *, wait: bool, timeout: float) -> None:
         assert wait
+        assert timeout == 60
         self.delete_started.set()
         await self.delete_release.wait()
         if self.delete_error:

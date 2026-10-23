@@ -48,7 +48,7 @@ Command output labels stdout and stderr separately, reports non-zero exit codes,
 
 Commands receive stdin from `/dev/null` (`cat` without arguments exits rather than waiting for input). Each command has its own process session, so concurrent tool calls can run in parallel. Bash is used when available; images without bash fall back to `/bin/sh`. The shell is detected once per opened session (owned or attached), with `/bin/sh` also used if the probe fails. Pipes, redirection, and bare `exit N` preserve their usual behavior.
 
-Stdout and stderr are captured separately in unique sandbox temporary files. After completion or timeout, each stream is cut to its last `max_output_bytes` **inside the sandbox before transfer**; line limits are applied afterwards. Truncated streams retain a `[... output truncated ...]` marker. Output collection combines sizes, both bounded tails, and file removal in one API call (base64 framing adds bounded transfer overhead). Temporary files are removed best-effort, including on errors/cancellation.
+Stdout and stderr are captured separately in unique sandbox temporary files. After completion or timeout, each stream is cut to its last `max_output_bytes` **inside the sandbox before transfer**; line limits are applied afterwards. Truncated streams retain a `[... output truncated to the last <limit> ...]` marker, where `<limit>` is a byte size (e.g. `50.0KB`) or line count (e.g. `2000 lines`). Output collection combines sizes, both bounded tails, and file removal in one API call (base64 framing adds bounded transfer overhead). Temporary files are removed best-effort, including on errors/cancellation.
 
 A timeout now retains partial output rather than discarding it, followed by the applied deadline:
 
@@ -76,7 +76,7 @@ For fully untrusted code, block outbound network access at creation. Independent
 DaytonaSandbox(network_block_all=True, ephemeral=True, labels={'app': 'support-agent'})
 ```
 
-**Attached** — reuse a sandbox you manage elsewhere; stopped, archived, and paused sandboxes are restarted and never deleted by this package. Startup transitions are awaited with a deadline; destroyed/destroying sandboxes are rejected rather than restarted:
+**Attached** — reuse a sandbox you manage elsewhere; stopped, archived, and paused sandboxes are restarted and never deleted by this capability (their owner or Daytona may still delete them). Startup transitions are awaited with a deadline; destroyed/destroying sandboxes are rejected rather than restarted:
 
 ```python
 DaytonaSandbox(sandbox_id='my-sandbox-id', env={'APP_MODE': 'agent'})
@@ -84,7 +84,7 @@ DaytonaSandbox(sandbox_id='my-sandbox-id', env={'APP_MODE': 'agent'})
 
 `env` is applied per command in both owned and attached sessions, and also at creation for owned sandboxes. Values are shell-quoted literally (including spaces, quotes, `$HOME`, and newlines). Bash preserves dashed variable names; on the `sh` fallback, environment variable names that aren't valid shell identifiers are dropped. Per-command values do not permanently change an attached sandbox's environment. An injected session supplies its own `env`; do not also pass `env` to `DaytonaSandbox(session=...)`.
 
-Unclassified Daytona operation errors trigger a control-plane probe. If the sandbox is deleted/destroying, or was stopped while idle, the operation raises `DaytonaSandboxTerminalError` instead of asking the model to retry. An inconclusive probe keeps the original retryable error; known missing-file/session-ended errors remain retryable and authentication errors remain terminal. Reattach to resume an idle-stopped sandbox.
+Unclassified Daytona errors from command and file operations trigger a control-plane probe. Session-opening paths (attached lookup, startup, and transition waits) map errors directly without probing. If the sandbox is deleted/destroying, or was stopped while idle, the operation raises `DaytonaSandboxTerminalError` instead of asking the model to retry. An inconclusive probe keeps the original retryable error; known missing-file/session-ended errors remain retryable and authentication errors remain terminal. Reattach to resume an idle-stopped sandbox.
 
 **Injected session** — share one sandbox across several runs while controlling its lifetime yourself:
 

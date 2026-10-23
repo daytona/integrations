@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import posixpath
 from collections.abc import Mapping
@@ -33,14 +34,10 @@ DEFAULT_SANDBOX_CREATE_TIMEOUT = 120.0
 class DaytonaSandboxSession:
     """Lifecycle, command, and file access for one Daytona sandbox.
 
-    Use as an async context manager. With `sandbox_id` the session attaches to an
-    existing sandbox (resuming it if stopped, archived, or paused) and leaves it running
-    on exit; otherwise
-    it creates a sandbox on enter (from `snapshot`, `image`, or the Daytona default
-    snapshot) and deletes it on exit.
-
-    Pass an entered session to `DaytonaSandbox(session=...)` to reuse one sandbox
-    across agent runs while controlling its lifetime yourself.
+    As an async context manager, attach with `sandbox_id` to resume an existing sandbox
+    and leave it running on exit, or create an owned sandbox and delete it on exit.
+    Pass an entered session to `DaytonaSandbox(session=...)` to control its lifetime
+    across agent runs.
     """
 
     def __init__(
@@ -157,7 +154,7 @@ class DaytonaSandboxSession:
                 await self._delete_quietly(sandbox)
         finally:
             self._owned = False
-            await daytona.close()
+            await asyncio.wait_for(daytona.close(), timeout=30)
 
     async def __aexit__(
         self,
@@ -174,14 +171,14 @@ class DaytonaSandboxSession:
             return
         try:
             if owned and sandbox is not None:
-                await self._delete_quietly(sandbox)
+                await run_to_completion(self._delete_quietly(sandbox))
         finally:
-            await daytona.close()
+            await asyncio.wait_for(daytona.close(), timeout=30)
 
     @staticmethod
     async def _delete_quietly(sandbox: AsyncSandbox) -> None:
         try:
-            await sandbox.delete(wait=True)
+            await sandbox.delete(wait=True, timeout=60)
         except DaytonaError as error:
             # Reported, not raised: teardown runs after the agent's work is done, and failing
             # the run here would discard its result. The id lets the user delete it manually.

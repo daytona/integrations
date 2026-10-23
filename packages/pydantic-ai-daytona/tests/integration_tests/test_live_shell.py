@@ -1,7 +1,6 @@
 import pytest
 
 from pydantic_ai_daytona import DaytonaSandboxSession
-from .test_live_sandbox import backend as backend
 from .test_live_sandbox import pytestmark as pytestmark
 from .test_live_sandbox import session as session
 

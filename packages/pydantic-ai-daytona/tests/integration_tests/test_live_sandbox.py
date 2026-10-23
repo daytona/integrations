@@ -14,11 +14,8 @@ import pytest_asyncio
 from daytona import (
     AsyncDaytona,
     AsyncSandbox,
+    CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
-    DaytonaGoneError,
-    DaytonaNotFoundError,
-    ListSandboxesQuery,
-    SandboxState,
 )
 
 from pydantic_ai_daytona import (
@@ -29,6 +26,8 @@ from pydantic_ai_daytona import (
 )
 from pydantic_ai_daytona._toolset import DaytonaSandboxToolset
 
+from .conftest import LABELS, listed_sandboxes
+
 # One sandbox is shared across this module's tests, so every test must run on the
 # same (module-scoped) event loop the sandbox's HTTP client was created on.
 pytestmark = [
@@ -38,41 +37,6 @@ pytestmark = [
     ),
     pytest.mark.asyncio(loop_scope="module"),
 ]
-LABELS = {"pai-upgrade": os.environ.get("PAI_UPGRADE_RUN", uuid.uuid4().hex)}
-
-
-async def listed_sandboxes(client: AsyncDaytona, labels: dict[str, str]) -> list[AsyncSandbox]:
-    # Label-filtered lists can retain deleted records after delete(wait=True), verified live.
-    sandboxes = []
-    async for listed in client.list(ListSandboxesQuery(labels=labels)):
-        try:
-            current = await client.get(listed.id)
-        except (DaytonaNotFoundError, DaytonaGoneError):
-            continue
-        if current.state != SandboxState.DESTROYED:
-            sandboxes.append(current)
-    return sandboxes
-
-
-@pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
-async def backend() -> AsyncGenerator[AsyncDaytona, None]:
-    client = AsyncDaytona()
-    print(f"\nLive sandbox labels: {LABELS}")
-    try:
-        yield client
-    finally:
-        try:
-            leftovers = await listed_sandboxes(client, LABELS)
-            for sandbox in leftovers:
-                try:
-                    await sandbox.delete(wait=True)
-                except (DaytonaNotFoundError, DaytonaGoneError):
-                    continue
-            remaining = [sandbox.id for sandbox in await listed_sandboxes(client, LABELS)]
-            assert not remaining, f"Live sandboxes remain: {remaining}"
-            print(f"\nLabel-filtered cleanup: {len(remaining)} sandboxes remain")
-        finally:
-            await client.close()
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -263,10 +227,25 @@ async def test_large_output_is_bounded_before_transfer(session: DaytonaSandboxSe
     assert result.stdout_truncated and result.stderr_truncated
 
 
-async def test_cancelled_creation_leaves_no_orphan(backend: AsyncDaytona) -> None:
+async def test_cancelled_creation_leaves_no_orphan(
+    backend: AsyncDaytona, monkeypatch: pytest.MonkeyPatch
+) -> None:
     labels = {**LABELS, "case": f"cancel-{uuid.uuid4().hex}"}
+    create_started = asyncio.Event()
+    original_create = AsyncDaytona.create
+
+    async def create(
+        client: AsyncDaytona,
+        params: CreateSandboxFromSnapshotParams | CreateSandboxFromImageParams,
+        *,
+        timeout: float,
+    ) -> AsyncSandbox:
+        create_started.set()
+        return await original_create(client, params, timeout=timeout)
+
+    monkeypatch.setattr(AsyncDaytona, "create", create)
     entering = asyncio.create_task(DaytonaSandboxSession(labels=labels).__aenter__())
-    await asyncio.sleep(0.5)
+    await asyncio.wait_for(create_started.wait(), timeout=30)
     assert not entering.done(), "Creation finished before cancellation could exercise it"
     entering.cancel()
     with pytest.raises(asyncio.CancelledError):

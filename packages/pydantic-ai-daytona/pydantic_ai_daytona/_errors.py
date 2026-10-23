@@ -49,7 +49,7 @@ async def operation_error(
         return mapped
     try:
         await sandbox.refresh_data(request_timeout=30)
-    except (DaytonaNotFoundError, DaytonaGoneError):
+    except DaytonaNotFoundError:
         return DaytonaSandboxTerminalError(f"The sandbox is gone while {action}: {error}")
     except (DaytonaAuthenticationError, DaytonaForbiddenError) as probe_error:
         return map_error(probe_error, action)

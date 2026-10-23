@@ -75,7 +75,15 @@ async def test_generic_error_probes_deleted_states(sdk: FakeDaytona, state: Sand
 
 
 @pytest.mark.parametrize(
-    "probe_error", [DaytonaNotFoundError("gone"), DaytonaError("offline"), None]
+    "probe_error",
+    [
+        DaytonaNotFoundError("gone"),
+        DaytonaFileNotFoundError("path"),
+        DaytonaGoneError("unavailable"),
+        DaytonaSessionEndedError("session"),
+        DaytonaError("offline"),
+        None,
+    ],
 )
 async def test_probe_preserves_inconclusive_errors(
     sdk: FakeDaytona, probe_error: DaytonaError | None

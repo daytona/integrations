@@ -73,11 +73,8 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
     """
 
     sandbox_id: str | None = None
-    """Attach to an existing sandbox by id instead of creating one.
-
-    Attached sandboxes are resumed if stopped, archived, or paused, and are never deleted.
-    The settings that only apply when creating a sandbox (`snapshot`, `image`,
-    `auto_stop_interval`, `auto_delete_interval`) cannot be combined with `sandbox_id`.
+    """Attach by id, resuming stopped, archived, or paused sandboxes.
+    This capability never deletes attached sandboxes; creation-only settings are incompatible.
     """
 
     session: DaytonaSandboxSession | None = None
