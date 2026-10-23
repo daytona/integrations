@@ -1,0 +1,53 @@
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_execution.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-148
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_execution.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-112
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_errors.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-64
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_lifecycle.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-104
+packages/pydantic-ai-daytona/tests/unit_tests/test_toolset.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 17,21,26,38-40,43,90,174,177,185
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_asyncio.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-23
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_errors.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-112
+packages/pydantic-ai-daytona/tests/integration_tests/test_live_shell.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-35
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_toolset.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 23,193,202-206,211-213,226-227
+packages/pydantic-ai-daytona/tests/integration_tests/test_live_sandbox.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 4,6-7,14-29,41-75,79-82,131,133-134,165-166,173,225-304
+packages/pydantic-ai-daytona/tests/unit_tests/conftest.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-150
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_capability.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 78-79,93,95,273,296-298
+packages/pydantic-ai-daytona/tests/unit_tests/test_capability.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 28-32,34,127-129
+packages/pydantic-ai-daytona/tests/unit_tests/test_command_output.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-18
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_shell.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1-135
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_session.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 1,5,21-26,28,30,37-38,90,106-108,114-123,126-142,145,148,154-161,184-188,232,234-239,241-243,253,264,276,285
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_tool_output.py
+  s_67a803e3e6fc01::t_d43389fcd8fab4 13,17-19,127,135-137,141,213-233
+packages/pydantic-ai-daytona/README.md
+  s_67a803e3e6fc01::t_d43389fcd8fab4 49-62,71-72,79,82,85-88,109,124,136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "84e8d20c5120faf823562faf88f0576fdbce7585",
+  "prompts": {},
+  "sessions": {
+    "s_67a803e3e6fc01": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_013a263c3ffernjUEd3n8Ojk47",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
