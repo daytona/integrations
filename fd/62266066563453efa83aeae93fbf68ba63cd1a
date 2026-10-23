@@ -1,0 +1,139 @@
+.github/workflows/ci.yml
+  s_2d67aeecd44b71::t_16814825e32ed3 30,52-53,135,161,187,227-264,281,378
+.github/workflows/integration.yml
+  s_2d67aeecd44b71::t_83fdeecf8a8374 40,74,94-95,109,138,351-374,384
+.github/workflows/release.yml
+  s_2d67aeecd44b71::t_390a2142d5e8d5 58-59,148-171,223,227-228,232,234-235,260,262-263,288,290-291,314,316-317,347-348
+.release-please-manifest.json
+  s_2d67aeecd44b71::t_910d1571cfb0b0 8-9,11
+README.md
+  s_2d67aeecd44b71::t_f8751dc6cf64e7 11,38-39
+packages/agentenv-daytona/.gitignore
+  s_2d67aeecd44b71::t_741fd7d4d1c477 1-76
+packages/agentenv-daytona/CHANGELOG.md
+  s_2d67aeecd44b71::t_cf1b9fd06705c4 1-8
+packages/agentenv-daytona/LICENSE
+  s_2d67aeecd44b71::t_be836f5f0c4754 1-190
+packages/agentenv-daytona/README.md
+  s_2d67aeecd44b71::t_d6196bd09f3d09 1-245
+packages/agentenv-daytona/agentenv_daytona/__init__.py
+  s_2d67aeecd44b71::t_05f339ae3f472b 1-10
+packages/agentenv-daytona/agentenv_daytona/config.py
+  s_2d67aeecd44b71::t_a855ebe8adfe76 1-148
+packages/agentenv-daytona/agentenv_daytona/image.py
+  s_2d67aeecd44b71::t_91af395d32e662 1-55
+packages/agentenv-daytona/agentenv_daytona/lifecycle.py
+  s_2d67aeecd44b71::t_86c7dc5962396b 1-242
+packages/agentenv-daytona/agentenv_daytona/network.py
+  s_2d67aeecd44b71::t_b78554cd86f345 1-103
+packages/agentenv-daytona/agentenv_daytona/preview_domain.py
+  s_2d67aeecd44b71::t_6835a17c86738f 1-72
+packages/agentenv-daytona/agentenv_daytona/provider.py
+  s_2d67aeecd44b71::t_1520a73ec7a6c6 1-277
+packages/agentenv-daytona/agentenv_daytona/sandbox.py
+  s_2d67aeecd44b71::t_82156e68ece9bb 1-259
+packages/agentenv-daytona/agentenv_daytona/transfer.py
+  s_2d67aeecd44b71::t_696540eb8d50c7 1-134
+packages/agentenv-daytona/pyproject.toml
+  s_2d67aeecd44b71::t_b03c8742d193e4 1-79
+packages/agentenv-daytona/tests/integration_tests/conftest.py
+  s_2d67aeecd44b71::t_0bee63ec4d39be 1-90
+packages/agentenv-daytona/tests/integration_tests/test_live_cli.py
+  s_2d67aeecd44b71::t_7582e1deeaea4d 1-50
+packages/agentenv-daytona/tests/integration_tests/test_live_provider.py
+  s_2d67aeecd44b71::t_e759a6c23010a1 1-153
+packages/agentenv-daytona/tests/unit_tests/fakes.py
+  s_2d67aeecd44b71::t_9993b077ca6186 1-177
+packages/agentenv-daytona/tests/unit_tests/test_image.py
+  s_2d67aeecd44b71::t_62b3042ef0f906 1-57
+packages/agentenv-daytona/tests/unit_tests/test_lifecycle_clients.py
+  s_2d67aeecd44b71::t_7b091017b7fb9d 1-83
+packages/agentenv-daytona/tests/unit_tests/test_network.py
+  s_2d67aeecd44b71::t_a7db1f9ecd291e 1-126
+packages/agentenv-daytona/tests/unit_tests/test_preview_domain.py
+  s_2d67aeecd44b71::t_63af75280a7266 1-72
+packages/agentenv-daytona/tests/unit_tests/test_provider_config.py
+  s_2d67aeecd44b71::t_f4d917f478b5d3 1-128
+packages/agentenv-daytona/tests/unit_tests/test_provider_create.py
+  s_2d67aeecd44b71::t_80c2c0922e8710 1-498
+packages/agentenv-daytona/tests/unit_tests/test_registration.py
+  s_2d67aeecd44b71::t_11ff1c56f09178 1-73
+packages/agentenv-daytona/tests/unit_tests/test_sandbox_exec.py
+  s_2d67aeecd44b71::t_434af429f1888f 1-192
+packages/agentenv-daytona/tests/unit_tests/test_sandbox_files.py
+  s_2d67aeecd44b71::t_8428af5b5896d6 1-208
+packages/claude-toolsets/python/CHANGELOG.md
+  s_2d67aeecd44b71::t_355800e05bbe5e 3-9
+packages/claude-toolsets/python/README.md
+  s_2d67aeecd44b71::t_8bbfae124dc74c 48,59,102,108,110-112
+packages/claude-toolsets/python/daytona_claude_toolsets/_files.py
+  s_2d67aeecd44b71::t_220be06c960c7b 85-86
+packages/claude-toolsets/python/daytona_claude_toolsets/_tabs.py
+  s_2d67aeecd44b71::t_04f6444be794b3 74
+packages/claude-toolsets/python/daytona_claude_toolsets/browser.py
+  s_2d67aeecd44b71::t_f8bc8a04223d51 139-147,238-239,263,276-277,508,516-518,532,538,602-606,610,794-800,899,927,931,933,1333,1339,1348
+packages/claude-toolsets/python/daytona_claude_toolsets/computer.py
+  s_2d67aeecd44b71::t_d72d3b1d46d22c 8,13,42,61-84,143-144,343-351,356-364,381-385,387-391,561,565,591-611
+packages/claude-toolsets/python/pyproject.toml
+  s_2d67aeecd44b71::t_e0054775d924f6 7
+packages/claude-toolsets/python/tests/unit_tests/test_browser.py
+  s_2d67aeecd44b71::t_ede55a4d615184 4,185-186,528-583,613-633,644-680
+packages/claude-toolsets/python/tests/unit_tests/test_computer.py
+  s_2d67aeecd44b71::t_170cbc698a2b0f 6-7,18,31-44,84-85,92-152,458-477
+packages/claude-toolsets/typescript/tests/browser.test.ts
+  s_2d67aeecd44b71::t_64037b543bf309 9,11,30-42,47-59,62-64,68-70,76-81,85-95,99-100,106-109,155-161,408-951
+packages/claude-toolsets/typescript/tests/computer.test.ts
+  s_2d67aeecd44b71::t_0f8699862dd317 298-343
+packages/claude-toolsets/typescript/tests/helpers.ts
+  s_2d67aeecd44b71::t_5a19afa2c00736 1,156-170
+packages/convex/CHANGELOG.md
+  s_2d67aeecd44b71::t_d46dd5dcf8ddf1 3-11
+packages/convex/README.md
+  s_2d67aeecd44b71::t_2cfca186cfcbfa 229-265,271
+packages/convex/example/convex/_generated/server.d.ts
+  s_2d67aeecd44b71::t_9f78bad5f7c138 34
+packages/convex/example/convex/convex.config.ts
+  s_2d67aeecd44b71::t_bdd83401e52ff5 6-10,13-14,16-21
+packages/convex/package-lock.json
+  s_2d67aeecd44b71::t_26fbdb95c5eea0 3,9
+packages/convex/package.json
+  s_2d67aeecd44b71::t_68e8315aeca047 3
+packages/convex/scripts/live.mjs
+  s_2d67aeecd44b71::t_bdd223609b84e0 15-16,59-62,172-220
+packages/convex/src/component/_generated/api.ts
+  s_2d67aeecd44b71::t_c72a56d6dfd0e1 14,18,31,35
+packages/convex/src/component/_generated/component.ts
+  s_2d67aeecd44b71::t_242d323f048dc1 256,278
+packages/convex/src/component/_generated/server.ts
+  s_2d67aeecd44b71::t_ecca3a38ee4e6d 43
+packages/convex/src/component/convex.config.ts
+  s_2d67aeecd44b71::t_bf9f01799968fd 10-13
+packages/convex/src/component/http.ts
+  s_2d67aeecd44b71::t_313c77ff9c0b62 1-81
+packages/convex/src/component/sandboxes.ts
+  s_2d67aeecd44b71::t_78deeb6b00865c 161-167,173,195-197
+packages/convex/src/component/schema.ts
+  s_2d67aeecd44b71::t_bca44a02c57fdc 25-34
+packages/convex/src/component/webhooks.test.ts
+  s_2d67aeecd44b71::t_986be1c093826d 1-245
+packages/convex/src/component/webhooks.ts
+  s_2d67aeecd44b71::t_d327ddbd0f1b5e 1-151
+release-please-config.json
+  s_2d67aeecd44b71::t_bf7ca874971f10 36-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fd62266066563453efa83aeae93fbf68ba63cd1a",
+  "prompts": {},
+  "sessions": {
+    "s_2d67aeecd44b71": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e957f8b28ffeJU2eo4v6zHbUl2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
