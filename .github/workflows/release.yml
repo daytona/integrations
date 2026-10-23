@@ -55,6 +55,8 @@ jobs:
       pydantic_ai_tag: ${{ steps.release.outputs['packages/pydantic-ai-daytona--tag_name'] }}
       daytona_claude_toolsets_released: ${{ steps.release.outputs['packages/daytona-claude-toolsets--release_created'] }}
       daytona_claude_toolsets_tag: ${{ steps.release.outputs['packages/daytona-claude-toolsets--tag_name'] }}
+      agentenv_daytona_released: ${{ steps.release.outputs['packages/agentenv-daytona--release_created'] }}
+      agentenv_daytona_tag: ${{ steps.release.outputs['packages/agentenv-daytona--tag_name'] }}
       convex_released: ${{ steps.release.outputs['packages/convex--release_created'] }}
       convex_tag: ${{ steps.release.outputs['packages/convex--tag_name'] }}
       claude_toolsets_released: ${{ steps.release.outputs['packages/claude-toolsets--release_created'] }}
@@ -142,6 +144,30 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: packages/daytona-claude-toolsets/dist
+
+  # ---- PyPI: agentenv-daytona (setuptools) -------------------------------
+  publish-agentenv-daytona:
+    needs: release-please
+    if: needs.release-please.outputs.agentenv_daytona_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC -> PyPI Trusted Publishing
+      contents: read
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Build sdist + wheel
+        working-directory: packages/agentenv-daytona
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/agentenv-daytona/dist
 
   # ---- PyPI: langchain-daytona-data-analysis (Poetry) ---------------------
   publish-langchain:

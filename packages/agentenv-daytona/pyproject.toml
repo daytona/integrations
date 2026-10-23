@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentenv-daytona"
+version = "0.0.0"
+description = "Daytona sandbox provider for Scale AI's AgentEnv framework"
+readme = "README.md"
+requires-python = ">=3.11.4"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Daytona Platforms Inc.", email = "support@daytona.io"}
+]
+keywords = ["agentenv", "agentenv-framework", "daytona", "sandbox", "reinforcement-learning", "agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Floor: the `agent_env.sandbox_providers` entry-point group and the VmSandbox
+    # file-transfer hooks this provider overrides. agent-env checks this pin before
+    # loading the plugin and skips it when the installed agent-env is outside it.
+    "agentenv-framework>=0.9.1322,<0.10",
+    "daytona>=0.224.0,<0.225.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.24.0",
+    "black>=23.0.0",
+    "ruff>=0.15,<0.17",
+    "mypy>=1.0.0",
+    "httpx>=0.27",
+]
+
+[project.entry-points."agent_env.sandbox_providers"]
+daytona = "agentenv_daytona.provider:DaytonaSandboxProvider"
+
+[project.urls]
+Homepage = "https://github.com/daytona/integrations/tree/main/packages/agentenv-daytona#readme"
+Repository = "https://github.com/daytona/integrations"
+Documentation = "https://github.com/daytona/integrations/tree/main/packages/agentenv-daytona#readme"
+Issues = "https://github.com/daytona/integrations/issues"
+
+[tool.setuptools]
+packages = ["agentenv_daytona"]
+
+[tool.setuptools.package-data]
+agentenv_daytona = ["py.typed"]
+
+[tool.pytest.ini_options]
+# Unit tests only by default; live tests live in tests/integration_tests and are
+# invoked explicitly (see .github/workflows/integration.yml).
+testpaths = ["tests/unit_tests"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
