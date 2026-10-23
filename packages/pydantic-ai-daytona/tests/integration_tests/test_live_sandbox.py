@@ -26,7 +26,7 @@ from pydantic_ai_daytona import (
 )
 from pydantic_ai_daytona._toolset import DaytonaSandboxToolset
 
-from .conftest import LABELS, listed_sandboxes
+from .conftest import LABELS, is_gone, listed_sandboxes
 
 # One sandbox is shared across this module's tests, so every test must run on the
 # same (module-scoped) event loop the sandbox's HTTP client was created on.
@@ -232,6 +232,7 @@ async def test_cancelled_creation_leaves_no_orphan(
 ) -> None:
     labels = {**LABELS, "case": f"cancel-{uuid.uuid4().hex}"}
     create_started = asyncio.Event()
+    created: list[str] = []
     original_create = AsyncDaytona.create
 
     async def create(
@@ -241,7 +242,9 @@ async def test_cancelled_creation_leaves_no_orphan(
         timeout: float,
     ) -> AsyncSandbox:
         create_started.set()
-        return await original_create(client, params, timeout=timeout)
+        sandbox = await original_create(client, params, timeout=timeout)
+        created.append(sandbox.id)
+        return sandbox
 
     monkeypatch.setattr(AsyncDaytona, "create", create)
     entering = asyncio.create_task(DaytonaSandboxSession(labels=labels).__aenter__())
@@ -250,8 +253,11 @@ async def test_cancelled_creation_leaves_no_orphan(
     entering.cancel()
     with pytest.raises(asyncio.CancelledError):
         await entering
-    remaining = [sandbox.id for sandbox in await listed_sandboxes(backend, labels)]
-    assert not remaining
+    # Creation must run to completion despite the cancellation, so its id is always known.
+    assert created, "create never returned, so the created sandbox cannot be verified"
+    remaining = [sandbox_id for sandbox_id in created if not await is_gone(backend, sandbox_id)]
+    assert not remaining, f"Orphaned sandboxes: {remaining}"
+    assert not await listed_sandboxes(backend, labels)
 
 
 async def test_out_of_band_deletion_is_terminal(backend: AsyncDaytona) -> None:
