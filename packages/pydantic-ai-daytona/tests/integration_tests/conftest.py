@@ -1,11 +1,18 @@
 import os
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterable
 from typing import Any
 
 import pytest
 import pytest_asyncio
-from daytona import AsyncDaytona, AsyncSandbox, DaytonaNotFoundError, ListSandboxesQuery, SandboxState
+from daytona import (
+    AsyncDaytona,
+    AsyncSandbox,
+    DaytonaError,
+    DaytonaNotFoundError,
+    ListSandboxesQuery,
+    SandboxState,
+)
 
 LABELS = {"pai-upgrade": f"{os.environ.get('PAI_UPGRADE_RUN', 'live')}-{uuid.uuid4().hex}"}
 # Every sandbox created during the run, verified by id at cleanup: a label-filtered list
@@ -34,6 +41,54 @@ async def listed_sandboxes(client: AsyncDaytona, labels: dict[str, str]) -> list
     return sandboxes
 
 
+async def cleanup_sandboxes(
+    client: AsyncDaytona, sandbox_ids: Iterable[str], labels: dict[str, str]
+) -> int:
+    """Delete every tracked and label-listed sandbox, then verify none remain.
+
+    Every deletion is attempted even when others fail; all failures and leftovers are
+    reported together at the end, so one transient error cannot leak the rest.
+    """
+    ids = sorted(sandbox_ids)
+    failures: list[str] = []
+
+    async def delete(sandbox_id: str, sandbox: AsyncSandbox | None = None) -> None:
+        try:
+            current = sandbox if sandbox is not None else await client.get(sandbox_id)
+            if current.state != SandboxState.DESTROYED:
+                await current.delete(wait=True, timeout=60)
+        except DaytonaNotFoundError:
+            return
+        except DaytonaError as error:
+            failures.append(f"delete {sandbox_id}: {error!r}")
+
+    async def listed(phase: str) -> list[AsyncSandbox]:
+        try:
+            return await listed_sandboxes(client, labels)
+        except DaytonaError as error:
+            failures.append(f"{phase} label sweep: {error!r}")
+            return []
+
+    for sandbox_id in ids:
+        await delete(sandbox_id)
+    for sandbox in await listed("delete"):
+        await delete(sandbox.id, sandbox)
+
+    remaining: list[str] = []
+    for sandbox_id in ids:
+        try:
+            if not await is_gone(client, sandbox_id):
+                remaining.append(sandbox_id)
+        except DaytonaError as error:
+            failures.append(f"verify {sandbox_id}: {error!r}")
+    remaining += [s.id for s in await listed("verify") if s.id not in remaining]
+    if remaining or failures:
+        raise AssertionError(
+            f"Live sandbox cleanup incomplete: remaining={remaining} failures={failures}"
+        )
+    return len(ids)
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
 async def backend() -> AsyncGenerator[AsyncDaytona, None]:
     original_create = AsyncDaytona.create
@@ -51,21 +106,7 @@ async def backend() -> AsyncGenerator[AsyncDaytona, None]:
             yield client
         finally:
             try:
-                for sandbox_id in sorted(CREATED_IDS):
-                    try:
-                        sandbox = await client.get(sandbox_id)
-                        if sandbox.state != SandboxState.DESTROYED:
-                            await sandbox.delete(wait=True, timeout=60)
-                    except DaytonaNotFoundError:
-                        continue
-                for sandbox in await listed_sandboxes(client, LABELS):
-                    try:
-                        await sandbox.delete(wait=True, timeout=60)
-                    except DaytonaNotFoundError:
-                        continue
-                remaining = [i for i in sorted(CREATED_IDS) if not await is_gone(client, i)]
-                remaining += [s.id for s in await listed_sandboxes(client, LABELS)]
-                assert not remaining, f"Live sandboxes remain: {sorted(set(remaining))}"
-                print(f"\nCleanup verified by id: {len(CREATED_IDS)} created, none remain")
+                created = await cleanup_sandboxes(client, CREATED_IDS, LABELS)
+                print(f"\nCleanup verified by id: {created} created, none remain")
             finally:
                 await client.close()
