@@ -10,9 +10,12 @@ consistent behavior across sandbox capabilities.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic_ai.exceptions import ModelRetry
+
+if TYPE_CHECKING:
+    from ._execution import DaytonaSandboxExecResult
 
 DEFAULT_MAX_LINES = 2000
 DEFAULT_MAX_BYTES = 50 * 1024
@@ -121,6 +124,7 @@ def truncate_output(
     max_lines: int = DEFAULT_MAX_LINES,
     max_bytes: int = DEFAULT_MAX_BYTES,
     direction: Literal["head", "tail"] = "tail",
+    already_truncated: bool = False,
 ) -> str:
     """Cap free-form tool output (e.g. shell) and mark it when anything was dropped.
 
@@ -128,11 +132,13 @@ def truncate_output(
     a marker rather than a continuation offset. Defaults to `tail`: command errors and
     exit status live at the end.
     """
-    result = truncate(_split_lines(text), max_lines=max_lines, max_bytes=max_bytes, direction=direction)
+    result = truncate(
+        _split_lines(text), max_lines=max_lines, max_bytes=max_bytes, direction=direction
+    )
     if result.first_line_exceeded:
         return f"[... first line exceeds the {format_size(max_bytes)} limit, output omitted ...]"
     body = "\n".join(result.kept_lines)
-    if not result.truncated:
+    if not result.truncated and not already_truncated:
         return body
     kept = "last" if direction == "tail" else "first"
     limit = f"{max_lines} lines" if result.truncated_by == "lines" else format_size(max_bytes)
@@ -204,3 +210,24 @@ def render_file_window(
         return f"{body}\n\n[{remaining} more lines in file. Use offset={end + 1} to continue.]"
 
     return body
+
+
+def render_command_result(
+    result: DaytonaSandboxExecResult, *, max_bytes: int, max_lines: int
+) -> str:
+    parts: list[str] = []
+    for label, text, cut in (
+        ("stdout", result.stdout, result.stdout_truncated),
+        ("stderr", result.stderr, result.stderr_truncated),
+    ):
+        if text or cut:
+            truncated = truncate_output(
+                text, max_lines=max_lines, max_bytes=max_bytes, already_truncated=cut
+            )
+            parts.append(f"[{label}]\n{truncated}")
+    output = "\n".join(parts) if parts else "(no output)"
+    if result.timed_out:
+        return f"{output}\n[timed out after {result.applied_timeout}s]"
+    if result.exit_code:
+        return f"{output}\n[exit code: {result.exit_code}]"
+    return output

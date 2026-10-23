@@ -20,6 +20,7 @@ from pydantic_ai_daytona._session import (
 )
 from pydantic_ai_daytona._tool_output import (
     guard_read_size,
+    render_command_result,
     render_file_window,
     truncate_output,
 )
@@ -189,7 +190,7 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
 
         The command runs through a shell, so pipes, redirection, `&&`, and globs work.
         A non-zero exit is reported, not raised, so you can react to it. A timed-out
-        command's output is not captured.
+        command returns the output written before its deadline. Stdin is closed.
 
         Args:
             command: The shell command to run.
@@ -198,27 +199,18 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
         """
         session = self._require_session()
         try:
-            result = await session.exec(command, timeout=self._command_timeout(timeout_seconds))
+            result = await session.exec(
+                command,
+                timeout=self._command_timeout(timeout_seconds),
+                max_output_bytes=self._max_output_bytes,
+            )
         except DaytonaSandboxTerminalError:
             raise
         except DaytonaSandboxError as e:
             raise ModelRetry(str(e))
-        if result.timed_out:
-            return f"[timed out after {result.applied_timeout}s; output was not captured]"
-        # Truncate each stream separately and label it afterwards, so the `[stdout]` /
-        # `[stderr]` markers always survive truncation and a large stderr cannot crowd
-        # stdout out of a shared budget.
-        parts: list[str] = []
-        for label, text in (("stdout", result.stdout), ("stderr", result.stderr)):
-            if text:
-                truncated = truncate_output(
-                    text, max_lines=self._max_output_lines, max_bytes=self._max_output_bytes
-                )
-                parts.append(f"[{label}]\n{truncated}")
-        output = "\n".join(parts) if parts else "(no output)"
-        if result.exit_code:
-            return f"{output}\n[exit code: {result.exit_code}]"
-        return output
+        return render_command_result(
+            result, max_lines=self._max_output_lines, max_bytes=self._max_output_bytes
+        )
 
     async def read_file(
         self,
@@ -231,11 +223,8 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
     ) -> str:
         """Read a text file from the sandbox and return its contents.
 
-        Large files are truncated to a safety cap; the result ends with the next
-        `offset` to use to page through the rest. Each page re-transfers the whole
-        file from the sandbox (Daytona has no ranged download), so for files of
-        megabytes prefer slicing server-side via `run_command` (e.g. `sed -n`,
-        `head`, `tail`, or `grep`).
+        Each page transfers the whole file; use shell slicing for large files.
+        Capped reads end with the next `offset` to continue from.
 
         Args:
             path: Path to the file inside the sandbox. Relative paths are resolved
