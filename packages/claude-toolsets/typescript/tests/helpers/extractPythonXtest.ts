@@ -25,7 +25,7 @@ export const readPythonXtestScript = (): string => {
   const helperDirectory = dirname(fileURLToPath(import.meta.url));
   const pythonPath = resolve(
     helperDirectory,
-    "../../../daytona-claude-toolsets/daytona_claude_toolsets/_xtest.py",
+    "../../../python/daytona_claude_toolsets/_xtest.py",
   );
   return extractPythonXtestScript(readFileSync(pythonPath, "utf8"));
 };

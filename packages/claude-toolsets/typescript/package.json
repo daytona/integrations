@@ -6,14 +6,14 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/daytona/integrations.git",
-    "directory": "packages/claude-toolsets"
+    "directory": "packages/claude-toolsets/typescript"
   },
   "author": "Daytona Platforms Inc.",
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/daytona/integrations/issues"
   },
-  "homepage": "https://github.com/daytona/integrations/tree/main/packages/claude-toolsets#readme",
+  "homepage": "https://github.com/daytona/integrations/tree/main/packages/claude-toolsets/typescript#readme",
   "keywords": [
     "daytona",
     "sandbox",
