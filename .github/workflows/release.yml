@@ -55,6 +55,8 @@ jobs:
       pydantic_ai_tag: ${{ steps.release.outputs['packages/pydantic-ai-daytona--tag_name'] }}
       daytona_claude_toolsets_released: ${{ steps.release.outputs['packages/claude-toolsets/python--release_created'] }}
       daytona_claude_toolsets_tag: ${{ steps.release.outputs['packages/claude-toolsets/python--tag_name'] }}
+      agentenv_daytona_released: ${{ steps.release.outputs['packages/agentenv-daytona--release_created'] }}
+      agentenv_daytona_tag: ${{ steps.release.outputs['packages/agentenv-daytona--tag_name'] }}
       convex_released: ${{ steps.release.outputs['packages/convex--release_created'] }}
       convex_tag: ${{ steps.release.outputs['packages/convex--tag_name'] }}
       claude_toolsets_released: ${{ steps.release.outputs['packages/claude-toolsets/typescript--release_created'] }}
@@ -143,6 +145,30 @@ jobs:
         with:
           packages-dir: packages/claude-toolsets/python/dist
 
+  # ---- PyPI: agentenv-daytona (setuptools) -------------------------------
+  publish-agentenv-daytona:
+    needs: release-please
+    if: needs.release-please.outputs.agentenv_daytona_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC -> PyPI Trusted Publishing
+      contents: read
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Build sdist + wheel
+        working-directory: packages/agentenv-daytona
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/agentenv-daytona/dist
+
   # ---- PyPI: langchain-daytona-data-analysis (Poetry) ---------------------
   publish-langchain:
     needs: release-please
@@ -194,19 +220,19 @@ jobs:
         run: npm install -g npm@latest
       - name: Install, build, publish
         working-directory: packages/n8n-nodes-daytona
-        # `n8n-node build` produces the n8n-compliant dist/. On `npm publish`,
+        # `n8n-node build` produces the n8n-compliant dist/. On publish,
         # the package's prepublishOnly hook (`n8n-node prerelease`) aborts with
         # exit 1 unless RELEASE_MODE is set — this is exactly what
         # `n8n-node release` exports internally when it publishes from CI. We
-        # set it explicitly so we can keep the direct, OIDC-friendly
-        # `npm publish --provenance` invocation instead of shelling out to the
-        # CLI's release command.
+        # set it explicitly so we can keep the OIDC-friendly npm CLI invocation
+        # instead of shelling out to the n8n CLI's release command.
         env:
           RELEASE_MODE: 'true'
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npx n8n-node build
-          npm publish --provenance --access public
+          # Stage for maintainer review and 2FA approval instead of publishing directly.
+          npm stage publish --provenance --access public
 
   # ---- npm: @daytona/pi (Pi coding-agent extension) -----------------------
   publish-pi:
@@ -231,9 +257,10 @@ jobs:
       - name: Install, build, publish
         working-directory: packages/pi-extension
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm run build --if-present
-          npm publish --provenance --access public
+          # Stage for maintainer review and 2FA approval instead of publishing directly.
+          npm stage publish --provenance --access public
 
   # ---- npm: @daytona/convex (Convex component) ----------------------------
   publish-convex:
@@ -258,9 +285,10 @@ jobs:
       - name: Install, build, publish
         working-directory: packages/convex
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm run build
-          npm publish --provenance --access public
+          # Stage for maintainer review and 2FA approval instead of publishing directly.
+          npm stage publish --provenance --access public
 
   # ---- npm: @daytona/opencode (OpenCode plugin) ---------------------------
   publish-opencode:
@@ -283,9 +311,10 @@ jobs:
       - name: Install, build, publish
         working-directory: packages/opencode-plugin
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm run build --if-present
-          npm publish --provenance --access public
+          # Stage for maintainer review and 2FA approval instead of publishing directly.
+          npm stage publish --provenance --access public
 
   # ---- npm: @daytona/claude-toolsets (Anthropic toolset drivers) ----------
   # npm (TypeScript) — distinct from publish-daytona-claude-toolsets (PyPI/Python).
@@ -315,4 +344,5 @@ jobs:
           # dependency's install script (protobufjs' postinstall, via @daytona/sdk) needs to run.
           npm ci --ignore-scripts
           npm run build
-          npm publish --provenance --access public
+          # Stage for maintainer review and 2FA approval instead of publishing directly.
+          npm stage publish --provenance --access public

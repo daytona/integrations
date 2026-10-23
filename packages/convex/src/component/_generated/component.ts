@@ -253,6 +253,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           lastError?: string;
           name?: string;
           public?: boolean;
+          remoteUpdatedAt?: number;
           sandboxId: string;
           snapshot?: string;
           state: string;
@@ -274,6 +275,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           lastError?: string;
           name?: string;
           public?: boolean;
+          remoteUpdatedAt?: number;
           sandboxId: string;
           snapshot?: string;
           state: string;

@@ -295,6 +295,52 @@ describe("DaytonaComputer native and XTest routing", () => {
     await toolset.close();
   });
 
+  // `middle_click` is the one computer member the rest of the suite never dispatched through
+  // `toolResult()`. README: it is a plain click, so it takes the native mouse API and — unlike the
+  // migrated members — must NOT spend a capability probe, because it works on older daemons too.
+  it("dispatches a plain middle click natively without probing the platform", async () => {
+    const { mock, toolset } = await computer();
+
+    const result = await callMember(toolset, "middle_click", { coordinate: [7, 9] });
+
+    expect(result.is_error).not.toBe(true);
+    expect(mock.raw.computerUse.mouse.click).toHaveBeenCalledWith(7, 9, "middle", false, 1, []);
+    expect(mock.raw.computerUse.mouse.down).not.toHaveBeenCalled();
+    await toolset.close();
+  });
+
+  it("probes the platform for a middle click holding a modifier", async () => {
+    const { mock, toolset } = await computer();
+    mock.raw.computerUse.mouse.down.mockRejectedValueOnce(new DaytonaError("probe", 400));
+
+    await callMember(toolset, "middle_click", { coordinate: [7, 9], text: "shift" });
+
+    expect(mock.raw.computerUse.mouse.down).toHaveBeenCalledWith(0);
+    expect(mock.raw.computerUse.mouse.click).toHaveBeenCalledWith(7, 9, "middle", false, 1, ["shift"]);
+    await toolset.close();
+  });
+
+  it("orders a non-modifier middle-click chord through XTest on button 2", async () => {
+    const { mock, toolset } = await computer();
+
+    await callMember(toolset, "middle_click", { coordinate: [7, 9], text: "ctrl+a" });
+
+    expect(xtestActions(mock)).toEqual([["move", 7, 9], ["keydown", "Control_L"], ["keydown", "a"], ["down", 2], ["up", 2], ["keyup", "a"], ["keyup", "Control_L"]]);
+    expect(mock.raw.computerUse.mouse.click).not.toHaveBeenCalled();
+    await toolset.close();
+  });
+
+  it("refuses an off-screen middle click instead of clamping it", async () => {
+    const { mock, toolset } = await computer();
+
+    const result = await callMember(toolset, "middle_click", { coordinate: [0, 800] });
+
+    expect(result.is_error).toBe(true);
+    expect(resultText(result)).toContain("outside the 1280x800 screen");
+    expect(mock.raw.computerUse.mouse.click).not.toHaveBeenCalled();
+    await toolset.close();
+  });
+
   it("uses native routing arguments for triple click, horizontal scroll and modifier drag", async () => {
     const { mock, toolset } = await computer();
     mock.raw.computerUse.mouse.down.mockRejectedValueOnce(new DaytonaError("probe", 400));

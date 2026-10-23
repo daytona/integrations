@@ -226,12 +226,49 @@ export const mySandboxes = query({
 });
 ```
 
+### Keeping sandbox state in sync (webhooks)
+
+Sandbox records reflect what the component last observed. When Daytona changes a sandbox on its own (auto-stop, auto-archive, auto-delete), the record lags until you call `refreshSandbox`. To keep the `sandboxes` table in sync in real time, connect a Daytona webhook. It's opt-in, and it takes three steps:
+
+**1. Mount the component's webhook route and pass the secret down** in `convex/convex.config.ts`:
+
+```ts
+const app = defineApp({
+  env: {
+    DAYTONA_API_KEY: v.string(),
+    DAYTONA_WEBHOOK_SECRET: v.optional(v.string()),
+  },
+});
+app.use(daytona, {
+  httpPrefix: "/daytona/",
+  env: {
+    DAYTONA_API_KEY: app.env.DAYTONA_API_KEY,
+    DAYTONA_WEBHOOK_SECRET: app.env.DAYTONA_WEBHOOK_SECRET,
+  },
+});
+```
+
+**2. Create a webhook endpoint in the Daytona Dashboard** ([how to create an endpoint](https://www.daytona.io/docs/en/webhooks#create-webhook-endpoints)):
+
+- **Endpoint URL**: `https://<your-deployment>.convex.site/daytona/webhook` (your deployment's HTTP actions URL, plus the prefix above)
+- **Events**: subscribe to `sandbox.state.updated`. The component ignores every other event, so subscribing to anything else only creates extra deliveries.
+
+Create the endpoint in the **same Daytona organization as your `DAYTONA_API_KEY`**: webhooks are per organization, so an endpoint in another org never receives your sandboxes' events.
+
+**3. Copy the endpoint's signing secret into your deployment.** Daytona generates a signing secret (starting with `whsec_`) for each endpoint you create and signs every delivery with it. In the Daytona Dashboard's **Webhooks** page, click your endpoint in the endpoints table; its details show the signing secret, ready to copy. Set it on your Convex deployment:
+
+```bash
+npx convex env set DAYTONA_WEBHOOK_SECRET whsec_...
+```
+
+From then on, every state change Daytona makes shows up in `getSandbox`/`listSandboxes` as it happens. For example, `listSandboxes(ctx, { state: "started" })` becomes an accurate live count. Every delivery's signature is verified (deliveries older than 5 minutes are rejected as possible replays). Duplicate and out-of-order deliveries are handled automatically. Events for sandboxes this deployment doesn't track are acknowledged and ignored, since an endpoint receives every sandbox in your organization. If the secret isn't set, the route refuses all deliveries.
+
 ### Limits & long-running work
 
 - Convex actions time out after 10 minutes, so synchronous `run`/`runCode` commands are always bounded below that ceiling: `timeoutSeconds` defaults to 540 and is capped at 570. For longer jobs, use `runBackground` — it has no duration bound and holds no action open.
 - Sandbox and execution rows are kept as audit history. They never clean themselves up — prune them in batches with `daytona.purgeSandboxes(ctx, { olderThanMs })` and `daytona.purgeExecutions(ctx, { olderThanMs })` (each call returns `hasMore`; terminal rows only, remote sandboxes untouched). `listSandboxes` accepts a `state` filter (e.g. `"started"` for a live count) and `listSandboxesPaginated` provides cursor pagination.
 - Stored execution output is truncated (64 KB); the action's return value carries up to 4 MB.
-- Sandboxes cost money while running: set `autoStopInterval`, and delete sandboxes you're done with. `refreshSandbox` reconciles records whose remote sandbox was removed out-of-band.
+- Sandboxes cost money while running: set `autoStopInterval`, and delete sandboxes you're done with. `refreshSandbox` reconciles a record on demand; [webhooks](#keeping-sandbox-state-in-sync-webhooks) keep all records in sync automatically.
 
 See [example/convex/example.ts](./example/convex/example.ts) for a complete example app.
 

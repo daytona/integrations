@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.0](https://github.com/daytona/integrations/compare/convex-v2.0.0...convex-v2.1.0) (2026-10-09)
+
+
+### Features
+
+* **convex:** binary-safe readFileBytes/writeFileBytes ([#79](https://github.com/daytona/integrations/issues/79)) ([b5cb0e8](https://github.com/daytona/integrations/commit/b5cb0e83d59b4e679f7d4e66b7eab683a8d91491))
+* **convex:** onComplete callbacks, cancelExecution, poll tuning, and row hygiene for background executions ([#77](https://github.com/daytona/integrations/issues/77)) ([8cd4647](https://github.com/daytona/integrations/commit/8cd464748123663532d794f8cc1ac3d55efb0797))
+* **convex:** webhook-driven sandbox state sync ([#83](https://github.com/daytona/integrations/issues/83)) ([cb0d4e8](https://github.com/daytona/integrations/commit/cb0d4e898625910f415517f4f1f0121e18c527af))
+
 ## [2.0.0](https://github.com/daytona/integrations/compare/convex-v1.1.0...convex-v2.0.0) (2026-10-02)
 
 

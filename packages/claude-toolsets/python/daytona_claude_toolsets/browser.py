@@ -136,6 +136,15 @@ KEEP_ALIVE = 45.0
 """The longest the sandbox may go unheard from while the browser is in use. Under Daytona's
 shortest auto-stop interval (one minute) with room for the round trip, and counted across a
 member's own wait, not just between calls."""
+UNCHECKED_URL_POLICY = (
+    "no url_policy was given, so navigate and page requests are not checked; anything the sandbox "
+    "network can reach is reachable, including local services. Pass url_policy (or None to refuse "
+    "everything) to restrict it."
+)
+PUBLIC_SANDBOX = (
+    "the sandbox is public, so its preview URLs need no authentication: anyone who knows the "
+    "sandbox id can reach Chromium's debugging port and control the browser. Use a private sandbox."
+)
 
 PLAYWRIGHT_MODIFIERS = {"ctrl": "Control", "alt": "Alt", "shift": "Shift", "cmd": "Meta"}
 
@@ -226,6 +235,8 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             policy = options["file_policy"] = policy.for_download_dir(self._download_dir)
             self._download_dir = policy.download_dir or self._download_dir
         super().__init__(**options)
+        if not self._has_url_policy:
+            log.warning(UNCHECKED_URL_POLICY)
 
         self._policy: Any = policy
         """The file policy as configured, of whatever class, for the download-path check."""
@@ -249,7 +260,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._downloads: dict[str, str] = {}
         self._refused_tabs: set[str] = set()
         """Tabs a page-started navigation left on an address the url policy refuses."""
-        self._navigating = False
+        self._navigating_tabs: set[str] = set()
         self._disconnected = False
         self._last_activity = time.monotonic()
         """When the sandbox last saw something Daytona counts as activity. Construction does."""
@@ -262,6 +273,8 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
                 on_close=on_close,
                 create_timeout=create_timeout,
             )
+            if self.sandbox.public is True:
+                log.warning(PUBLIC_SANDBOX)
             port = self._launch(chromium, headless)
             self._connect(port)
         except BaseException:
@@ -492,7 +505,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         otherwise leave the model reading a page the policy bars. The tab is only marked here —
         an event handler runs while Playwright is waiting and must not call back into it — and
         is taken off the page before the next member runs."""
-        if self._navigating or not self._has_url_policy:
+        if not self._has_url_policy:
             return
         try:
             if frame.parent_frame is not None:
@@ -500,7 +513,9 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             tab, url = self._tab_of(frame.page), frame.url
         except PlaywrightError:
             return  # the page went away meanwhile
-        if tab is None or url in ("", "about:blank") or not self._refuses(url, tab.id):
+        if tab is None or tab.id in self._navigating_tabs:
+            return
+        if url in ("", "about:blank") or not self._refuses(url, tab.id):
             return
         self._refused_tabs.add(tab.id)
         self._changes.append(BetaNavigationRefused())
@@ -514,13 +529,13 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
 
     def _blank(self, tab: Tab) -> None:
         """Leave a page the URL policy refuses, without reporting a second refusal for it."""
-        self._navigating = True
+        self._navigating_tabs.add(tab.id)
         try:
             tab.page.goto("about:blank", wait_until="commit", timeout=self._navigation_ms)
         except Exception as exc:
             log.debug("could not leave a page the url policy refused: %s", type(exc).__name__)
         finally:
-            self._navigating = False
+            self._navigating_tabs.discard(tab.id)
             self._refused_tabs.discard(tab.id)
             tab.world = None
 
@@ -584,11 +599,15 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
             top_level = request.is_navigation_request() and request.frame.parent_frame is None
         except PlaywrightError:
             top_level = False
-        if top_level and not self._navigating:
+        # Aborting a page-started top-level request is itself a refused navigation and must be
+        # reported, even though no refused document committed. Suppress only the tab whose
+        # `navigate()` call is already responsible for reporting its own refusal; another tab's
+        # request remains an independent page-started navigation.
+        if top_level and (tab is None or tab.id not in self._navigating_tabs):
             self._changes.append(BetaNavigationRefused())
 
     def _on_download_begin(self, event: dict[str, Any]) -> None:
-        guid, url = str(event.get("guid", "")), str(event.get("url", ""))
+        guid, url = str(event.get("guid", "")), str(event.get("url", ""))[:MAX_TEXT]
         self._downloads[guid] = url
         self._changes.append({"type": "download_started", "download_id": guid, "url": url})
 
@@ -772,8 +791,13 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         title = tab.title
         if tab.target_id is not None and tab.target_id in titles:
             title, url = titles[tab.target_id]
-            tab.title = title
-        return {"tab_id": tab.id, "title": title, "url": url, "active": tab.id == self._active}
+            tab.title = title[:MAX_TEXT]
+        return {
+            "tab_id": tab.id,
+            "title": title[:MAX_TEXT],
+            "url": url[:MAX_TEXT],
+            "active": tab.id == self._active,
+        }
 
     def _targets(self) -> dict[str, tuple[str, str]]:
         """Every page's title and URL in one CDP round trip."""
@@ -872,7 +896,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         tab = self._tab(input.tab_id)
         page = tab.page
         before = page.url
-        self._navigating = True
+        self._navigating_tabs.add(tab.id)
         try:
             if input.url in ("back", "forward", "reload"):
                 history = {"back": page.go_back, "forward": page.go_forward, "reload": page.reload}
@@ -900,13 +924,13 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
                 raise ToolError(failure_phrase(exc)) from None
             response = None  # the address is a download, reported in the browser state
         finally:
-            self._navigating = False
+            self._navigating_tabs.discard(tab.id)
         tab.world = None
         self._check_where_it_landed(tab, before)
         return BetaBrowserNavigateResult(
-            url=page.url,
+            url=page.url[:MAX_TEXT],
             status=response.status if response is not None else None,
-            title=(safe_title(page) or None),
+            title=(safe_title(page)[:MAX_TEXT] or None),
         )
 
     def _check_where_it_landed(self, tab: Tab, before: str) -> None:
@@ -1306,21 +1330,13 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         self._on_page(page)  # the context's page event may not have run yet
         tab = self._tabs[self._by_page[page]]
         self._activate(tab.id)
-        return {"tab_id": tab.id, "title": "", "url": page.url, "active": True}
+        return self._entry(tab, {})
 
     @override
     def list_tabs(
         self, context: BetaToolsetCallContext, input: BetaBrowserListTabsInput
     ) -> list[BetaBrowserStateTabEntryParam]:
-        return [
-            {
-                "tab_id": tab.id,
-                "title": tab.title,
-                "url": tab.page.url,
-                "active": tab.id == self._active,
-            }
-            for tab in self._tabs.values()
-        ]
+        return [self._entry(tab, {}) for tab in self._tabs.values()]
 
     @override
     def switch_tab(
@@ -1329,7 +1345,7 @@ class DaytonaBrowser(BetaAbstractBrowserToolset20260801):
         tab = self._tab(input.tab_id)
         tab.page.bring_to_front()
         self._activate(tab.id)
-        return {"tab_id": tab.id, "title": tab.title, "url": tab.page.url, "active": True}
+        return self._entry(tab, {})
 
     @override
     def close_tab(self, context: BetaToolsetCallContext, input: BetaBrowserCloseTabInput) -> None:

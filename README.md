@@ -8,6 +8,7 @@ Packages published to **a package registry** live in [`packages/`](packages/):
 
 | Package | Published as |
 |---|---|
+| [`agentenv-daytona`](packages/agentenv-daytona) — AgentEnv (Scale AI) sandbox provider | PyPI · [`agentenv-daytona`](https://pypi.org/project/agentenv-daytona/) |
 | [`adk-plugin`](packages/adk-plugin) — Google ADK plugin | PyPI · [`daytona-adk`](https://pypi.org/project/daytona-adk/) |
 | [`langchain-data-analysis`](packages/langchain-data-analysis) — LangChain data-analysis tool | PyPI · [`langchain-daytona-data-analysis`](https://pypi.org/project/langchain-daytona-data-analysis/) |
 | [`convex`](packages/convex) — Convex sandbox component | npm · [`@daytona/convex`](https://www.npmjs.com/package/@daytona/convex) |
@@ -34,7 +35,8 @@ Standalone projects **not published to a package registry** live in [`apps/`](ap
 Versioning is **per package**, automated with [release-please](https://github.com/googleapis/release-please):
 
 - Merging PRs to `main` keeps a rolling **Release PR** per affected package up to date.
-- Merging a package's Release PR tags it (`<component>-vX.Y.Z`), publishes a GitHub Release, and publishes to npm/PyPI via OIDC (with provenance) — no manual publish step.
+- Merging a package's Release PR tags it (`<component>-vX.Y.Z`), publishes a GitHub Release, and publishes to PyPI via OIDC (with provenance) — no manual publish step.
+- For npm packages, the Release PR merge stages the version with provenance. A maintainer must then approve it with 2FA on npmjs.com (**package → Staged Packages**) or with `npm stage list` and `npm stage approve <id>`.
 
 ## Contributing
 

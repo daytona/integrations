@@ -7,5 +7,9 @@ export default defineComponent("daytona", {
   // runs from the scheduler, outside any call from the app.
   env: {
     DAYTONA_API_KEY: v.optional(v.string()),
+    // Signing secret of the Daytona webhook endpoint (see README). Optional:
+    // webhook-driven state sync is opt-in, and the webhook route refuses every
+    // request when it isn't set.
+    DAYTONA_WEBHOOK_SECRET: v.optional(v.string()),
   },
 });

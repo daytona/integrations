@@ -158,12 +158,19 @@ export const upsertSandbox = internalMutation({
       Object.entries(args).filter(([, value]) => value !== undefined),
     ) as typeof args;
     if (existing) {
-      await ctx.db.patch(existing._id, { ...defined, updatedAt: now });
+      await ctx.db.patch(existing._id, {
+        ...defined,
+        // A state observed via the API counts as the newest known state, so a
+        // late webhook event older than this observation can't overwrite it.
+        ...(defined.state !== undefined ? { remoteUpdatedAt: now } : {}),
+        updatedAt: now,
+      });
       return existing._id;
     }
     return await ctx.db.insert("sandboxes", {
       ...defined,
       createdAt: now,
+      remoteUpdatedAt: now,
       updatedAt: now,
     });
   },
@@ -185,7 +192,9 @@ export const setSandboxError = internalMutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         lastError: args.error,
-        ...(args.state !== undefined ? { state: args.state } : {}),
+        ...(args.state !== undefined
+          ? { state: args.state, remoteUpdatedAt: Date.now() }
+          : {}),
         updatedAt: Date.now(),
       });
     }

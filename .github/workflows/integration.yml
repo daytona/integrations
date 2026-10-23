@@ -37,6 +37,7 @@ on:
           - n8n
           - pi
           - pydantic-ai
+          - agentenv-daytona
 
 permissions:
   contents: read
@@ -70,6 +71,7 @@ jobs:
       n8n: ${{ steps.decide.outputs.n8n }}
       pi: ${{ steps.decide.outputs.pi }}
       pydantic_ai: ${{ steps.decide.outputs.pydantic_ai }}
+      agentenv_daytona: ${{ steps.decide.outputs.agentenv_daytona }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -89,6 +91,8 @@ jobs:
               - 'packages/pi-extension/**'
             pydantic_ai:
               - 'packages/pydantic-ai-daytona/**'
+            agentenv_daytona:
+              - 'packages/agentenv-daytona/**'
       - name: Decide which packages run
         id: decide
         env:
@@ -102,6 +106,7 @@ jobs:
           CH_N8N: ${{ steps.filter.outputs.n8n }}
           CH_PI: ${{ steps.filter.outputs.pi }}
           CH_PYDANTIC_AI: ${{ steps.filter.outputs.pydantic_ai }}
+          CH_AGENTENV_DAYTONA: ${{ steps.filter.outputs.agentenv_daytona }}
         run: |
           set -euo pipefail
           # Two lanes, one lane per PR type: same-repo PRs run on `pull_request`,
@@ -130,6 +135,7 @@ jobs:
             echo "n8n=$(decide n8n "${CH_N8N:-false}")"
             echo "pi=$(decide pi "${CH_PI:-false}")"
             echo "pydantic_ai=$(decide pydantic-ai "${CH_PYDANTIC_AI:-false}")"
+            echo "agentenv_daytona=$(decide agentenv-daytona "${CH_AGENTENV_DAYTONA:-false}")"
           } >> "$GITHUB_OUTPUT"
 
   adk:
@@ -342,6 +348,30 @@ jobs:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: pytest tests/integration_tests
 
+  agentenv-daytona:
+    needs: changes
+    if: needs.changes.outputs.agentenv_daytona == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: packages/agentenv-daytona
+        run: python -m pip install -e ".[dev]"
+      - name: Integration tests (live Daytona)
+        working-directory: packages/agentenv-daytona
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: pytest tests/integration_tests -v
+
   # Single, stable status check to require in branch protection -- the
   # integration counterpart of ci.yml's ci-success. Suites skipped because a PR
   # does not touch their package pass through; a failed, cancelled, or
@@ -351,7 +381,7 @@ jobs:
   # required checks treat as satisfied, so the owning lane's verdict governs.
   integration-success:
     name: integration-success
-    needs: [changes, adk, convex, langchain, n8n, pi, pydantic-ai]
+    needs: [changes, adk, convex, langchain, n8n, pi, pydantic-ai, agentenv-daytona]
     if: >-
       always() && (
         github.event_name == 'workflow_dispatch' ||
