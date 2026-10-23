@@ -8,5 +8,5 @@
   "packages/agentenv-daytona": "0.1.0",
   "packages/convex": "2.1.0",
   "packages/claude-toolsets": "1.0.0",
-  "packages/daytona-claude-toolsets": "0.1.0"
+  "packages/daytona-claude-toolsets": "0.1.1"
 }
