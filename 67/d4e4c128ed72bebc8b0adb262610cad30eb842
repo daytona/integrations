@@ -1,0 +1,24 @@
+packages/pydantic-ai-daytona/tests/integration_tests/test_live_sandbox.py
+  s_67a803e3e6fc01::t_c2d5e5d1e639b7 256-260
+  s_67a803e3e6fc01::t_8c4736d29c63d7 29
+  s_67a803e3e6fc01::t_9f3944f22bb26a 235,245-247
+packages/pydantic-ai-daytona/tests/integration_tests/conftest.py
+  s_67a803e3e6fc01::t_a877a95ab4ec83 39-45,48-49,51,53-71
+  s_67a803e3e6fc01::t_9fab6dfc167c71 4,6,11-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "67d4e4c128ed72bebc8b0adb262610cad30eb842",
+  "prompts": {},
+  "sessions": {
+    "s_67a803e3e6fc01": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_013a263c3ffernjUEd3n8Ojk47",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
