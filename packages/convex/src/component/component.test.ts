@@ -205,6 +205,34 @@ describe("sandbox lifecycle actions", () => {
     });
   });
 
+  test("create mounts the requested volumes", async () => {
+    const t = initConvexTest();
+    const { calls } = stubFetch([
+      {
+        method: "POST",
+        match: "/api/sandbox",
+        response: () => json({ id: "sbx-vol", state: "creating" }),
+      },
+      {
+        method: "GET",
+        match: "/api/sandbox/sbx-vol",
+        response: () => json({ id: "sbx-vol", state: "started" }),
+      },
+    ]);
+    const volumes = [
+      { volumeId: "vol-1", mountPath: "/home/daytona/data" },
+      { volumeId: "datasets", mountPath: "/data/train", subpath: "train" },
+    ];
+
+    const result = await t.action(api.sandboxes.create, { config, volumes });
+    expect(result).toEqual({ sandboxId: "sbx-vol", state: "started" });
+
+    const createCall = calls.find(
+      (c) => c.method === "POST" && c.url.endsWith("/api/sandbox"),
+    );
+    expect(JSON.parse(createCall?.body ?? "{}").volumes).toEqual(volumes);
+  });
+
   test("create surfaces failure states and records the error", async () => {
     const t = initConvexTest();
     stubFetch([

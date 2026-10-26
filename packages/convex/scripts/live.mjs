@@ -48,6 +48,47 @@ const assert = (condition, message) => {
   console.log(`✓ ${message}`);
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The component mounts existing volumes but doesn't manage them, so the suite
+// creates and deletes its volume straight through the Daytona REST API.
+const daytonaApiUrl = (
+  process.env.DAYTONA_API_URL || "https://app.daytona.io/api"
+).replace(/\/+$/, "");
+const daytonaApi = async (method, path, body) => {
+  const response = await fetch(`${daytonaApiUrl}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(`Daytona API ${method} ${path} failed with ${response.status}: ${text.slice(0, 300)}`),
+      { status: response.status },
+    );
+  }
+  return text ? JSON.parse(text) : null;
+};
+
+// Daytona refuses to delete a volume (409) while a sandbox still mounts it,
+// and sandbox deletion finishes asynchronously, so keep retrying for a while.
+const deleteVolume = async (volumeId) => {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await daytonaApi("DELETE", `/volumes/${volumeId}`);
+      return;
+    } catch (error) {
+      if (error.status === 404) return;
+      if (attempt >= 30) throw error;
+      await sleep(2000);
+    }
+  }
+};
+
 if (!existsSync("dist/component/convex.config.js")) {
   console.error("dist/ missing — run `npm run build` first");
   process.exit(1);
@@ -78,14 +119,41 @@ await new Promise((resolve) => setTimeout(resolve, 5000));
 console.log("✓ example app deployed to local Convex with the daytona component");
 
 let sandboxId;
+let volumeId;
 try {
+  let volume = await daytonaApi("POST", "/volumes", {
+    name: `convex-live-e2e-${randomBytes(4).toString("hex")}`,
+  });
+  volumeId = volume.id;
+  for (let i = 0; i < 60 && volume.state !== "ready" && volume.state !== "error"; i++) {
+    await sleep(2000);
+    volume = await daytonaApi("GET", `/volumes/${volumeId}`);
+  }
+  assert(volume.state === "ready", `volume ${volume.name} is ready to mount`);
+
   const created = run("example:createSandbox", {
     // Background commands don't reset the idle timer — never auto-stop a sandbox
     // that hosts the long-running cancellation target.
     autoStopInterval: 0,
+    volumes: [{ volumeId, mountPath: "/home/daytona/volume" }],
   });
   sandboxId = created.sandboxId;
   assert(created.state === "started", `createSandbox → started (${sandboxId})`);
+
+  const mount = run("example:runCommand", {
+    sandboxId,
+    command: "grep -qs ' /home/daytona/volume ' /proc/mounts && echo mounted",
+  });
+  assert(
+    mount.exitCode === 0 && mount.result.includes("mounted"),
+    "createSandbox mounted the volume at /home/daytona/volume",
+  );
+  const onVolume = run("example:writeAndReadFile", {
+    sandboxId,
+    path: "/home/daytona/volume/live-e2e.txt",
+    content: "convex-live-e2e-volume",
+  });
+  assert(onVolume === "convex-live-e2e-volume", "writeFile/readFile round-trip on the mounted volume");
 
   const exec = run("example:runCommand", { sandboxId, command: "echo live-e2e" });
   assert(exec.exitCode === 0 && exec.result.includes("live-e2e"), "runCommand round-trip");
@@ -228,8 +296,8 @@ try {
   const byStatus = (status) =>
     executions.filter((e) => e.status === status).length;
   assert(
-    executions.length === 5 && byStatus("completed") === 4 && byStatus("cancelled") === 1,
-    "executions table recorded 4 completed runs + 1 cancelled",
+    executions.length === 6 && byStatus("completed") === 5 && byStatus("cancelled") === 1,
+    "executions table recorded 5 completed runs + 1 cancelled",
   );
 
   run("example:deleteSandbox", { sandboxId });
@@ -246,6 +314,14 @@ try {
       console.log(`✓ cleanup: deleted sandbox ${sandboxId}`);
     } catch (error) {
       console.error(`cleanup failed for sandbox ${sandboxId}:`, error.message);
+    }
+  }
+  if (volumeId) {
+    try {
+      await deleteVolume(volumeId);
+      console.log(`✓ cleanup: deleted volume ${volumeId}`);
+    } catch (error) {
+      console.error(`cleanup failed for volume ${volumeId}:`, error.message);
     }
   }
 }
