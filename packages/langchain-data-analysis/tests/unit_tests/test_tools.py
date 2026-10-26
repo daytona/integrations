@@ -72,6 +72,14 @@ class TestDaytonaDataAnalysisToolUnit(ToolsUnitTests):
         result = tool._add_last_line_print(code)
         assert _run_locally(result) == "1\n"
 
+    def test_add_last_line_print_leaves_globals_untouched(
+        self, tool: DaytonaDataAnalysisTool
+    ) -> None:
+        namespace: dict = {}
+        with redirect_stdout(io.StringIO()):
+            exec(tool._add_last_line_print("x = 1\nx"), namespace)
+        assert set(namespace) == {"__builtins__", "x"}
+
     def test_add_last_line_print_ignores_trailing_statement(
         self, tool: DaytonaDataAnalysisTool
     ) -> None:

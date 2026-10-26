@@ -248,31 +248,13 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
                 return self._unparse(tree)
 
         if isinstance(node, ast.Expr):
-            # Bind the value first so the expression is evaluated exactly once.
-            value_name = "_daytona_last_value"
-            tree.body[-1:] = [
-                ast.Assign(
-                    targets=[ast.Name(id=value_name, ctx=ast.Store())],
-                    value=node.value,
-                ),
-                ast.If(
-                    test=ast.Compare(
-                        left=ast.Name(id=value_name, ctx=ast.Load()),
-                        ops=[ast.IsNot()],
-                        comparators=[ast.Constant(value=None)],
-                    ),
-                    body=[
-                        ast.Expr(
-                            value=ast.Call(
-                                func=ast.Name(id="print", ctx=ast.Load()),
-                                args=[ast.Name(id=value_name, ctx=ast.Load())],
-                                keywords=[],
-                            )
-                        )
-                    ],
-                    orelse=[],
-                ),
-            ]
-            ast.fix_missing_locations(tree)
+            # Passing the value into a lambda evaluates the expression exactly once
+            # without adding a helper name to the script's globals.
+            print_unless_none = ast.parse(
+                "lambda value: print(value) if value is not None else None", mode="eval"
+            ).body
+            tree.body[-1] = ast.Expr(
+                value=ast.Call(func=print_unless_none, args=[node.value], keywords=[])
+            )
 
         return self._unparse(tree)
