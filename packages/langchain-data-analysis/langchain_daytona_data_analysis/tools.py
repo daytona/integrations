@@ -1,6 +1,6 @@
 import ast
 import os
-from typing import IO, Any, Callable, List, Optional, Type, Union
+from typing import IO, Any, Callable, List, Literal, Optional, Tuple, Type, Union
 
 from daytona import (  # type: ignore
     Daytona,
@@ -80,6 +80,13 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
             ExecutionArtifacts attributes:
                 stdout (str): Standard output from the command
                 charts (Optional[List[Chart]]): List of chart metadata from matplotlib
+        max_output_chars: int
+            Maximum characters of printed output returned to the model (default 20000).
+            Longer output keeps its beginning and end.
+
+    The model receives the printed output plus a one-line summary of each chart. Chart
+    image data never enters the model's context: the full ExecutionArtifacts go to
+    ``on_result`` and to the ``artifact`` of the returned ToolMessage.
 
 
     Instantiation:
@@ -98,7 +105,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
         .. code-block:: python
 
-            { "stdout": "Hello World\n", "charts": [] }
+            'Hello World'
 
     Invocation with ToolCall:
 
@@ -108,13 +115,15 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
         .. code-block:: python
 
-            ToolMessage(content='{ "stdout": "Hello World\n", "charts": [] }', name='daytona_data_analysis', tool_call_id='1')
+            ToolMessage(content='Hello World', name='daytona_data_analysis', tool_call_id='1', artifact=ExecutionArtifacts(stdout='Hello World\n', charts=[]))
 
     """  # noqa: E501
 
     name: str = "daytona_data_analysis"
     description: str = tool_base_description
     args_schema: Type[BaseModel] = DaytonaDataAnalysisToolInput
+    response_format: Literal["content_and_artifact"] = "content_and_artifact"
+    max_output_chars: int = Field(default=20_000, gt=0)
 
     _daytonaClient: Daytona = PrivateAttr()
     _sandbox: Sandbox = PrivateAttr()
@@ -152,24 +161,50 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         self,
         data_analysis_python_code: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
-    ) -> Union[str, ExecutionArtifacts]:
+    ) -> Tuple[str, Optional[ExecutionArtifacts]]:
         python_code_to_exec = self._add_last_line_print(data_analysis_python_code)
 
         execution = self._sandbox.process.code_run(python_code_to_exec)
         if execution.exit_code != 0:
             return (
                 f"Python code execution exited with code {execution.exit_code}\n"
-                f"Result: {execution.result}"
+                f"Result: {self._truncate(execution.result)}",
+                execution.artifacts,
             )
 
+        if not execution.artifacts:
+            return "Python code execution didn't generate any artifacts", None
+
         if self._on_result is not None:
-            if not execution.artifacts:
-                return "Python code execution didn't generate any artifacts"
-            else:
-                self._on_result(execution.artifacts)
-                return execution.artifacts
-        else: 
-            return execution.artifacts
+            self._on_result(execution.artifacts)
+        return self._describe(execution.artifacts), execution.artifacts
+
+    def _describe(self, artifacts: ExecutionArtifacts) -> str:
+        """Build the text the model sees: printed output and chart summaries, no image data."""
+        sections = []
+        if artifacts.stdout.strip():
+            sections.append(self._truncate(artifacts.stdout).rstrip("\n"))
+        if artifacts.charts:
+            lines = [
+                f"Generated {len(artifacts.charts)} chart(s). The image data was passed to "
+                "the application and is not included here:"
+            ]
+            for chart in artifacts.charts:
+                kind = chart.type if chart.type and chart.type != "unknown" else "chart"
+                lines.append(f"- {kind}: {chart.title or 'untitled'}")
+            sections.append("\n".join(lines))
+        if not sections:
+            return "Python code executed successfully with no output."
+        return "\n\n".join(sections)
+
+    def _truncate(self, text: str) -> str:
+        """Keep the beginning and end of text longer than `max_output_chars`."""
+        if len(text) <= self.max_output_chars:
+            return text
+        head = self.max_output_chars // 2
+        tail = self.max_output_chars - head
+        omitted = len(text) - head - tail
+        return f"{text[:head]}\n... [{omitted} characters truncated] ...\n{text[-tail:]}"
     
     def close(self) -> None:
         """Close and delete sandbox."""
