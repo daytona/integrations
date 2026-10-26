@@ -235,8 +235,9 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
             LLM tries to print the variable only by writing `variable_name` (as you would in
             REPL, for example).
 
-        This methods checks the AST of the generated Python code and adds the print
-            statement to the last line if it's missing.
+        This methods checks the AST of the generated Python code and, like a REPL, prints
+            the value of a trailing expression unless that value is None. Calls such as
+            `plt.show()` return None, so they don't add a stray "None" line to the output.
         """
         tree = ast.parse(code)
         if not tree.body:
@@ -247,12 +248,31 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
                 return self._unparse(tree)
 
         if isinstance(node, ast.Expr):
-            tree.body[-1] = ast.Expr(
-                value=ast.Call(
-                    func=ast.Name(id="print", ctx=ast.Load()),
-                    args=[node.value],
-                    keywords=[],
-                )
-            )
+            # Bind the value first so the expression is evaluated exactly once.
+            value_name = "_daytona_last_value"
+            tree.body[-1:] = [
+                ast.Assign(
+                    targets=[ast.Name(id=value_name, ctx=ast.Store())],
+                    value=node.value,
+                ),
+                ast.If(
+                    test=ast.Compare(
+                        left=ast.Name(id=value_name, ctx=ast.Load()),
+                        ops=[ast.IsNot()],
+                        comparators=[ast.Constant(value=None)],
+                    ),
+                    body=[
+                        ast.Expr(
+                            value=ast.Call(
+                                func=ast.Name(id="print", ctx=ast.Load()),
+                                args=[ast.Name(id=value_name, ctx=ast.Load())],
+                                keywords=[],
+                            )
+                        )
+                    ],
+                    orelse=[],
+                ),
+            ]
+            ast.fix_missing_locations(tree)
 
         return self._unparse(tree)
