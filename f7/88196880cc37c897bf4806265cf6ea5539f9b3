@@ -1,0 +1,20 @@
+packages/convex/scripts/live.mjs
+  s_094079efcdce28::t_087f5faeada22c 134-137
+  s_094079efcdce28::t_3ea62ff5436fe9 77-79,87-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f788196880cc37c897bf4806265cf6ea5539f9b3",
+  "prompts": {},
+  "sessions": {
+    "s_094079efcdce28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e85a536c6ffezf3M5uPMwbtgaF",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
