@@ -100,3 +100,14 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
         tool.install_python_packages(package_name)
         response: ExecuteResponse = tool._sandbox.process.exec(f"pip show {package_name}")
         assert package_name in response.result
+
+    def test_trailing_plt_show_adds_no_none_line(self, tool: DaytonaDataAnalysisTool) -> None:
+        code = (
+            "import matplotlib.pyplot as plt\n"
+            "print('real output')\n"
+            "plt.plot([1, 2], [3, 4])\n"
+            "plt.show()"
+        )
+        execution = tool._sandbox.process.code_run(tool._add_last_line_print(code))
+        assert execution.exit_code == 0
+        assert execution.result == "real output\n"

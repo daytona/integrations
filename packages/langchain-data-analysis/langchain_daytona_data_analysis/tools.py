@@ -235,8 +235,9 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
             LLM tries to print the variable only by writing `variable_name` (as you would in
             REPL, for example).
 
-        This methods checks the AST of the generated Python code and adds the print
-            statement to the last line if it's missing.
+        This methods checks the AST of the generated Python code and, like a REPL, prints
+            the value of a trailing expression unless that value is None. Calls such as
+            `plt.show()` return None, so they don't add a stray "None" line to the output.
         """
         tree = ast.parse(code)
         if not tree.body:
@@ -247,12 +248,13 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
                 return self._unparse(tree)
 
         if isinstance(node, ast.Expr):
+            # Passing the value into a lambda evaluates the expression exactly once
+            # without adding a helper name to the script's globals.
+            print_unless_none = ast.parse(
+                "lambda value: print(value) if value is not None else None", mode="eval"
+            ).body
             tree.body[-1] = ast.Expr(
-                value=ast.Call(
-                    func=ast.Name(id="print", ctx=ast.Load()),
-                    args=[node.value],
-                    keywords=[],
-                )
+                value=ast.Call(func=print_unless_none, args=[node.value], keywords=[])
             )
 
         return self._unparse(tree)
