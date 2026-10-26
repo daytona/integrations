@@ -1,0 +1,35 @@
+packages/langchain-data-analysis/README.md
+  s_094079efcdce28::t_d284a8bc00ec91 46,62
+  s_094079efcdce28::t_76ccacd632eec1 75-77
+  s_094079efcdce28::t_fd4e8122a247df 53-54
+packages/langchain-data-analysis/tests/integration_tests/test_tools.py
+  s_094079efcdce28::t_7a4966efa3ac1d 8
+  s_094079efcdce28::t_af9fb77ffa9867 81-84,93-119
+  s_094079efcdce28::t_06ab898771bdde 120
+packages/langchain-data-analysis/tests/unit_tests/test_tool_output.py
+  s_094079efcdce28::t_68ae11f7c995ae 1-40,44-51,53,56-104
+  s_094079efcdce28::t_e4c2c67a2def84 41-43,52,54-55
+packages/langchain-data-analysis/langchain_daytona_data_analysis/tools.py
+  s_094079efcdce28::t_f1c4ecc79ad9cf 3
+  s_094079efcdce28::t_7f0d64b2d61867 164,171-172,175-177,179-191,195-207
+  s_094079efcdce28::t_8ab27d8b980a13 125-126
+  s_094079efcdce28::t_6b2a0ccca10767 83-89
+  s_094079efcdce28::t_4be902f83e43a5 108,118
+  s_094079efcdce28::t_e1370790fa059d 192-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "852604424373c33c5b706a0e257000b037e6ed84",
+  "prompts": {},
+  "sessions": {
+    "s_094079efcdce28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e85a536c6ffezf3M5uPMwbtgaF",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
