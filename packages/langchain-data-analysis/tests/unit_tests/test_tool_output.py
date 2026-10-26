@@ -39,8 +39,11 @@ def _tool_call(tool: DaytonaDataAnalysisTool) -> Any:
 
 def test_chart_image_data_stays_out_of_model_content(sandbox: MagicMock) -> None:
     scatter = Chart.model_validate({"type": "scatter", "title": "50k points", "png": PNG_BASE64})
-    trend = Chart.model_validate({"type": "unknown", "png": PNG_BASE64})
-    artifacts = _respond(sandbox, "done\n", [scatter, trend])
+    trend = Chart.model_validate(
+        {"type": "unknown", "title": "Price vs. mileage\n(2026)", "png": PNG_BASE64}
+    )
+    untitled = Chart.model_validate({"png": PNG_BASE64})
+    artifacts = _respond(sandbox, "done\n", [scatter, trend, untitled])
     on_result = Mock()
     tool = DaytonaDataAnalysisTool(daytona_api_key="test-key", on_result=on_result)
 
@@ -49,9 +52,10 @@ def test_chart_image_data_stays_out_of_model_content(sandbox: MagicMock) -> None
     assert isinstance(message, ToolMessage)
     assert message.content == (
         "done\n\n"
-        "Generated 2 chart(s). The image data was passed to the application "
+        "Generated 3 chart(s). The image data was passed to the application "
         "and is not included here:\n"
         "- scatter: 50k points\n"
+        "- chart: Price vs. mileage (2026)\n"
         "- chart: untitled"
     )
     assert message.artifact is artifacts
@@ -82,9 +86,16 @@ def test_long_output_keeps_beginning_and_end(sandbox: MagicMock) -> None:
 
     assert content.startswith("HEAD")
     assert content.endswith("TAIL")
-    assert "\n... [9908 characters truncated] ...\n" in content
-    assert len(content) < 200
+    assert "\n... [9946 characters truncated] ...\n" in content
+    assert len(content) <= 100
     assert artifacts is not None and len(artifacts.stdout) == 10_008
+
+
+@pytest.mark.parametrize("limit", [1, 10, 37, 38, 39, 100, 5_000])
+def test_truncation_never_exceeds_max_output_chars(sandbox: MagicMock, limit: int) -> None:
+    tool = DaytonaDataAnalysisTool(daytona_api_key="test-key", max_output_chars=limit)
+
+    assert len(tool._truncate("x" * 10_008)) <= limit
 
 
 def test_failed_run_output_is_bounded(sandbox: MagicMock) -> None:
@@ -96,7 +107,7 @@ def test_failed_run_output_is_bounded(sandbox: MagicMock) -> None:
 
     assert content.startswith("Python code execution exited with code 1\nResult: row")
     assert content.endswith("ZeroDivisionError: division by zero\n")
-    assert len(content) < 400
+    assert len(content) <= len("Python code execution exited with code 1\nResult: ") + 200
 
 
 def test_max_output_chars_must_be_positive(sandbox: MagicMock) -> None:

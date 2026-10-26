@@ -42,6 +42,10 @@ The code should NOT be wrapped in backticks. \
 All python packages including requests, matplotlib, scipy, numpy, pandas, seaborn \
 etc are available. Create and display chart using `plt.show()`."""
 
+
+def _truncation_marker(omitted: int) -> str:
+    return f"\n... [{omitted} characters truncated] ...\n"
+
 class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
     """Tool for running python code in a sandboxed environment for data analysis.
 
@@ -191,20 +195,25 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
             ]
             for chart in artifacts.charts:
                 kind = chart.type if chart.type and chart.type != "unknown" else "chart"
-                lines.append(f"- {kind}: {chart.title or 'untitled'}")
+                title = " ".join((chart.title or "").split()) or "untitled"
+                lines.append(f"- {kind}: {title}")
             sections.append("\n".join(lines))
         if not sections:
             return "Python code executed successfully with no output."
         return "\n\n".join(sections)
 
     def _truncate(self, text: str) -> str:
-        """Keep the beginning and end of text longer than `max_output_chars`."""
-        if len(text) <= self.max_output_chars:
+        """Cap text at `max_output_chars`, keeping its beginning and end around a marker."""
+        limit = self.max_output_chars
+        if len(text) <= limit:
             return text
-        head = self.max_output_chars // 2
-        tail = self.max_output_chars - head
-        omitted = len(text) - head - tail
-        return f"{text[:head]}\n... [{omitted} characters truncated] ...\n{text[-tail:]}"
+        # Size the marker for the largest possible count so the result stays within the limit.
+        kept = limit - len(_truncation_marker(len(text)))
+        if kept <= 0:
+            return text[:limit]
+        head = kept // 2
+        tail = kept - head
+        return text[:head] + _truncation_marker(len(text) - kept) + text[-tail:]
     
     def close(self) -> None:
         """Close and delete sandbox."""
