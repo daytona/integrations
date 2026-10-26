@@ -74,8 +74,9 @@ const daytonaApi = async (method, path, body) => {
   return text ? JSON.parse(text) : null;
 };
 
-// Daytona refuses to delete a volume (409) while a sandbox still mounts it,
-// and sandbox deletion finishes asynchronously, so keep retrying for a while.
+// Daytona refuses to delete a volume that is still provisioning (400) or still
+// mounted by a sandbox (409), and sandbox deletion finishes asynchronously, so
+// retry those for a while. Any other error surfaces immediately.
 const deleteVolume = async (volumeId) => {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -83,7 +84,8 @@ const deleteVolume = async (volumeId) => {
       return;
     } catch (error) {
       if (error.status === 404) return;
-      if (attempt >= 30) throw error;
+      const transient = error.status === 400 || error.status === 409;
+      if (!transient || attempt >= 30) throw error;
       await sleep(2000);
     }
   }
@@ -129,7 +131,10 @@ try {
     await sleep(2000);
     volume = await daytonaApi("GET", `/volumes/${volumeId}`);
   }
-  assert(volume.state === "ready", `volume ${volume.name} is ready to mount`);
+  assert(
+    volume.state === "ready",
+    `volume ${volume.name} is ready to mount (state: ${volume.state})`,
+  );
 
   const created = run("example:createSandbox", {
     // Background commands don't reset the idle timer — never auto-stop a sandbox
