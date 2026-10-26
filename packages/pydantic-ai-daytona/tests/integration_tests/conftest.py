@@ -46,47 +46,59 @@ async def cleanup_sandboxes(
 ) -> int:
     """Delete every tracked and label-listed sandbox, then verify none remain.
 
-    Every deletion is attempted even when others fail; all failures and leftovers are
-    reported together at the end, so one transient error cannot leak the rest.
+    Every deletion is attempted even when others fail, and a label sweep that fails partway
+    keeps the ids it already collected, so one transient error cannot leak the rest. The
+    end state decides the outcome: leftovers and errors that left a sandbox unverified are
+    reported together, while an error later superseded by success is dropped.
     """
-    ids = sorted(sandbox_ids)
-    failures: list[str] = []
+    tracked = sorted(sandbox_ids)
+    errors: dict[str, str] = {}
 
-    async def delete(sandbox_id: str, sandbox: AsyncSandbox | None = None) -> None:
+    async def label_ids(phase: str) -> list[str]:
+        ids: list[str] = []
         try:
-            current = sandbox if sandbox is not None else await client.get(sandbox_id)
-            if current.state != SandboxState.DESTROYED:
-                await current.delete(wait=True, timeout=60)
+            async for listed in client.list(ListSandboxesQuery(labels=labels)):
+                ids.append(listed.id)
+        except DaytonaError as error:
+            errors[f"{phase} label sweep"] = repr(error)
+        return ids
+
+    async def delete(sandbox_id: str) -> None:
+        try:
+            sandbox = await client.get(sandbox_id)
+            if sandbox.state != SandboxState.DESTROYED:
+                await sandbox.delete(wait=True, timeout=60)
         except DaytonaNotFoundError:
+            pass
+        except DaytonaError as error:
+            errors[f"delete {sandbox_id}"] = repr(error)
             return
-        except DaytonaError as error:
-            failures.append(f"delete {sandbox_id}: {error!r}")
+        errors.pop(f"delete {sandbox_id}", None)
 
-    async def listed(phase: str) -> list[AsyncSandbox]:
-        try:
-            return await listed_sandboxes(client, labels)
-        except DaytonaError as error:
-            failures.append(f"{phase} label sweep: {error!r}")
-            return []
-
-    for sandbox_id in ids:
+    for sandbox_id in tracked:
         await delete(sandbox_id)
-    for sandbox in await listed("delete"):
-        await delete(sandbox.id, sandbox)
+    for sandbox_id in await label_ids("delete"):
+        await delete(sandbox_id)
 
     remaining: list[str] = []
-    for sandbox_id in ids:
+    listed_ids = await label_ids("verify")
+    for sandbox_id in dict.fromkeys([*tracked, *listed_ids]):
         try:
-            if not await is_gone(client, sandbox_id):
-                remaining.append(sandbox_id)
+            gone = await is_gone(client, sandbox_id)
         except DaytonaError as error:
-            failures.append(f"verify {sandbox_id}: {error!r}")
-    remaining += [s.id for s in await listed("verify") if s.id not in remaining]
-    if remaining or failures:
+            errors[f"verify {sandbox_id}"] = repr(error)
+            continue
+        if gone:
+            errors.pop(f"delete {sandbox_id}", None)
+        else:
+            remaining.append(sandbox_id)
+    if "verify label sweep" not in errors:
+        errors.pop("delete label sweep", None)
+    if remaining or errors:
         raise AssertionError(
-            f"Live sandbox cleanup incomplete: remaining={remaining} failures={failures}"
+            f"Live sandbox cleanup incomplete: remaining={remaining} errors={errors}"
         )
-    return len(ids)
+    return len(tracked)
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
