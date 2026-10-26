@@ -25,9 +25,13 @@ class TestModeValidation:
         with pytest.raises(ValueError, match="snapshot.*only apply when creating"):
             DaytonaSandbox(sandbox_id="sb-123", snapshot="my-snapshot")
 
-    def test_attach_rejects_env(self) -> None:
+    def test_attach_allows_env(self) -> None:
+        capability = DaytonaSandbox(sandbox_id="sb-123", env={"A": "1"})
+        assert capability.env == {"A": "1"}
+
+    def test_session_rejects_env(self) -> None:
         with pytest.raises(ValueError, match="env"):
-            DaytonaSandbox(sandbox_id="sb-123", env={"A": "1"})
+            DaytonaSandbox(session=DaytonaSandboxSession(), env={"A": "1"})
 
     def test_attach_allows_workdir_and_credentials(self) -> None:
         DaytonaSandbox(sandbox_id="sb-123", workdir="/workspace", api_key="key")
@@ -120,7 +124,9 @@ class TestInstructions:
         assert "persists across runs" in text
 
     def test_default_timeout_clamped_to_ceiling(self) -> None:
-        text = DaytonaSandbox(default_command_timeout=500.0, max_command_timeout=120).get_instructions()
+        text = DaytonaSandbox(
+            default_command_timeout=500.0, max_command_timeout=120
+        ).get_instructions()
         assert text is not None
         assert "after 120s" in text
         assert "up to 120s" in text

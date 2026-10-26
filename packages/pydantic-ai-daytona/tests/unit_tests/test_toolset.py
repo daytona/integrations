@@ -14,14 +14,16 @@ from pydantic_ai_daytona._session import (
 from pydantic_ai_daytona._toolset import DaytonaSandboxToolset
 
 
-class FakeSession:
+class FakeSession(DaytonaSandboxSession):
     """In-memory stand-in for DaytonaSandboxSession with scriptable failures."""
 
     def __init__(self) -> None:
+        super().__init__()
         self.files: dict[str, bytes] = {}
         self.dirs: dict[str, list[tuple[str, bool]]] = {}
         self.exec_results: list[DaytonaSandboxExecResult] = []
         self.exec_calls: list[tuple[str, int]] = []
+        self.exec_caps: list[int] = []
         self.error: DaytonaSandboxError | None = None
         self._sandbox_id: str | None = "sb-fake"
 
@@ -33,9 +35,12 @@ class FakeSession:
         if self.error is not None:
             raise self.error
 
-    async def exec(self, command: str, *, timeout: int) -> DaytonaSandboxExecResult:
+    async def exec(
+        self, command: str, *, timeout: int, max_output_bytes: int = 50 * 1024
+    ) -> DaytonaSandboxExecResult:
         self._maybe_raise()
         self.exec_calls.append((command, timeout))
+        self.exec_caps.append(max_output_bytes)
         return self.exec_results.pop(0)
 
     async def file_size(self, path: str) -> int:
@@ -82,7 +87,7 @@ def make_toolset(session: FakeSession, **overrides: Any) -> DaytonaSandboxToolse
         "max_output_bytes": 50 * 1024,
         "max_output_lines": 2000,
         "max_read_bytes": 5 * 1024 * 1024,
-        "session": cast(DaytonaSandboxSession, session),
+        "session": session,
         "_run_scoped": True,
     }
     settings.update(overrides)
@@ -166,10 +171,10 @@ class TestRunCommand:
                 )
             )
             out = await toolset.run_command("sleep 100", timeout_seconds=5)
-            assert out == "[timed out after 5s; output was not captured]"
+            assert out == "(no output)\n[timed out after 5s]"
 
     async def test_each_stream_is_tail_truncated_separately(self, session: FakeSession) -> None:
-        toolset = make_toolset(session, max_output_lines=2)
+        toolset = make_toolset(session, max_output_lines=2, max_output_bytes=7)
         async with toolset:
             session.exec_results.append(ok("a\nb\nc\n", stderr="x\ny\nz\n"))
             out = await toolset.run_command("seq 3")
@@ -177,6 +182,7 @@ class TestRunCommand:
                 "[stdout]\n[... output truncated to the last 2 lines ...]\nb\nc\n"
                 "[stderr]\n[... output truncated to the last 2 lines ...]\ny\nz"
             )
+            assert session.exec_caps == [7]
 
     async def test_default_timeout_applied(self, session: FakeSession) -> None:
         toolset = make_toolset(session, default_command_timeout=42.4)

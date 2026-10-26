@@ -1,88 +1,43 @@
-"""Daytona sandbox session: lifecycle, command execution, and file access.
-
-`DaytonaSandboxSession` wraps the Daytona SDK behind the small surface the toolset
-needs. It owns error translation: SDK failures become `DaytonaSandboxError` (retryable
-by the model) or `DaytonaSandboxTerminalError` (the sandbox or credentials are gone;
-retrying a tool call cannot help).
-
-Commands run through Daytona process sessions (rather than one-shot `process.exec`)
-because only session commands report stdout and stderr as separate streams. A session
-runs its commands sequentially, so each command gets its own short-lived session --
-that is what lets parallel tool calls actually run in parallel. Each command is also
-wrapped in `cd <base> && (...)`: the `cd` keeps `run_command` and the file tools
-agreeing on what `.` means, and the subshell keeps shell-terminating commands (like
-a bare `exit`) from hanging the session until timeout.
-"""
+"""Daytona sandbox lifecycle and file access; commands use independent file-backed sessions."""
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import posixpath
-import shlex
 from collections.abc import Mapping
-from dataclasses import dataclass
 from types import TracebackType
-from uuid import uuid4
 
 from daytona import (
     AsyncDaytona,
     AsyncSandbox,
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
-    DaytonaAuthenticationError,
     DaytonaConfig,
-    DaytonaConnectionTimeoutError,
     DaytonaError,
-    DaytonaFileNotFoundError,
-    DaytonaForbiddenError,
-    DaytonaGoneError,
-    DaytonaNotFoundError,
-    DaytonaProcessExecutionTimeoutError,
-    DaytonaSessionEndedError,
     SandboxState,
-    SessionExecuteRequest,
 )
 from typing_extensions import Self
 
+from ._asyncio import run_to_completion
+from ._errors import DaytonaSandboxAuthError as DaytonaSandboxAuthError
+from ._errors import DaytonaSandboxError, DaytonaSandboxTerminalError, map_error, operation_error
+from ._execution import CapturedCommand
+from ._execution import DaytonaSandboxExecResult as DaytonaSandboxExecResult
+from ._tool_output import DEFAULT_MAX_BYTES
+
+logger = logging.getLogger(__name__)
+
 DEFAULT_SANDBOX_CREATE_TIMEOUT = 120.0
-
-
-class DaytonaSandboxError(Exception):
-    """A sandbox operation failed in a way the model may be able to react to."""
-
-
-class DaytonaSandboxTerminalError(DaytonaSandboxError):
-    """The sandbox is gone or unusable; retrying a tool call cannot fix it."""
-
-
-class DaytonaSandboxAuthError(DaytonaSandboxTerminalError):
-    """Daytona rejected the credentials."""
-
-
-@dataclass(kw_only=True, frozen=True)
-class DaytonaSandboxExecResult:
-    """Outcome of one command: separate output streams, exit code, and timeout status.
-
-    A timed-out command's output is not captured (`stdout` and `stderr` are empty and
-    `timed_out` is True).
-    """
-
-    stdout: str
-    stderr: str
-    exit_code: int
-    timed_out: bool
-    applied_timeout: int
 
 
 class DaytonaSandboxSession:
     """Lifecycle, command, and file access for one Daytona sandbox.
 
-    Use as an async context manager. With `sandbox_id` the session attaches to an
-    existing sandbox (starting it if stopped) and leaves it running on exit; otherwise
-    it creates a sandbox on enter (from `snapshot`, `image`, or the Daytona default
-    snapshot) and deletes it on exit.
-
-    Pass an entered session to `DaytonaSandbox(session=...)` to reuse one sandbox
-    across agent runs while controlling its lifetime yourself.
+    As an async context manager, attach with `sandbox_id` to resume an existing sandbox
+    and leave it running on exit, or create an owned sandbox and delete it on exit.
+    Pass an entered session to `DaytonaSandbox(session=...)` to control its lifetime
+    across agent runs.
     """
 
     def __init__(
@@ -129,6 +84,7 @@ class DaytonaSandboxSession:
         self._sandbox: AsyncSandbox | None = None
         self._owned = False
         self._exec_base: str | None = None
+        self._shell = "/bin/sh"
 
     @property
     def sandbox_id(self) -> str | None:
@@ -144,34 +100,61 @@ class DaytonaSandboxSession:
             raise DaytonaSandboxError("The session is already open.")
         config = None
         if self._api_key or self._api_url or self._target:
-            config = DaytonaConfig(api_key=self._api_key, api_url=self._api_url, target=self._target)
+            config = DaytonaConfig(
+                api_key=self._api_key, api_url=self._api_url, target=self._target
+            )
         daytona = AsyncDaytona(config)
         sandbox: AsyncSandbox | None = None
         try:
             if self._attach_id is not None:
                 sandbox = await daytona.get(self._attach_id)
-                if sandbox.state != SandboxState.STARTED:
-                    await sandbox.start()
+                if sandbox.state in (SandboxState.DESTROYING, SandboxState.DESTROYED):
+                    raise DaytonaSandboxTerminalError("The sandbox is gone (it was deleted).")
+                if sandbox.state in (
+                    SandboxState.STOPPED,
+                    SandboxState.ARCHIVED,
+                    SandboxState.PAUSED,
+                ):
+                    await sandbox.start(timeout=self._create_timeout)
+                elif sandbox.state != SandboxState.STARTED:
+                    await sandbox.wait_for_sandbox_start(timeout=self._create_timeout)
                 self._owned = False
             else:
-                sandbox = await daytona.create(self._create_params(), timeout=self._create_timeout)
-                self._owned = True
+
+                async def create() -> None:
+                    nonlocal sandbox
+                    sandbox = await daytona.create(
+                        self._create_params(), timeout=self._create_timeout
+                    )
+                    self._owned = True
+
+                await run_to_completion(create())
+            assert sandbox is not None
+            try:
+                probe = await sandbox.process.exec("command -v bash", timeout=30)
+            except DaytonaError:
+                # Discovery is optional: a failed probe keeps the portable shell default.
+                self._shell = "/bin/sh"
+            else:
+                self._shell = (probe.result.strip() or "/bin/sh") if not probe.exit_code else "/bin/sh"
             self._exec_base = self._workdir or await sandbox.get_work_dir()
         except DaytonaError as e:
-            if self._owned and sandbox is not None:
-                await self._delete_quietly(sandbox)
-            await daytona.close()
-            self._owned = False
+            await run_to_completion(self._close(daytona, sandbox))
             raise self._map_error(e, "opening the sandbox session") from e
         except BaseException:
-            if self._owned and sandbox is not None:
-                await self._delete_quietly(sandbox)
-            await daytona.close()
-            self._owned = False
+            await run_to_completion(self._close(daytona, sandbox))
             raise
         self._daytona = daytona
         self._sandbox = sandbox
         return self
+
+    async def _close(self, daytona: AsyncDaytona, sandbox: AsyncSandbox | None) -> None:
+        try:
+            if self._owned and sandbox is not None:
+                await self._delete_quietly(sandbox)
+        finally:
+            self._owned = False
+            await asyncio.wait_for(daytona.close(), timeout=30)
 
     async def __aexit__(
         self,
@@ -188,19 +171,18 @@ class DaytonaSandboxSession:
             return
         try:
             if owned and sandbox is not None:
-                await self._delete_quietly(sandbox)
+                await run_to_completion(self._delete_quietly(sandbox))
         finally:
-            await daytona.close()
+            await asyncio.wait_for(daytona.close(), timeout=30)
 
     @staticmethod
     async def _delete_quietly(sandbox: AsyncSandbox) -> None:
         try:
-            await sandbox.delete()
-        except DaytonaError:
-            # Best-effort cleanup: the sandbox's auto-stop/auto-delete/ephemeral settings
-            # are the server-side backstop, and failing the whole agent run over a cleanup
-            # hiccup would discard its result.
-            pass
+            await sandbox.delete(wait=True, timeout=60)
+        except DaytonaError as error:
+            # Reported, not raised: teardown runs after the agent's work is done, and failing
+            # the run here would discard its result. The id lets the user delete it manually.
+            logger.warning("Could not delete Daytona sandbox %s: %s", sandbox.id, error)
 
     def _create_params(self) -> CreateSandboxFromSnapshotParams | CreateSandboxFromImageParams:
         if self._image is not None:
@@ -244,80 +226,18 @@ class DaytonaSandboxSession:
             return posixpath.normpath(posixpath.join(self._workdir, path))
         return path
 
-    @staticmethod
-    def _map_error(e: DaytonaError, action: str) -> DaytonaSandboxError:
-        if isinstance(e, (DaytonaAuthenticationError, DaytonaForbiddenError)):
-            return DaytonaSandboxAuthError(f"Daytona rejected the credentials while {action}: {e}")
-        # Order matters: file-not-found and session-ended both subclass the "gone"
-        # errors below, but neither means the sandbox itself is lost, so they stay
-        # retryable.
-        if isinstance(e, (DaytonaFileNotFoundError, DaytonaSessionEndedError)):
-            return DaytonaSandboxError(f"Failed {action}: {e}")
-        if isinstance(e, (DaytonaNotFoundError, DaytonaGoneError)):
-            return DaytonaSandboxTerminalError(
-                f"The sandbox is gone (it may have been deleted) while {action}: {e}"
-            )
-        return DaytonaSandboxError(f"Failed {action}: {e}")
+    _map_error = staticmethod(map_error)
 
-    def _wrap_command(self, command: str) -> str:
-        # The `cd` pins the working directory: a fresh session starts in the sandbox
-        # default dir, not in a caller-pinned `workdir`. The subshell contains shell
-        # termination: a bare `exit` kills the session's shell and the command then
-        # hangs until its timeout with all output lost (observed live), while
-        # `(exit N)` reports N cleanly.
-        if self._exec_base:
-            return f"cd {shlex.quote(self._exec_base)} && ({command})"
-        return f"({command})"
-
-    async def exec(self, command: str, *, timeout: int) -> DaytonaSandboxExecResult:
-        """Run a shell command in the sandbox and return its output streams.
-
-        A non-zero exit code is reported in the result, not raised. A timeout is
-        reported with `timed_out=True`; Daytona does not return output captured
-        before the deadline.
-        """
+    async def exec(
+        self, command: str, *, timeout: int, max_output_bytes: int = DEFAULT_MAX_BYTES
+    ) -> DaytonaSandboxExecResult:
+        """Return bounded output tails and exact exit status, including partial output on timeout."""
+        if max_output_bytes <= 0:
+            raise ValueError("max_output_bytes must be positive.")
         sandbox = self._require_sandbox()
-        session_id = f"pydantic-ai-{uuid4().hex[:12]}"
-        request = SessionExecuteRequest(
-            command=self._wrap_command(command), run_async=False, suppress_input_echo=True
-        )
-        # Session setup gets no timed-out interpretation: a connection timeout while
-        # creating the session is an infrastructure failure, not the command hitting
-        # its deadline, so it must surface as a retryable error instead.
-        try:
-            await sandbox.process.create_session(session_id)
-        except DaytonaError as e:
-            raise self._map_error(e, "running the command") from e
-        try:
-            try:
-                response = await sandbox.process.execute_session_command(
-                    session_id, request, timeout=timeout
-                )
-            finally:
-                try:
-                    await sandbox.process.delete_session(session_id)
-                except DaytonaError:
-                    # Best-effort: deleting the session also tears down a still-running
-                    # timed-out command, but a cleanup failure must not mask the result
-                    # (or the real error) of the command itself.
-                    pass
-        except (DaytonaProcessExecutionTimeoutError, DaytonaConnectionTimeoutError):
-            # Session commands surface the server-enforced command deadline as a
-            # connection timeout (observed live), not as the process-timeout error
-            # one-shot exec uses; treat both as the command timing out.
-            return DaytonaSandboxExecResult(
-                stdout="", stderr="", exit_code=-1, timed_out=True, applied_timeout=timeout
-            )
-        except DaytonaError as e:
-            raise self._map_error(e, "running the command") from e
-        if response.exit_code is None:
-            raise DaytonaSandboxError("The command did not report an exit code.")
-        return DaytonaSandboxExecResult(
-            stdout=response.stdout or "",
-            stderr=response.stderr or "",
-            exit_code=response.exit_code,
-            timed_out=False,
-            applied_timeout=timeout,
+        captured = CapturedCommand(sandbox, max_bytes=max_output_bytes, shell=self._shell)
+        return await captured.run(
+            captured.wrap(command, cwd=self._exec_base, env=self._env), timeout=timeout
         )
 
     async def file_size(self, path: str) -> int:
@@ -327,7 +247,7 @@ class DaytonaSandboxSession:
         try:
             info = await sandbox.fs.get_file_info(resolved)
         except DaytonaError as e:
-            raise self._map_error(e, f"inspecting {path!r}") from e
+            raise await operation_error(sandbox, e, f"inspecting {path!r}") from e
         if info.is_dir:
             raise DaytonaSandboxError(f"{path!r} is a directory, not a file.")
         return info.size
@@ -338,7 +258,7 @@ class DaytonaSandboxSession:
         try:
             data = await sandbox.fs.download_file(resolved)
         except DaytonaError as e:
-            raise self._map_error(e, f"reading {path!r}") from e
+            raise await operation_error(sandbox, e, f"reading {path!r}") from e
         if data is None:
             raise DaytonaSandboxError(f"Reading {path!r} returned no data.")
         return data
@@ -350,7 +270,7 @@ class DaytonaSandboxSession:
         try:
             await sandbox.fs.upload_file(data, resolved)
         except DaytonaError as e:
-            raise self._map_error(e, f"writing {path!r}") from e
+            raise await operation_error(sandbox, e, f"writing {path!r}") from e
 
     async def list_entries(self, path: str) -> list[tuple[str, bool]]:
         """`(name, is_dir)` for each entry in a directory, sorted by name."""
@@ -359,5 +279,5 @@ class DaytonaSandboxSession:
         try:
             infos = await sandbox.fs.list_files(resolved)
         except DaytonaError as e:
-            raise self._map_error(e, f"listing {path!r}") from e
+            raise await operation_error(sandbox, e, f"listing {path!r}") from e
         return sorted((info.name, info.is_dir) for info in infos)
