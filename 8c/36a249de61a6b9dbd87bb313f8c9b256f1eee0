@@ -1,0 +1,49 @@
+packages/convex/README.md
+  s_094079efcdce28::t_3218c377c97937 111-121
+packages/convex/src/client/index.ts
+  s_094079efcdce28::t_79c5edab2f1821 54-55
+  s_094079efcdce28::t_0b0a6296d1f7f8 27-36
+packages/convex/scripts/live.mjs
+  s_094079efcdce28::t_9f636e86a6a072 299-300
+  s_094079efcdce28::t_a18de3fb306cf0 122,124-133,138,143-156
+  s_094079efcdce28::t_ded732401c2b04 51-91
+  s_094079efcdce28::t_8a154877180e67 319-326
+  s_094079efcdce28::t_e3cd5d4d388e96 157
+packages/convex/src/component/types.ts
+  s_094079efcdce28::t_0141427b7aacf8 88
+  s_094079efcdce28::t_ecc2b0a6004a13 21-32
+packages/convex/src/component/sandboxes.ts
+  s_094079efcdce28::t_5554b3dc0ea116 24
+  s_094079efcdce28::t_040aa6b5be84bd 227-228
+  s_094079efcdce28::t_f781c442be2baf 270
+packages/convex/example/convex/example.ts
+  s_094079efcdce28::t_dffe3ba7cf1526 21-29,37
+packages/convex/src/component/component.test.ts
+  s_094079efcdce28::t_82b97bd02c99ae 208-235
+packages/convex/src/component/_generated/component.ts
+  s_e0535f590466f3::t_98313af70a352f 238-242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8c36a249de61a6b9dbd87bb313f8c9b256f1eee0",
+  "prompts": {},
+  "sessions": {
+    "s_094079efcdce28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e85a536c6ffezf3M5uPMwbtgaF",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_e0535f590466f3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e85a536c6ffezf3M5uPMwbtgaF",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
