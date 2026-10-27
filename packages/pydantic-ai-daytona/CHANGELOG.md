@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/daytona/integrations/compare/pydantic-ai-daytona-v0.2.0...pydantic-ai-daytona-v0.2.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **pydantic-ai-daytona:** allow daytona SDK &lt;1 ([#102](https://github.com/daytona/integrations/issues/102)) ([2995766](https://github.com/daytona/integrations/commit/299576675746427769711105387e4003ac3ad426))
+
 ## [0.2.0](https://github.com/daytona/integrations/compare/pydantic-ai-daytona-v0.1.0...pydantic-ai-daytona-v0.2.0) (2026-10-26)
 
 
