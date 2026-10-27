@@ -27,7 +27,9 @@ dependencies = [
     # Floor: `pydantic_ai.capabilities.AbstractCapability` and per-run toolsets
     # (`AbstractToolset.for_run`) are stable from this release on.
     "pydantic-ai-slim>=2.22.0",
-    "daytona>=0.203.0,<0.204.0",
+    # Wide on purpose: a one-minor pin can't share an environment with other
+    # Daytona SDK users, such as pydantic-ai-harness[daytona].
+    "daytona>=0.203.0,<1",
 ]
 
 [project.optional-dependencies]
