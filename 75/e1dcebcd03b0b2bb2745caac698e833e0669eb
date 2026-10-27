@@ -1,0 +1,19 @@
+packages/pydantic-ai-daytona/pyproject.toml
+  s_67a803e3e6fc01::t_67009f092f31f1 30-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "75e1dcebcd03b0b2bb2745caac698e833e0669eb",
+  "prompts": {},
+  "sessions": {
+    "s_67a803e3e6fc01": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_013a263c3ffernjUEd3n8Ojk47",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
