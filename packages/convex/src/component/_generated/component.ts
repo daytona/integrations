@@ -235,6 +235,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           target?: string;
           user?: string;
           userKey?: string;
+          volumes?: Array<{
+            mountPath: string;
+            subpath?: string;
+            volumeId: string;
+          }>;
           wait?: boolean;
           waitTimeoutMs?: number;
         },
