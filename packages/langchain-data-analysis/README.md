@@ -10,7 +10,7 @@ pip install -U langchain-daytona-data-analysis
 
 Requires Python 3.10+. This release depends on the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]`), pinned to the pre-release `2.0.0a5` until 2.0.0 is stable.
 
-Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 You must configure credentials for Daytona. You can do this in one of three ways:
 
