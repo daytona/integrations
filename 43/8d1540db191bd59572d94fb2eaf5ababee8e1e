@@ -1,0 +1,19 @@
+packages/agentenv-daytona/README.md
+  s_3aaf478413e92f::t_4198e04d9cafb0 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "438d1540db191bd59572d94fb2eaf5ababee8e1e",
+  "prompts": {},
+  "sessions": {
+    "s_3aaf478413e92f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e617a29afffej53qrfm7S7Bo2h",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
