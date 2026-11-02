@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 from anthropic.tools import ToolError
 from anthropic.tools.browser import BetaURLContext
-from daytona import DaytonaError, DaytonaNotFoundError
+from daytona.v0 import DaytonaError, DaytonaNotFoundError
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 CONTEXT = BetaURLContext(member="navigate")
@@ -64,10 +64,10 @@ def test_only_a_not_found_answer_counts_the_sandbox_as_gone(
     client = MagicMock()
     monkeypatch.setattr(module, "Daytona", lambda *args, **kwargs: client)
 
-    client.get.return_value = object()
+    client.v0.get.return_value = object()
     assert module._exists("sbx-1") is True
 
-    client.get.side_effect = DaytonaNotFoundError("sandbox not found", status_code=404)
+    client.v0.get.side_effect = DaytonaNotFoundError("sandbox not found", status_code=404)
     assert module._exists("sbx-1") is False
 
     for error in (
@@ -75,6 +75,6 @@ def test_only_a_not_found_answer_counts_the_sandbox_as_gone(
         DaytonaError("service unavailable", status_code=503),
         RuntimeError("the network went away"),
     ):
-        client.get.side_effect = error
+        client.v0.get.side_effect = error
         with pytest.raises(type(error)):
             module._exists("sbx-1")

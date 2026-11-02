@@ -14,6 +14,10 @@ pip install daytona-claude-toolsets             # DaytonaComputer
 pip install 'daytona-claude-toolsets[browser]'  # + DaytonaBrowser (Playwright client only; no local browser)
 ```
 
+This release uses the Daytona SDK 2.x `v0` namespace and is pinned to the pre-release `daytona[v0-sdk]==2.0.0a5` until 2.0.0 is stable.
+
+Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
+
 Set your keys in the environment:
 
 ```bash
@@ -51,7 +55,7 @@ With no `sandbox` argument and no custom snapshot or image in `create_params`, e
 
 | | How | On `close()` |
 |---|---|---|
-| **Owned** (default) | `DaytonaComputer(create_params=CreateSandboxFromSnapshotParams(...))`, or no arguments | deleted (`on_close="stop"` stops it instead) |
+| **Owned** (default) | `DaytonaComputer(create_params=CreateSandboxFromSnapshotParams(...))` (`from daytona.v0 import CreateSandboxFromSnapshotParams`), or no arguments | deleted (`on_close="stop"` stops it instead) |
 | **Borrowed** | `DaytonaComputer(sandbox)` with a running `Sandbox` | left running; `DaytonaBrowser` stops the Chromium it started |
 
 `close()` is idempotent and safe after a failed construction: a sandbox created before the failure is still removed. Sandboxes the drivers create always carry the label `created-by=daytona-claude-toolsets`, so a leftover one can be found and removed by it; `create_params.labels` adds your own labels but cannot change that one. Keyword arguments the drivers don't define (`confirm`, `configs`, `url_policy`, `file_policy`, `tool_configs`) go to the SDK unchanged.

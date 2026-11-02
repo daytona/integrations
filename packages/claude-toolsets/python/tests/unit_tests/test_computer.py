@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, call as mock_call, patch
 
 import pytest
 from anthropic.tools import ToolsetClosedError, ToolsetConfigError
-from daytona import DaytonaError
+from daytona.v0 import DaytonaError
 from PIL import Image
 
 from daytona_claude_toolsets import DaytonaComputer
@@ -531,9 +531,9 @@ def test_borrowed_sandbox_is_never_deleted(sandbox: MagicMock) -> None:
 def test_owned_sandbox_is_deleted_once() -> None:
     sandbox = fake_sandbox()
     client = MagicMock()
-    client.create.return_value = sandbox
+    client.v0.create.return_value = sandbox
     toolset = DaytonaComputer(daytona=client, confirm=approve, resolution=(1024, 768))
-    params = client.create.call_args.args[0]
+    params = client.v0.create.call_args.args[0]
     assert params.env_vars["VNC_RESOLUTION"] == "1024x768"
     assert params.labels["created-by"] == "daytona-claude-toolsets"
     with toolset:
@@ -546,11 +546,11 @@ def test_the_packages_marker_label_cannot_be_overridden() -> None:
     """`created-by=daytona-claude-toolsets` is how a leftover sandbox is found and removed, as the
     README tells people to. A caller's own label must not take a sandbox off that list, while
     every other label the caller sets is kept."""
-    from daytona import CreateSandboxFromSnapshotParams
+    from daytona.v0 import CreateSandboxFromSnapshotParams
 
     sandbox = fake_sandbox()
     client = MagicMock()
-    client.create.return_value = sandbox
+    client.v0.create.return_value = sandbox
     DaytonaComputer(
         daytona=client,
         confirm=approve,
@@ -558,14 +558,14 @@ def test_the_packages_marker_label_cannot_be_overridden() -> None:
             labels={"created-by": "someone-else", "purpose": "demo"}
         ),
     ).close()
-    params = client.create.call_args.args[0]
+    params = client.v0.create.call_args.args[0]
     assert params.labels == {"created-by": "daytona-claude-toolsets", "purpose": "demo"}
 
 
 def test_owned_sandbox_can_be_stopped_instead() -> None:
     sandbox = fake_sandbox()
     client = MagicMock()
-    client.create.return_value = sandbox
+    client.v0.create.return_value = sandbox
     DaytonaComputer(daytona=client, confirm=approve, on_close="stop").close()
     sandbox.stop.assert_called_once_with()
     sandbox.delete.assert_not_called()
@@ -576,7 +576,7 @@ def test_partial_construction_failure_cleans_up() -> None:
     sandbox.computer_use.start.side_effect = RuntimeError("desktop failed")
     sandbox.computer_use.get_status.return_value = SimpleNamespace(status="inactive")
     client = MagicMock()
-    client.create.return_value = sandbox
+    client.v0.create.return_value = sandbox
     with pytest.raises(RuntimeError, match="desktop failed"):
         DaytonaComputer(daytona=client, confirm=approve)
     sandbox.delete.assert_called_once_with()

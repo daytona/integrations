@@ -20,7 +20,7 @@ import shlex
 from typing import Union
 
 from anthropic.tools import ToolError
-from daytona import Sandbox
+from daytona.v0 import Sandbox
 
 log = logging.getLogger("daytona_claude_toolsets")
 

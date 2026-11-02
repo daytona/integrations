@@ -313,7 +313,7 @@ def test_constructor_checks_options_before_creating_a_sandbox() -> None:
         DaytonaBrowser(daytona=client, configs={"javascript_exec": {"enabled": True}})
     with pytest.raises(ValueError):
         DaytonaBrowser(daytona=client, viewport=(2560, 1440))
-    client.create.assert_not_called()
+    client.v0.create.assert_not_called()
 
 
 def test_every_member_is_implemented(browser: DaytonaBrowser) -> None:
@@ -960,7 +960,7 @@ def test_close_is_idempotent_and_releases_a_borrowed_sandbox(
 def test_owned_sandbox_is_deleted_even_if_launch_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     sandbox = fake_sandbox()
     client = MagicMock()
-    client.create.return_value = sandbox
+    client.v0.create.return_value = sandbox
 
     def launch(self: DaytonaBrowser, chromium: str, headless: bool) -> int:
         raise RuntimeError("Chromium did not start")

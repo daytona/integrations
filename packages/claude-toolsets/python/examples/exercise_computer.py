@@ -26,7 +26,8 @@ from typing import Any
 
 from anthropic.tools.computer import BetaAbstractComputerToolset20260801
 from anthropic.types.beta import BetaToolResultBlockParam, BetaToolUseBlock
-from daytona import CreateSandboxFromSnapshotParams, Daytona, DaytonaError, SessionExecuteRequest
+from daytona import Daytona
+from daytona.v0 import CreateSandboxFromSnapshotParams, DaytonaError, SessionExecuteRequest
 
 from daytona_claude_toolsets import DaytonaComputer
 
@@ -273,7 +274,7 @@ def main() -> None:
         exercise(computer)
     computer.close()  # a second close is a no-op
     time.sleep(2)
-    state = Daytona().get(sandbox_id).state if _exists(sandbox_id) else "gone"
+    state = Daytona().v0.get(sandbox_id).state if _exists(sandbox_id) else "gone"
     assert state in (
         "gone",
         "destroyed",
@@ -295,7 +296,7 @@ def main() -> None:
 
     # A sandbox the caller passes in is not the driver's to delete.
     daytona = Daytona()
-    borrowed = daytona.create(
+    borrowed = daytona.v0.create(
         CreateSandboxFromSnapshotParams(labels={"created-by": "daytona-claude-toolsets"})
     )
     try:
@@ -317,7 +318,7 @@ def _exists(sandbox_id: str) -> bool:
     API error or a bad credential satisfy the deletion check while the sandbox is still running.
     """
     try:
-        Daytona().get(sandbox_id)
+        Daytona().v0.get(sandbox_id)
     except DaytonaError as error:
         if error.status_code != 404:
             raise

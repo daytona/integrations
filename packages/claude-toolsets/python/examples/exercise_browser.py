@@ -30,7 +30,8 @@ from urllib.parse import urlsplit
 from anthropic.tools import ToolError
 from anthropic.tools.browser import BetaURLContext
 from anthropic.types.beta import BetaToolResultBlockParam, BetaToolUseBlock
-from daytona import CreateSandboxFromSnapshotParams, Daytona, Sandbox, SessionExecuteRequest
+from daytona import Daytona
+from daytona.v0 import CreateSandboxFromSnapshotParams, Sandbox, SessionExecuteRequest
 from PIL import Image
 
 from daytona_claude_toolsets import DaytonaBrowser, DaytonaFilePolicy
@@ -457,13 +458,13 @@ def main() -> None:
     browser.close()
     time.sleep(2)
     try:
-        state = str(Daytona().get(sandbox_id).state)
+        state = str(Daytona().v0.get(sandbox_id).state)
     except Exception:
         state = "gone"
     assert "destroy" in state or state == "gone", f"expected the owned sandbox deleted: {state}"
 
     # A sandbox the caller passes in survives close(); the driver's Chromium does not.
-    borrowed = Daytona().create(
+    borrowed = Daytona().v0.create(
         CreateSandboxFromSnapshotParams(labels={"created-by": "daytona-claude-toolsets"})
     )
     try:
