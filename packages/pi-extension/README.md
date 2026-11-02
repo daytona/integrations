@@ -47,7 +47,7 @@ The extension also reads this optional variable:
 
 - `DAYTONA_TARGET` — e.g. `us`.
 
-Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud), i.e. the last `@daytona/pi` built on `@daytona/sdk` 0.x.
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 If no key is set and a UI is available, Pi prompts you for one once per session.
 
