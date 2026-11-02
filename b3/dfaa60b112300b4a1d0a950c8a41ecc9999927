@@ -1,0 +1,14 @@
+packages/langchain-data-analysis/README.md
+  h_634fa4b3782b12 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b3dfaa60b112300b4a1d0a950c8a41ecc9999927",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
