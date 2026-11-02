@@ -1,0 +1,19 @@
+apps/dify-plugin/README.md
+  s_37e96adb68d22b::t_cd9a2ef09e2c30 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3e449f78d2dba924331cc00e8e113791d013bcaf",
+  "prompts": {},
+  "sessions": {
+    "s_37e96adb68d22b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61824da3ffeeyNUGv6dODELwH",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
