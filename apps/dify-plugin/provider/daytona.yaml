@@ -32,24 +32,6 @@ credentials_for_provider:
     required: true
     type: secret-input
     url: https://app.daytona.io/dashboard/keys
-  api_url:
-    description:
-      en_US: Daytona API URL (optional, defaults to https://app.daytona.io/api)
-      zh_Hans: Daytona API URL (optional, defaults to https://app.daytona.io/api)
-      ja_JP: Daytona API URL (optional, defaults to https://app.daytona.io/api)
-      pt_BR: Daytona API URL (optional, defaults to https://app.daytona.io/api)
-    help:
-      en_US: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
-      zh_Hans: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
-      ja_JP: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
-      pt_BR: Leave empty to use the default Daytona API endpoint, or set a custom URL to point at a different endpoint.
-    label:
-      en_US: API URL
-      zh_Hans: API URL
-      ja_JP: API URL
-      pt_BR: API URL
-    required: false
-    type: text-input
 tools:
   - tools/create_sandbox.yaml
   - tools/run_code.yaml
