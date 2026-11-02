@@ -2,12 +2,12 @@ import ast
 import os
 from typing import IO, Any, Callable, List, Literal, Optional, Tuple, Type, Union
 
-from daytona import (  # type: ignore
+from daytona import (
     Daytona,
     DaytonaConfig,
 )
-from daytona.v0 import (
-    ExecutionArtifacts,
+from daytona.v2 import (
+    InterpreterResult,
     Sandbox,
 )
 from langchain_core.callbacks import (  # type: ignore
@@ -80,18 +80,18 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
     Key init args:
         daytona_api_key: Optional[str]
             Daytona API key. Not required if API key is set via env variable.
-        on_result: Optional[Callable[[ExecutionArtifacts], Any]]
+        on_result: Optional[Callable[[InterpreterResult], Any]]
             Method which specifies actions to do with a result of data analysis.
-            Receives one argument of type ExecutionArtifacts.
-            ExecutionArtifacts attributes:
-                stdout (str): Standard output from the command
-                charts (Optional[List[Chart]]): List of chart metadata from matplotlib
+            Receives the full InterpreterResult: logs, process, results and error.
+            Chart images are MIME-keyed results, not Chart metadata objects.
+        image: Optional[str]
+            Registered v2 image name or ID; otherwise uses the platform default.
         max_output_chars: int
             Maximum characters of printed output returned to the model (default 20000).
             Longer output keeps its beginning and end.
 
     The model receives the printed output plus a one-line summary of each chart. Chart
-    image data never enters the model's context: the full ExecutionArtifacts go to
+    image data never enters the model's context: the full InterpreterResult goes to
     ``on_result`` and to the ``artifact`` of the returned ToolMessage.
 
 
@@ -121,7 +121,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
         .. code-block:: python
 
-            ToolMessage(content='Hello World', name='daytona_data_analysis', tool_call_id='1', artifact=ExecutionArtifacts(stdout='Hello World\n', charts=[]))
+            ToolMessage(content='Hello World', name='daytona_data_analysis', tool_call_id='1', artifact=InterpreterResult(...))
 
     """  # noqa: E501
 
@@ -154,51 +154,60 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
     def __init__(
         self,
         daytona_api_key: Optional[str] = None,
-        on_result: Optional[Callable[[ExecutionArtifacts], Any]] = None,
+        on_result: Optional[Callable[[InterpreterResult], Any]] = None,
+        image: str | None = None,
         **kwargs: Any,
     ):
         super().__init__(description=tool_base_description, **kwargs)
         daytona_api_key = daytona_api_key or os.environ.get("DAYTONA_API_KEY")
         self._daytonaClient = Daytona(DaytonaConfig(api_key=daytona_api_key))
-        self._sandbox = self._daytonaClient.v0.create()
+        self._sandbox = self._daytonaClient.v2.create(
+            image,
+            labels={"sdk2-readiness": "langchain-daytona-data-analysis"},
+            lifecycle_policy={"timeout_seconds": 600, "on_timeout": "delete"},
+            create_timeout_seconds=60,
+        )
         self._on_result = on_result
 
     def _run(
         self,
         data_analysis_python_code: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
-    ) -> Tuple[str, Optional[ExecutionArtifacts]]:
+    ) -> Tuple[str, InterpreterResult]:
         python_code_to_exec = self._add_last_line_print(data_analysis_python_code)
 
-        execution = self._sandbox.process.code_run(python_code_to_exec)
-        if execution.exit_code != 0:
+        execution = self._sandbox.run_code(python_code_to_exec, isolated=True, timeout=60)
+        if execution.error is not None or execution.process.exit_code != 0:
+            output = execution.logs.stdout + execution.logs.stderr
+            if execution.error is not None:
+                output += "\n".join(execution.error.traceback)
             return (
-                f"Python code execution exited with code {execution.exit_code}\n"
-                f"Result: {self._truncate(execution.result)}",
-                execution.artifacts,
+                f"Python code execution exited with code {execution.process.exit_code}\n"
+                f"Result: {self._truncate(output)}",
+                execution,
             )
 
-        if not execution.artifacts:
-            return "Python code execution didn't generate any artifacts", None
-
         if self._on_result is not None:
-            self._on_result(execution.artifacts)
-        return self._describe(execution.artifacts), execution.artifacts
+            self._on_result(execution)
+        return self._describe(execution), execution
 
-    def _describe(self, artifacts: ExecutionArtifacts) -> str:
+    def _describe(self, result: InterpreterResult) -> str:
         """Build the text the model sees: printed output and chart summaries, no image data."""
         sections = []
-        if artifacts.stdout.strip():
-            sections.append(self._truncate(artifacts.stdout).rstrip("\n"))
-        if artifacts.charts:
+        if result.logs.stdout.strip():
+            sections.append(self._truncate(result.logs.stdout).rstrip("\n"))
+        charts = [
+            output for output in result.results
+            if any(mime.startswith("image/") for mime in output.data)
+        ]
+        if charts:
             lines = [
-                f"Generated {len(artifacts.charts)} chart(s). The image data was passed to "
+                f"Generated {len(charts)} chart(s). The image data was passed to "
                 "the application and is not included here:"
             ]
-            for chart in artifacts.charts:
-                kind = chart.type if chart.type and chart.type != "unknown" else "chart"
-                title = " ".join((chart.title or "").split()) or "untitled"
-                lines.append(f"- {kind}: {title}")
+            for chart in charts:
+                formats = ", ".join(mime for mime in chart.data if mime.startswith("image/"))
+                lines.append(f"- chart: {formats}")
             sections.append("\n".join(lines))
         if not sections:
             return "Python code executed successfully with no output."
@@ -220,7 +229,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
     def close(self) -> None:
         """Close and delete sandbox."""
         self._sandbox_uploaded_files = []
-        self._daytonaClient.v0.delete(self._sandbox)
+        self._daytonaClient.v2.delete(self._sandbox)
 
     def install_python_packages(self, package_names: Union[str, List[str]]) -> None:
         """Install python packages in the sandbox."""
@@ -229,23 +238,23 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         else:
             packages_str = " ".join(package_names)
         command = f"pip install {packages_str}"
-        self._sandbox.process.exec(command)
+        self._sandbox.exec(command, timeout=60, execution_timeout=60)
 
     def download_file(self, remote_path: str) -> bytes:
         """Download file from the sandbox."""
-        return self._sandbox.fs.download_file(remote_path)
+        return self._sandbox.fs.read_bytes(remote_path)
 
     def upload_file(self, file: IO, description: str) -> SandboxUploadedFile:
         """Upload file to the sandbox.
 
-        The file is uploaded to the '/home/daytona' path."""
+        The file is uploaded to the measured v2 root user's home, '/root'."""
 
         fileName = os.path.basename(file.name)
-        fileRemotePath = "/home/daytona/" + fileName
+        fileRemotePath = "/root/" + fileName
         file_bytes = file.read()
         if isinstance(file_bytes, str):
             file_bytes = file_bytes.encode("utf-8")
-        self._sandbox.fs.upload_file(file_bytes, fileRemotePath)
+        self._sandbox.fs.write_bytes(fileRemotePath, file_bytes)
 
         sandboxFile = SandboxUploadedFile(
             name=os.path.basename(file.name),
@@ -258,7 +267,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
     def remove_uploaded_file(self, uploaded_file: SandboxUploadedFile) -> None:
         """Remove uploaded file from the sandbox."""
-        self._sandbox.fs.delete_file(uploaded_file.remote_path)
+        self._sandbox.fs.delete(uploaded_file.remote_path)
         self._sandbox_uploaded_files = [
             f
             for f in self._sandbox_uploaded_files
@@ -268,7 +277,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
     def get_sandbox(self) -> Sandbox:
         """Get the current sandbox instance."""
-        return self._daytonaClient.v0.get(self._sandbox.id)
+        return self._daytonaClient.v2.get(self._sandbox.id)
     
     def _unparse(self, tree: ast.AST) -> str:
         """Unparse the AST back into source code."""
