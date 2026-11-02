@@ -1,0 +1,21 @@
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_session.py
+  s_b92e326f291b01::t_5abead20fc78ef 97
+packages/pydantic-ai-daytona/README.md
+  s_b92e326f291b01::t_119299f9dcc125 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aac465504292d53b7716da6c9f9434a57eabb6fa",
+  "prompts": {},
+  "sessions": {
+    "s_b92e326f291b01": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6215fefbffex2n22dvbbKPGyC",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
