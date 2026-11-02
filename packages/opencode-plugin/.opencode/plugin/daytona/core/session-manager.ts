@@ -10,11 +10,13 @@
 
 import {
   Daytona,
+} from '@daytona/sdk'
+import {
   DaytonaNotFoundError,
   DaytonaValidationError,
   type CreateSandboxFromSnapshotParams,
   type Sandbox,
-} from '@daytona/sdk'
+} from '@daytona/sdk/v0'
 import { logger } from './logger'
 import type { GitReturnState, GitReturnStatus, SessionSandboxMap, SandboxInfo, SessionInfo } from './types'
 import { SessionGitManager } from '../git/session-git-manager'
@@ -135,7 +137,7 @@ export class DaytonaSessionManager {
         const daytona = new Daytona({ apiKey: this.apiKey })
         const reconnectStart = Date.now()
         logger.info(`Daytona get begin sandboxId=${existing.id}`)
-        const sandbox = await daytona.get(existing.id)
+        const sandbox = await daytona.v0.get(existing.id)
         logger.info(`Daytona get done sandboxId=${existing.id} in ${Date.now() - reconnectStart}ms`)
         logger.info(`Starting sandbox begin sandboxId=${sandbox.id}`)
         await sandbox.start()
@@ -206,7 +208,7 @@ export class DaytonaSessionManager {
     const waitingLog = setTimeout(() => {
       logger.warn(`Daytona create still waiting after ${Date.now() - createStart}ms (sessionId=${sessionId})`)
     }, 15_000)
-    const sandbox = await daytona
+    const sandbox = await daytona.v0
       .create(createParams)
       .catch((err: unknown) => {
         // Only blame the snapshot when the request itself was rejected. The create
@@ -337,7 +339,7 @@ export class DaytonaSessionManager {
       if (stored?.session.sandboxId) {
         const daytona = new Daytona({ apiKey: this.apiKey })
         try {
-          sandbox = await daytona.get(stored.session.sandboxId)
+          sandbox = await daytona.v0.get(stored.session.sandboxId)
           this.sessionSandboxes.set(sessionId, sandbox)
         } catch (err) {
           if (err instanceof DaytonaNotFoundError) {
