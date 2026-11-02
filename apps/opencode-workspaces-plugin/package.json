@@ -26,7 +26,7 @@
     "test": "bun test --timeout 180000"
   },
   "dependencies": {
-    "@daytona/sdk": "^0.163.0",
+    "@daytona/sdk": "2.0.0-alpha.5",
     "@opencode-ai/plugin": "^1.4.11"
   },
   "devDependencies": {
@@ -34,5 +34,8 @@
     "@types/node": "^22",
     "opencode-ai": "^1.18.15",
     "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=22.4.0"
   }
 }

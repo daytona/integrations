@@ -14,6 +14,7 @@ OpenCode plugin that provisions Daytona sandboxes as remote workspaces.
 ## Requirements
 
 - OpenCode 1.14.x or later
+- Node.js 22.4.0 or later
 - Daytona account and API key
 - `OPENCODE_EXPERIMENTAL_WORKSPACES=true` environment flag
 
@@ -29,6 +30,10 @@ cd integrations/apps/opencode-workspaces-plugin
 npm ci
 pwd   # note this path; it is used below
 ```
+
+`npm ci` installs the Daytona SDK 2.x (sandboxes are managed through its `v0` namespace), pinned to the pre-release `@daytona/sdk@2.0.0-alpha.5` until 2.0.0 is stable.
+
+Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
 
 Add a `file://` plugin spec to your project's `.opencode/opencode.jsonc`:
 
