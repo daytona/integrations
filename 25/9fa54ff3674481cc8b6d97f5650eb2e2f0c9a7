@@ -1,0 +1,50 @@
+apps/opencode-workspaces-plugin/package.json
+  s_f1f2776f920859::t_a790e367459d1c 29,37-39
+apps/opencode-workspaces-plugin/README.md
+  s_f1f2776f920859::t_cf86f46331ff1a 17
+  s_f1f2776f920859::t_fea91834c80d74 34-37
+apps/opencode-workspaces-plugin/.opencode/plugin/daytona/index.ts
+  s_2407f88f7af735::t_36b1561bd955ea 110,230,332,343,348,365
+apps/opencode-workspaces-plugin/package-lock.json
+  s_76ffaf501a8ee3::t_c59524580849fa 12,20-22,38-40,43-46,54-68,76-78,81-82,84-86,95-97,100-103,111-113,116-121,129-145,153-155,158-162,170-184,192-194,197-200,208-210,213-218,226-228,231-235,243-245,248-249,259,263-265,268-272,280-291,299-301,304-306,314-316,319-323,331-333,336,344-346,349,365-373,375-377,384-386,389-393,395-404,411-426,430-432,439-441,657-659,668-683,685-687,697-699,712-714,717-720,730-732,735-737,747-749,752-754,764-766,769-771,781-783,786-790,800-802,805-807,817-819,822-825,835-837,840-843,853-855,858-860,870-872,875-877,887-889,892-894,905-907,910-911,922-924,927-928,940-942,945-946,956-958,961-964,974-976,979-984,994-996,999,1009-1012,1015,1025-1027,1030,1041-1043,1046-1049,1059-1061,1064-1065,1075-1105,1116-1119,1122-1124,1135-1137,1140-1141,1152-1155,1158-1160,1171-1173,1186-1188,1191,1201-1204,1207-1208,1218-1222,1225-1227,1236-1240,1243-1245,1256-1258,1322-1324,1327,1335-1337,1340-1341,1349-1351,1354-1355,1363-1365,1368-1369,1377-1379,1382-1383,1391-1393,1402-1407,1423-1426,1428-1429,1475-1477,1507-1509,1568-1570,1705-1747,1766-1771,1895-1897,2100-2102,2106,2108-2110,2570-2572,2748-2750,2759-2786,2878-2880,2955-2957,2975-2982
+apps/opencode-workspaces-plugin/test/e2e-tui.test.ts
+  s_2407f88f7af735::t_870e293c1a4262 122,124-126,162
+apps/opencode-workspaces-plugin/test/integration.test.ts
+  s_2407f88f7af735::t_e9bbcd7afbef55 225,227,274
+apps/opencode-workspaces-plugin/test/plugin.test.ts
+  s_2407f88f7af735::t_de4addfc4258fe 66,68-70,88,108
+apps/opencode-workspaces-plugin/test/snapshot.test.ts
+  s_2407f88f7af735::t_0bcb9fb66b9c8c 188,190-192,206,227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "259fa54ff3674481cc8b6d97f5650eb2e2f0c9a7",
+  "prompts": {},
+  "sessions": {
+    "s_2407f88f7af735": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61daf2dfffe58yvu5ma6f06BU",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_76ffaf501a8ee3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61dd08c5ffeQLo0zUX3K7JcTl",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_f1f2776f920859": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e61daf2dfffe58yvu5ma6f06BU",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
