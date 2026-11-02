@@ -185,11 +185,8 @@ describe.skipIf(!HAS_DAYTONA_KEY)('DAYTONA_SNAPSHOT', () => {
     // Sweep from the plugin log rather than tracked names alone, so sandboxes
     // whose create hung or threw still get deleted.
     for (const name of sandboxNamesSince(await readLog(), logOffset)) {
-      // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.get(...)` (SDK 2.x moved client methods to .v0)
-      const sandbox = await daytona.get(name).catch(() => undefined)
-      if (sandbox)
-      // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.delete(...)` (SDK 2.x moved client methods to .v0)
-      await daytona.delete(sandbox).catch(() => undefined)
+      const sandbox = await daytona.v0.get(name).catch(() => undefined)
+      if (sandbox) await daytona.v0.delete(sandbox).catch(() => undefined)
     }
     await rm(testDir, { recursive: true, force: true }).catch(() => undefined)
   })
@@ -203,8 +200,7 @@ describe.skipIf(!HAS_DAYTONA_KEY)('DAYTONA_SNAPSHOT', () => {
       // opencode assigns its own workspace name; read it back rather than
       // assuming the one we posted.
       const workspace = JSON.parse(body)
-      // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.get(...)` (SDK 2.x moved client methods to .v0)
-      const sandbox = await daytona.get(`opencode-${workspace.name}`)
+      const sandbox = await daytona.v0.get(`opencode-${workspace.name}`)
       expect(sandbox.snapshot).toBe(TEST_SNAPSHOT)
 
       const del = await fetch(`http://127.0.0.1:${port}/experimental/workspace/${workspace.id}`, { method: 'DELETE' })
@@ -224,8 +220,7 @@ describe.skipIf(!HAS_DAYTONA_KEY)('DAYTONA_SNAPSHOT', () => {
       // No silent fallback: nothing may exist under any name the plugin started
       // building during this case.
       for (const name of sandboxNamesSince(await readLog(), before)) {
-        // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.get(...)` (SDK 2.x moved client methods to .v0)
-        expect(await daytona.get(name).catch(() => undefined)).toBeUndefined()
+        expect(await daytona.v0.get(name).catch(() => undefined)).toBeUndefined()
       }
     })
   })

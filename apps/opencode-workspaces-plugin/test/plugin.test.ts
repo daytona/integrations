@@ -8,6 +8,7 @@ import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 
 import { Daytona } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import { createOpencode } from '@opencode-ai/sdk/v2'
 
 const PLUGIN_PATH = resolve(import.meta.dir, '../.opencode/plugin/index.ts')
@@ -63,11 +64,8 @@ describe('opencode-plugin', () => {
     // deleted here, so a red test does not also burn money.
     afterAll(async () => {
       for (const id of leakedIds) {
-        // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.get(...)` (SDK 2.x moved client methods to .v0)
-        const sandbox = await daytona.get(id).catch(() => undefined)
-        if (sandbox)
-        // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.delete(...)` (SDK 2.x moved client methods to .v0)
-        await daytona.delete(sandbox).catch(() => undefined)
+        const sandbox = await daytona.v0.get(id).catch(() => undefined)
+        if (sandbox) await daytona.v0.delete(sandbox).catch(() => undefined)
       }
     })
 
@@ -85,8 +83,8 @@ describe('opencode-plugin', () => {
       // the failed create() is identifiable as a leak. opencode assigns a
       // random petname for `config.name`, so we cannot predict the sandbox
       // name up front.
-      // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.list(...)` (SDK 2.x moved client methods to .v0)
-      const before = new Set((await daytona.list()).items.map((s) => s.id))
+      const before = new Set<string>()
+      for await (const s of daytona.v0.list()) before.add(s.id)
 
       try {
         // The bad branch makes the host-side `git clone --branch ...` fail;
@@ -105,8 +103,8 @@ describe('opencode-plugin', () => {
         const start = Date.now()
         let leaks: Array<{ id: string; name: string }> = []
         while (Date.now() - start < 30_000) {
-          // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.list(...)` (SDK 2.x moved client methods to .v0)
-          const after = (await daytona.list()).items
+          const after: Sandbox[] = []
+          for await (const s of daytona.v0.list()) after.push(s)
           leaks = after
             .filter((s) => !before.has(s.id))
             // Daytona renames deleted sandboxes to DESTROYED_<name>_<ts> the

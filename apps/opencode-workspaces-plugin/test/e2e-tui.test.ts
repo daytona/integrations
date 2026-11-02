@@ -119,11 +119,8 @@ describe.skipIf(!ENABLED)('e2e tui (daytona workspace)', () => {
   afterAll(async () => {
     tmux('kill-server')
     if (createdSandboxName) {
-      // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.get(...)` (SDK 2.x moved client methods to .v0)
-      const sb = await daytona.get(createdSandboxName).catch(() => undefined)
-      if (sb)
-      // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.delete(...)` (SDK 2.x moved client methods to .v0)
-      await daytona.delete(sb).catch(() => undefined)
+      const sb = await daytona.v0.get(createdSandboxName).catch(() => undefined)
+      if (sb) await daytona.v0.delete(sb).catch(() => undefined)
     }
     if (projectDir) await rm(projectDir, { recursive: true, force: true }).catch(() => undefined)
   })
@@ -159,8 +156,7 @@ describe.skipIf(!ENABLED)('e2e tui (daytona workspace)', () => {
     console.log(`[e2e] created workspace=${name} sandbox=${createdSandboxName} id=${id}`)
 
     // --- HARD ASSERT: the sandbox exists and its remote server is healthy ---
-    // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.get(...)` (SDK 2.x moved client methods to .v0)
-    const sandbox = await daytona.get(createdSandboxName)
+    const sandbox = await daytona.v0.get(createdSandboxName)
     expect(sandbox.state).toBe('started')
     const health = await sandbox.process.executeCommand('curl -fsS http://127.0.0.1:3096/global/health')
     expect(health.exitCode, 'remote /global/health').toBe(0)
