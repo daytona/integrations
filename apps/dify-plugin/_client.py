@@ -11,12 +11,8 @@ _client_cache: dict[str, Daytona] = {}
 
 
 def _cache_key(credentials: dict[str, Any]) -> str:
-    # Length-prefix each field so distinct api_key/api_url pairs can't collide
-    # into the same entry (e.g. "a:" + "b" vs "a" + ":b").
     api_key = str(credentials.get("api_key", ""))
-    api_url = str(credentials.get("api_url", ""))
-    raw = f"{len(api_key)}:{api_key}{len(api_url)}:{api_url}"
-    return hashlib.sha256(raw.encode()).hexdigest()
+    return hashlib.sha256(api_key.encode()).hexdigest()
 
 
 def to_int(value: Any, name: str) -> int:
@@ -32,10 +28,7 @@ def to_int(value: Any, name: str) -> int:
 def build_client(credentials: dict[str, Any]) -> Daytona:
     key = _cache_key(credentials)
     if key not in _client_cache:
-        config = DaytonaConfig(api_key=credentials["api_key"])
-        if api_url := credentials.get("api_url"):
-            config.api_url = api_url
-        _client_cache[key] = Daytona(config)
+        _client_cache[key] = Daytona(DaytonaConfig(api_key=credentials["api_key"]))
     return _client_cache[key]
 
 
