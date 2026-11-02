@@ -121,7 +121,7 @@ The backend exposes 11 tools to the agent, all defined with `defineTool` from `@
 
 | Tool | What it does | Daytona SDK call |
 |---|---|---|
-| `createSandbox({envVars?, labels?, autoStopInterval?})` | Create an ephemeral sandbox (auto-deletes on stop) | `daytona.create({ public: true, ephemeral: true, ... })` |
+| `createSandbox({envVars?, labels?, autoStopInterval?})` | Create an ephemeral sandbox (auto-deletes on stop) | `daytona.v0.create({ public: true, ephemeral: true, ... })` |
 | `runCommand({sandboxId, command, background?})` | Run a shell command; `background:true` for watchers/log tails | `process.executeCommand` / `executeSessionCommand({runAsync:true})` |
 | `writeFile({sandboxId, path, content})` | Overwrite a file with full new content | `fs.uploadFile` |
 | `readFile({sandboxId, path})` | Read a file's text | `fs.downloadFile` |
@@ -137,7 +137,9 @@ On the React side, `app/page.tsx` registers one `useRenderTool` per tool; each r
 
 ## Prerequisites
 
-- **Node.js 20+**
+- **Node.js 22.4+** (`engines.node` is `>=22.4.0`, which Vercel reads to pick a Node 22+ runtime)
+- Installs Daytona SDK 2.x (`@daytona/sdk` pinned to the pre-release `2.0.0-alpha.5` until 2.0.0 is stable), used through its `daytona.v0` namespace
+- Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud)
 - A **Daytona** key (or `daytona/sandbox` via Stripe Projects) — note a Daytona plan must be active before a sandbox can be provisioned
 - An **OpenRouter** key (or `openrouter/api` via Stripe Projects). The default model needs the `pay_as_you_go` plan; on the `free` plan, set `OPENROUTER_MODEL` to a free model
 

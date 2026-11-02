@@ -111,7 +111,7 @@ const createSandbox = defineTool({
       .describe('Minutes of inactivity before the sandbox auto-stops. 0 disables, default 15.'),
   }),
   execute: async ({ envVars, labels, autoStopInterval }) => {
-    const sandbox = await daytona.create({
+    const sandbox = await daytona.v0.create({
       public: true,
       ephemeral: true,
       envVars,
@@ -137,7 +137,7 @@ const runCommand = defineTool({
       ),
   }),
   execute: async ({ sandboxId, command, background }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     if (background) {
       const sessionId = `bg-${Date.now()}`
       await sandbox.process.createSession(sessionId)
@@ -161,7 +161,7 @@ const writeFile = defineTool({
     content: z.string().describe('Complete new file content.'),
   }),
   execute: async ({ sandboxId, path, content }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     await sandbox.fs.uploadFile(Buffer.from(content), path)
     return { path, bytesWritten: Buffer.byteLength(content) }
   },
@@ -175,7 +175,7 @@ const readFile = defineTool({
     path: z.string().describe('Absolute path to the file in the sandbox.'),
   }),
   execute: async ({ sandboxId, path }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const buf = await sandbox.fs.downloadFile(path)
     return { path, content: buf.toString('utf-8'), bytes: buf.length }
   },
@@ -189,7 +189,7 @@ const listFiles = defineTool({
     path: z.string().describe('Absolute directory path, e.g. "/home/daytona/app".'),
   }),
   execute: async ({ sandboxId, path }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const files = await sandbox.fs.listFiles(path)
     return {
       path,
@@ -212,7 +212,7 @@ const findFiles = defineTool({
     pattern: z.string().describe('Regex pattern to match against file contents.'),
   }),
   execute: async ({ sandboxId, path, pattern }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const matches = await sandbox.fs.findFiles(path, pattern)
     return { pattern, matches }
   },
@@ -227,7 +227,7 @@ const searchFiles = defineTool({
     pattern: z.string().describe('Glob pattern for file names, e.g. "**/*.tsx".'),
   }),
   execute: async ({ sandboxId, path, pattern }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const result = await sandbox.fs.searchFiles(path, pattern)
     return { pattern, files: result.files }
   },
@@ -244,7 +244,7 @@ const replaceInFiles = defineTool({
     newValue: z.string().describe('Replacement text.'),
   }),
   execute: async ({ sandboxId, files, pattern, newValue }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const results = await sandbox.fs.replaceInFiles(files, pattern, newValue)
     return {
       pattern,
@@ -266,7 +266,7 @@ const getFileDetails = defineTool({
     path: z.string(),
   }),
   execute: async ({ sandboxId, path }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const info = await sandbox.fs.getFileDetails(path)
     return {
       path,
@@ -300,7 +300,7 @@ const startWebServer = defineTool({
       ),
   }),
   execute: async ({ sandboxId, command, port }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const sessionId = `web-${Date.now()}`
     await sandbox.process.createSession(sessionId)
     const bg = await sandbox.process.executeSessionCommand(sessionId, {
@@ -344,7 +344,7 @@ const getPreviewUrl = defineTool({
     port: z.number().describe('Port the hosted process is listening on.'),
   }),
   execute: async ({ sandboxId, port }) => {
-    const sandbox = await daytona.get(sandboxId)
+    const sandbox = await daytona.v0.get(sandboxId)
     const preview = await sandbox.getPreviewLink(port)
     return { url: preview.url, port }
   },

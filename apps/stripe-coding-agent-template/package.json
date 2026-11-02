@@ -4,7 +4,7 @@
   "description": "Generative-UI coding agent that writes and runs code in a Daytona sandbox, live-previewed in chat. CopilotKit UI, OpenRouter LLM, deploy on Vercel. A Stripe Projects build template.",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=22.4.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -32,7 +32,7 @@
     "@ai-sdk/openai": "^3.0.36",
     "@copilotkit/react-core": "1.59.5",
     "@copilotkit/runtime": "1.59.5",
-    "@daytona/sdk": "0.184.0",
+    "@daytona/sdk": "2.0.0-alpha.5",
     "next": "15.5.15",
     "react": "19.0.0",
     "react-dom": "19.0.0",

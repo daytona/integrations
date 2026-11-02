@@ -117,7 +117,7 @@ try {
 console.log(`\n[3/3] Daytona sandbox lifecycle`)
 let sandbox
 try {
-  sandbox = await daytona.create({ public: true, ephemeral: true })
+  sandbox = await daytona.v0.create({ public: true, ephemeral: true })
   ok(`createSandbox → ${sandbox.id}`)
 
   const r = await sandbox.process.executeCommand('echo hello-from-daytona')
