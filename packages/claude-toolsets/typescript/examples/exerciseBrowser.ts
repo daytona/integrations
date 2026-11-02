@@ -36,7 +36,7 @@ import type {
   BetaBrowserStateBlockParam,
   BetaToolResultBlockParam,
 } from "@anthropic-ai/sdk/resources/beta";
-import type { Sandbox } from "@daytona/sdk";
+import type { Sandbox } from "@daytona/sdk/v0";
 
 import { DaytonaBrowser, DaytonaFilePolicy } from "../src/index.js";
 import { SCREENSHOT_BOUNDS, decodePng } from "../src/png.js";

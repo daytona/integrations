@@ -1,4 +1,5 @@
-import { Daytona, type Sandbox } from "@daytona/sdk";
+import { Daytona } from "@daytona/sdk";
+import type { Sandbox } from "@daytona/sdk/v0";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -74,9 +75,9 @@ describe("sandbox lease", () => {
   ])("passes %s create params and the timeout through a real Daytona client", async (_shape, createParams) => {
     // Given: a Daytona client whose create is observed (this is the `instanceof Daytona` path).
     const sandbox = fakeSandbox();
-    const daytona = new Daytona({ apiKey: "dtn_test", apiUrl: "https://example.invalid/api" });
+    const daytona = new Daytona({ apiKey: "dtn_test" });
     const create = vi.fn(async () => sandbox as unknown as Sandbox);
-    daytona.create = create as unknown as Daytona["create"];
+    daytona.v0.create = create as unknown as Daytona["v0"]["create"];
 
     // When: an owned lease is acquired with those create params and a non-default timeout.
     await SandboxLease.acquire(undefined, { daytona, createParams, createTimeout: 45 });

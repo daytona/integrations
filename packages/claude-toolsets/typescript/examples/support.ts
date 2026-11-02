@@ -10,8 +10,9 @@ import { strict as assert } from "node:assert";
 import { pathToFileURL } from "node:url";
 
 import type { BetaToolResultBlockParam } from "@anthropic-ai/sdk/resources/beta";
-import { Daytona, DaytonaError } from "@daytona/sdk";
-import type { Sandbox } from "@daytona/sdk";
+import { Daytona } from "@daytona/sdk";
+import { DaytonaError } from "@daytona/sdk/v0";
+import type { Sandbox } from "@daytona/sdk/v0";
 
 /** One block of a `tool_result`, as the model receives it. */
 export type ResultBlock = Exclude<BetaToolResultBlockParam["content"], string | undefined>[number];
@@ -75,7 +76,7 @@ export const printBlocks = (
  */
 export const borrowedSandbox = async (): Promise<Sandbox | undefined> => {
   const id = process.env["CTTS_SANDBOX_ID"];
-  return id === undefined || id === "" ? undefined : new Daytona().get(id);
+  return id === undefined || id === "" ? undefined : new Daytona().v0.get(id);
 };
 
 /**
@@ -86,7 +87,7 @@ export const borrowedSandbox = async (): Promise<Sandbox | undefined> => {
  */
 export const exists = async (sandboxId: string): Promise<boolean> => {
   try {
-    await new Daytona().get(sandboxId);
+    await new Daytona().v0.get(sandboxId);
   } catch (error: unknown) {
     if (error instanceof DaytonaError && error.statusCode === 404) return false;
     throw error;
@@ -96,11 +97,11 @@ export const exists = async (sandboxId: string): Promise<boolean> => {
 
 /** The sandbox's state, or `gone` once it has been deleted. */
 export const stateOfSandbox = async (sandboxId: string): Promise<string> =>
-  (await exists(sandboxId)) ? String((await new Daytona().get(sandboxId)).state) : "gone";
+  (await exists(sandboxId)) ? String((await new Daytona().v0.get(sandboxId)).state) : "gone";
 
 /** A sandbox of this package's own making, for the checks about a sandbox the caller passes in. */
 export const throwawaySandbox = async (): Promise<Sandbox> =>
-  new Daytona().create({ labels: { "created-by": "daytona-claude-toolsets" } });
+  new Daytona().v0.create({ labels: { "created-by": "daytona-claude-toolsets" } });
 
 /** Whether this module's file is the one node was asked to run, rather than one a harness imported. */
 export const invokedDirectly = (moduleUrl: string): boolean => {

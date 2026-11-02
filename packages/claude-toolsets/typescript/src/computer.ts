@@ -26,8 +26,9 @@ import type {
   BetaComputerWaitInput,
   BetaComputerZoomInput,
 } from "@anthropic-ai/sdk/resources/beta";
-import { DaytonaError } from "@daytona/sdk";
-import type { Daytona, Sandbox } from "@daytona/sdk";
+import { DaytonaError } from "@daytona/sdk/v0";
+import type { Daytona } from "@daytona/sdk";
+import type { Sandbox } from "@daytona/sdk/v0";
 
 import { XKEYSYMS, desktopKey, parseChord, splitSequence } from "./keys.js";
 import { debug, errorName, warn } from "./logging.js";

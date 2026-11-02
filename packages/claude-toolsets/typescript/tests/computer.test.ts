@@ -1,5 +1,5 @@
 import { ToolsetClosedError, ToolsetConfigError } from "@anthropic-ai/sdk/helpers/beta/toolsets";
-import { DaytonaError } from "@daytona/sdk";
+import { DaytonaError } from "@daytona/sdk/v0";
 import pngjs from "pngjs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

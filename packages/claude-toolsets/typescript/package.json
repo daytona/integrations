@@ -40,7 +40,7 @@
   "types": "./dist/index.d.ts",
   "module": "./dist/index.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.4.0"
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
@@ -54,7 +54,7 @@
     "example:exercise-browser": "tsx examples/exerciseBrowser.ts"
   },
   "dependencies": {
-    "@daytona/sdk": "^0.223.0",
+    "@daytona/sdk": "2.0.0-alpha.5",
     "playwright-core": "^1.49.0",
     "pngjs": "^7.0.0"
   },

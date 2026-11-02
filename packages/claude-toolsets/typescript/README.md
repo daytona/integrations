@@ -13,6 +13,8 @@ Every member of both toolsets is implemented, including the browser members that
 npm install @daytona/claude-toolsets @anthropic-ai/sdk
 ```
 
+This release depends on the Daytona SDK 2.x through its `v0` namespace and pins the pre-release `@daytona/sdk` `2.0.0-alpha.5` exactly until 2.0.0 is stable.
+
 `@anthropic-ai/sdk` is a peer dependency — install it yourself so the toolset base classes this package extends come from the exact SDK version your application runs. Version `0.132.0` or newer is required; that is the first release exporting the toolset helpers from `@anthropic-ai/sdk/helpers/beta/toolsets`. Chromium is driven with `playwright-core`, which is a direct dependency and downloads no browser: the one that matters already lives in the sandbox.
 
 Set your keys in the environment:
@@ -74,9 +76,10 @@ With no `sandbox` option and no custom snapshot or image in `createParams`, each
 
 ## Requirements
 
-- **Node.js 20 or newer.**
+- **Node.js 22.4 or newer.**
 - **ESM only.** The package ships ES modules with no CommonJS build, so import it from a package with `"type": "module"` (or from `.mts` files, or through a bundler). `require("@daytona/claude-toolsets")` will not work; from CommonJS use dynamic `await import(...)`.
 - A **Daytona account and API key**, plus an Anthropic API key for the model loop.
+- Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
 
 ## Sandbox lifecycle
 
