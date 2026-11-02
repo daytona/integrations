@@ -1,0 +1,20 @@
+packages/adk-plugin/README.md
+  s_cfca1b56eeaeb9::t_0f475a44b12dad 15-61
+  s_cfca1b56eeaeb9::t_0ad9c2daa3e8c2 62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d671fb5c93ae227884b722576cbf7f9a390b066e",
+  "prompts": {},
+  "sessions": {
+    "s_cfca1b56eeaeb9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61751165ffeZN9dO1Ed36zm4U",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
