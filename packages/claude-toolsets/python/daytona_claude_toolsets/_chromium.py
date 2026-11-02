@@ -10,7 +10,7 @@ import shlex
 import time
 from typing import Optional
 
-from daytona import Sandbox, SessionExecuteRequest
+from daytona.v0 import Sandbox, SessionExecuteRequest
 
 ACTIVE_PORT_FILE = "DevToolsActivePort"
 """Chromium writes the debugging port it bound into this file in its user-data-dir."""
