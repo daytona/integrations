@@ -1,0 +1,51 @@
+packages/pydantic-ai-daytona/README.md
+  s_b02e1fc578b062::t_afd05d63346fc5 11-14
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_errors.py
+  s_b92e326f291b01::t_13786e1edb6136 3
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_execution.py
+  s_b92e326f291b01::t_a08d5f2ef8bfce 14
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_session.py
+  s_b92e326f291b01::t_40c9e8d78e35f1 13-15,103,119
+packages/pydantic-ai-daytona/pyproject.toml
+  s_b92e326f291b01::t_d8944a21b8c004 32-33
+packages/pydantic-ai-daytona/tests/integration_tests/conftest.py
+  s_b92e326f291b01::t_0d71d0075203d9 10-11,27,36,38,62,70,108-111,113-114,120
+packages/pydantic-ai-daytona/tests/integration_tests/test_live_sandbox.py
+  s_b92e326f291b01::t_365ca9dfc418ad 16-17,132,236-238,241,251,268
+packages/pydantic-ai-daytona/tests/unit_tests/conftest.py
+  s_b92e326f291b01::t_8fce7457b130ee 8,127-144,153,156
+packages/pydantic-ai-daytona/tests/unit_tests/test_live_cleanup.py
+  s_b92e326f291b01::t_20fea7508f071d 8-10,36-37,55-56,94-95,114-115,144-145
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_errors.py
+  s_b92e326f291b01::t_1e1541fcdbbfb4 7
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_execution.py
+  s_b92e326f291b01::t_2dd647ca414706 12
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_lifecycle.py
+  s_b92e326f291b01::t_e1c0a1a097f126 8
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_shell.py
+  s_b92e326f291b01::t_aaf64c9fad483d 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c79404c357f09d864ce28fd56c004f588e1c7dc4",
+  "prompts": {},
+  "sessions": {
+    "s_b02e1fc578b062": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e6215fefbffex2n22dvbbKPGyC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_b92e326f291b01": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6215fefbffex2n22dvbbKPGyC",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
