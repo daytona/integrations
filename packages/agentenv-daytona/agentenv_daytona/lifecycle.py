@@ -15,7 +15,7 @@ from collections.abc import Callable, Coroutine, Hashable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from daytona import (
+from daytona.v0 import (
     DaytonaAuthenticationError,
     DaytonaAuthorizationError,
     DaytonaBadRequestError,
@@ -182,7 +182,7 @@ async def delete_named(client: Any, name: str, retry: Retry) -> None:
     """Delete the sandbox called ``name`` if Daytona made one; logged by name if that can't be confirmed."""
     for attempt in range(retry.reclaim_attempts):
         try:
-            raw = await client.get(name)
+            raw = await client.v0.get(name)
         except DaytonaNotFoundError:
             return
         except (
@@ -219,10 +219,10 @@ def _reap_when_done(client: Any, task: asyncio.Future[Any], name: str, retry: Re
 
 
 async def create(client: Any, params: Any, *, timeout: float, retry: Retry) -> Any:
-    """``client.create(params)``, retried while rate limited, leaving no sandbox behind on failure."""
+    """``client.v0.create(params)``, retried while rate limited, leaving no sandbox behind on failure."""
     name = params.name
     for attempt in range(retry.attempts):
-        task = asyncio.ensure_future(client.create(params, timeout=timeout))
+        task = asyncio.ensure_future(client.v0.create(params, timeout=timeout))
         try:
             return await asyncio.shield(task)
         except asyncio.CancelledError:

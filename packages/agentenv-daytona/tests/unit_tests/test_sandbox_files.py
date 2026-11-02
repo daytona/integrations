@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from agent_env.providers.sandbox_providers.sandbox import NetworkMode, NetworkPolicy
-from daytona import DaytonaBadRequestError, DaytonaConflictError
+from daytona.v0 import DaytonaBadRequestError, DaytonaConflictError
 
 from agentenv_daytona.network import create_fields
 from agentenv_daytona.sandbox import DaytonaSandbox

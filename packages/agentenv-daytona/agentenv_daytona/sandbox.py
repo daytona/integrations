@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from agent_env.config import get_config
 from agent_env.providers.sandbox_providers.sandbox import NetworkPolicy, VmSandbox
 from agent_env.providers.sandbox_providers.sandbox_provider import SANDBOX_MODE_VM
-from daytona import (
+from daytona.v0 import (
     DaytonaBadGatewayError,
     DaytonaConflictError,
     DaytonaConnectionError,

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agent_env.config.errors import ConfigError
-from daytona import CreateSandboxFromImageParams, CreateSandboxFromSnapshotParams, Resources
+from daytona.v0 import CreateSandboxFromImageParams, CreateSandboxFromSnapshotParams, Resources
 
 from agentenv_daytona.image import DEFAULT_BASE_IMAGE, HOST_IMAGE_VERSION, host_image
 

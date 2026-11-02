@@ -11,7 +11,7 @@ from agent_env.providers.sandbox_providers.sandbox import (
     NetworkPolicy,
     NetworkPolicyUnsupportedError,
 )
-from daytona import (
+from daytona.v0 import (
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
     DaytonaAuthenticationError,
@@ -364,7 +364,7 @@ async def test_a_create_the_api_rejected_outright_looks_nothing_up() -> None:
 
 
 async def test_a_failed_setup_retries_a_delete_that_fails_once() -> None:
-    from daytona import DaytonaError
+    from daytona.v0 import DaytonaError
 
     provider, fake = make()
     fake.make_raw = lambda: FakeRaw(
@@ -379,7 +379,7 @@ async def test_a_failed_setup_retries_a_delete_that_fails_once() -> None:
 
 
 async def test_a_cancelled_create_retries_a_delete_that_fails_once() -> None:
-    from daytona import DaytonaError
+    from daytona.v0 import DaytonaError
 
     started, release = asyncio.Event(), asyncio.Event()
 

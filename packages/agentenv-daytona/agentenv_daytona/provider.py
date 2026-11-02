@@ -21,7 +21,8 @@ from agent_env.providers.sandbox_providers.sandbox_provider import (
     SandboxProvider,
     apply_default_attribution,
 )
-from daytona import AsyncDaytona, DaytonaBadRequestError, DaytonaConfig, DaytonaForbiddenError
+from daytona import AsyncDaytona, DaytonaConfig
+from daytona.v0 import DaytonaBadRequestError, DaytonaForbiddenError
 
 from agentenv_daytona import lifecycle, preview_domain
 from agentenv_daytona.config import (
@@ -129,7 +130,7 @@ class DaytonaSandboxProvider(SandboxProvider):
         _learn(preview_domain.preview_host_pattern(sample))
 
         async def read_raw() -> Any:
-            return await client.get(raw.id)
+            return await client.v0.get(raw.id)
 
         return DaytonaSandbox(raw, tunnel_urls=urls, network_policy=policy, read_raw=read_raw)
 
@@ -260,7 +261,7 @@ class DaytonaSandboxProvider(SandboxProvider):
 
     async def get_sandbox(self, sandbox_id: str) -> DaytonaSandbox:
         """Reconnect, restoring ports, preview URLs and the applied egress policy."""
-        raw = await self._clients.current().get(sandbox_id)
+        raw = await self._clients.current().v0.get(sandbox_id)
         labels = getattr(raw, "labels", None) or {}
         ports = [
             int(port)

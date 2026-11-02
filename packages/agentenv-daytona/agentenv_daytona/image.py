@@ -9,7 +9,7 @@ prepares it at boot.
 
 from __future__ import annotations
 
-from daytona import Image
+from daytona.v0 import Image
 
 # Bump when the recipe changes; it is written into the image so a sandbox shows which recipe it has.
 HOST_IMAGE_VERSION = "v2"

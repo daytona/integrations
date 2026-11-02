@@ -40,14 +40,17 @@ def _state(value: object) -> str:
 
 async def _sweep() -> tuple[list[str], list[str]]:
     """Delete this session's sandboxes still running: (ids left running, ids that could not be deleted)."""
-    from daytona import AsyncDaytona, DaytonaError, DaytonaNotFoundError, ListSandboxesQuery
+    from daytona import AsyncDaytona
+    from daytona.v0 import DaytonaError, DaytonaNotFoundError, ListSandboxesQuery
 
     query = ListSandboxesQuery(labels={SESSION_LABEL: SESSION})
     left: list[Any] = []
     async with AsyncDaytona() as client:
         # The list lags a delete by a few seconds, so give in-flight deletes time to show.
         for _ in range(15):
-            left = [s async for s in client.list(query) if _state(s.desired_state) != "destroyed"]
+            left = [
+                s async for s in client.v0.list(query) if _state(s.desired_state) != "destroyed"
+            ]
             if not left:
                 return [], []
             await asyncio.sleep(2)
