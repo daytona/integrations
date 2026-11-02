@@ -13,7 +13,7 @@
  * nothing ahead of its remote is skipped.
  */
 
-import type { Sandbox } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import { withRecovery } from './sandbox.ts'
 
 const PUSH_USERNAME = 'x-access-token'

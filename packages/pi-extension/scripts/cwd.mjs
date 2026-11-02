@@ -47,7 +47,7 @@ const { registerTools } = await jiti.import(path.join(root, 'src/tools.ts'))
 const daytona = new Daytona()
 let sandbox
 try {
-  sandbox = await daytona.create({ ephemeral: true, labels: { 'created-by': 'pi-daytona-test' } })
+  sandbox = await daytona.v0.create({ ephemeral: true, labels: { 'created-by': 'pi-daytona-test' } })
   const home = (await sandbox.getUserHomeDir()) ?? '/home/daytona'
   const cwd = `${home}/proj`
   await sandbox.fs.createFolder(cwd, '755')

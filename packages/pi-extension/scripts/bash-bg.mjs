@@ -49,7 +49,7 @@ const daytona = new Daytona()
 // check (deterministic PASS/FAIL) instead of aborting with a raw rejection.
 let sandbox
 try {
-  sandbox = await daytona.create({ ephemeral: true, labels: { 'created-by': 'pi-daytona-test' } })
+  sandbox = await daytona.v0.create({ ephemeral: true, labels: { 'created-by': 'pi-daytona-test' } })
   const home = (await sandbox.getUserHomeDir()) ?? '/home/daytona'
   const ops = createBashOps(sandbox)
   // Bound every exec with a watchdog: the whole point of this test is that a

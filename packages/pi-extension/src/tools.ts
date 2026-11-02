@@ -15,7 +15,7 @@
  * find/grep run a dedicated in-sandbox search; preview_url is a custom tool.
  */
 
-import type { Sandbox } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import type { ExtensionAPI, ToolDefinition } from '@earendil-works/pi-coding-agent'
 import {
   createBashToolDefinition,
