@@ -1,0 +1,19 @@
+packages/claude-toolsets/python/README.md
+  s_f71705bde4e088::t_396ad68322a4c1 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "22de00f327c0b609731f25ffd9cababc4cf0cc41",
+  "prompts": {},
+  "sessions": {
+    "s_f71705bde4e088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6181c0dfffeSdvxQJVG2cNq1S",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
