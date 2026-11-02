@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest  # type: ignore
 from daytona import ExecuteResponse, ExecutionArtifacts  # type: ignore
+from langchain_core.messages import ToolMessage
 from langchain_tests.integration_tests import ToolsIntegrationTests  # type: ignore
 
 from langchain_daytona_data_analysis.tools import (
@@ -77,9 +78,10 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
         tool._on_result = mock_on_result
 
         code = "print('Integration test')"
-        result = tool._run(code)
-        assert isinstance(result, ExecutionArtifacts)
-        assert "Integration test" in result.stdout
+        content, artifacts = tool._run(code)
+        assert content == "Integration test"
+        assert isinstance(artifacts, ExecutionArtifacts)
+        assert "Integration test" in artifacts.stdout
 
         assert mock_on_result.called
         args, kwargs = mock_on_result.call_args
@@ -87,6 +89,34 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
 
         assert isinstance(result_arg, ExecutionArtifacts)
         assert "Integration test" in result_arg.stdout
+
+    def test_chart_image_data_stays_out_of_tool_message(
+        self, tool: DaytonaDataAnalysisTool
+    ) -> None:
+        code = (
+            "import matplotlib.pyplot as plt\n"
+            "import numpy as np\n"
+            "rng = np.random.default_rng(0)\n"
+            "plt.scatter(rng.random(50000), rng.random(50000), s=1)\n"
+            "plt.title('50k points')\n"
+            "plt.show()\n"
+            "print('done')"
+        )
+        message = tool.invoke(
+            {
+                "args": {"data_analysis_python_code": code},
+                "id": "1",
+                "name": tool.name,
+                "type": "tool_call",
+            }
+        )
+
+        assert isinstance(message, ToolMessage)
+        assert isinstance(message.content, str)
+        assert message.content.startswith("done\n\nGenerated 1 chart(s).")
+        assert message.content.endswith("- scatter: 50k points")
+        assert isinstance(message.artifact, ExecutionArtifacts)
+        assert message.artifact.charts and message.artifact.charts[0].png
 
     def test_close(self, tool: DaytonaDataAnalysisTool) -> None:
         try:

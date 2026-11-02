@@ -43,11 +43,14 @@ def process_data_analysis_result(result: ExecutionArtifacts):
 
 tool = DaytonaDataAnalysisTool(
 	# daytona_api_key="your-daytona-api-key",  # Only needed if DAYTONA_API_KEY is not set as an environment variable
+	# max_output_chars=20_000,  # Cap on printed output returned to the model (beginning and end are kept)
 	on_result=process_data_analysis_result
 )
 ```
 
 ## Usage
+
+The model only ever receives text: the code's printed output, plus a one-line summary of each generated chart (for example `- scatter: Price vs. mileage`). Chart image data stays out of the model's context; the full `ExecutionArtifacts`, PNG data included, are passed to `on_result` and attached to the returned `ToolMessage` as its `artifact`. Printed output longer than `max_output_chars` keeps its beginning and end.
 
 `DaytonaDataAnalysisTool` can be used in three ways:
 
@@ -56,6 +59,7 @@ tool = DaytonaDataAnalysisTool(
 
 ```python
 tool.invoke({'data_analysis_python_code': "print('Hello World')"})
+# 'Hello World'
 ```
 
 ### Invocation with ToolCall
@@ -68,7 +72,9 @@ model_generated_tool_call = {
     "type": "tool_call",
 }
 
-tool.invoke(model_generated_tool_call)
+message = tool.invoke(model_generated_tool_call)
+message.content   # 'Hello World'
+message.artifact  # ExecutionArtifacts(stdout='Hello World\n', charts=[])
 ```
 
 ### Usage Inside an Agent
