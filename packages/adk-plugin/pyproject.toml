@@ -25,6 +25,7 @@ classifiers = [
 
 dependencies = [
     "google-adk>=0.1.0",
+    "anyio>=4,<5",
     "daytona[v0-sdk]==2.0.0a5",
 ]
 

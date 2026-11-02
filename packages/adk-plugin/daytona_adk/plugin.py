@@ -5,16 +5,18 @@ with lifecycle hooks for monitoring and customization.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
+import anyio
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.plugins import BasePlugin
 from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
 
-from daytona import Daytona, DaytonaConfig  # type: ignore
-from daytona.v0 import CreateSandboxBaseParams  # type: ignore
+from daytona import Daytona, DaytonaConfig
+from daytona.v2 import LifecyclePolicyConfig, Sandbox, SandboxNotRunningError
 
 from daytona_adk.tools import (
     ExecuteCodeTool,
@@ -45,8 +47,9 @@ class DaytonaPlugin(BasePlugin):
         sandbox_name: Optional name for the sandbox.
         env_vars: Optional environment variables for the sandbox.
         labels: Optional custom labels for the sandbox.
-        auto_stop_interval: Interval in minutes after which sandbox auto-stops. Default is 15. 0 means no auto-stop.
-        auto_delete_interval: Interval in minutes after which stopped sandbox auto-deletes. Negative means disabled.
+        auto_stop_interval: Idle minutes before deletion on v2; 0 disables idle expiry.
+        auto_delete_interval: Wall-clock lifetime in minutes on v2; nonpositive values inherit defaults.
+        image: Registered v2 image name or ID; None uses the project's default image.
     """
 
     def __init__(
@@ -58,30 +61,43 @@ class DaytonaPlugin(BasePlugin):
         labels: Optional[Dict[str, str]] = None,
         auto_stop_interval: Optional[int] = None,
         auto_delete_interval: Optional[int] = None,
+        image: str | None = None,
     ):
         super().__init__(name=plugin_name)
         self._daytona = Daytona(DaytonaConfig(api_key=api_key))
 
-        # Create sandbox with optional parameters
-        params = CreateSandboxBaseParams(
-            name=sandbox_name,
-            env_vars=env_vars,
-            labels=labels,
-            auto_stop_interval=auto_stop_interval,
-            auto_delete_interval=auto_delete_interval,
-        )
-        self._sandbox = self._daytona.v0.create(params)
+        # v2 create is ephemeral: idle expiry deletes rather than stopping.
+        # A stopped-sandbox deletion interval has no equivalent; positive values
+        # become a wall-clock lifetime. Omitted/disabled values inherit v2 defaults.
+        policy: LifecyclePolicyConfig = {}
+        if auto_stop_interval is not None:
+            policy["idle_expiry_seconds"] = auto_stop_interval * 60 if auto_stop_interval > 0 else -1
+            if auto_stop_interval > 0:
+                policy["on_idle_timeout"] = "delete"
+        if auto_delete_interval is not None and auto_delete_interval > 0:
+            policy["timeout_seconds"] = auto_delete_interval * 60
+            policy["on_timeout"] = "delete"
+        # The public constructor stays synchronous, including inside ADK async apps.
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            self._sandbox: Sandbox | None = worker.submit(
+                self._daytona.v2.create, image, name=sandbox_name, env=env_vars,
+                labels=labels, lifecycle_policy=policy or None,
+            ).result()
         logger.debug(f"Daytona sandbox created: {self._sandbox.id}")
 
     def get_tools(self) -> list[BaseTool]:
         """Get all Daytona tools with shared sandbox instance."""
-        return [
-            ExecuteCodeTool(self._sandbox),
-            ExecuteCommandTool(self._sandbox),
-            UploadFileTool(self._sandbox),
-            ReadFileTool(self._sandbox),
-            StartLongRunningCommandTool(self._sandbox),
+        sandbox = self._sandbox
+        if sandbox is None:
+            raise SandboxNotRunningError("Plugin sandbox has been deleted")
+        tools: list[BaseTool] = [
+            ExecuteCodeTool(sandbox),
+            ExecuteCommandTool(sandbox),
+            UploadFileTool(sandbox),
+            ReadFileTool(sandbox),
+            StartLongRunningCommandTool(sandbox),
         ]
+        return tools
 
     async def before_agent_callback(
         self,
@@ -143,7 +159,7 @@ class DaytonaPlugin(BasePlugin):
         if self._sandbox:
             try:
                 logger.info("Deleting Daytona sandbox...")
-                self._daytona.v0.delete(self._sandbox)
+                self._daytona.v2.delete(self._sandbox)
                 self._sandbox = None
                 logger.info("Daytona sandbox deleted.")
             except Exception as e:
@@ -151,4 +167,5 @@ class DaytonaPlugin(BasePlugin):
 
     async def close(self) -> None:
         """Clean up the Daytona sandbox."""
-        self.destroy_sandbox()
+        with anyio.CancelScope(shield=True):
+            await anyio.to_thread.run_sync(self.destroy_sandbox)
