@@ -143,6 +143,51 @@ On the React side, `app/page.tsx` registers one `useRenderTool` per tool; each r
 - A **Daytona** key (or `daytona/sandbox` via Stripe Projects) — note a Daytona plan must be active before a sandbox can be provisioned
 - An **OpenRouter** key (or `openrouter/api` via Stripe Projects). The default model needs the `pay_as_you_go` plan; on the `free` plan, set `OPENROUTER_MODEL` to a free model
 
+## v2 PoC
+
+This stacked `feat/stripe-coding-agent-template-sdk2-v2` branch ports the route's
+sandbox calls to `daytona.v2` with the same exact `2.0.0-alpha.5` pin. The tool
+table and v0 prerequisites above describe the Step A branch; this PoC changes
+only sandbox operations, not the CopilotKit/OpenRouter/renderers. It is **not
+end-to-end ready: BLOCKED-BY-V2-GAP(sessions)**.
+
+- Set `DAYTONA_V2_IMAGE` to a registered v2 image name/id before creating a
+  sandbox. No default image is configured in the measured environment. The live
+  smoke used `img_YbqbxTpdfgCQ4RdEFYzvga` (Debian 13, Python 3.12.16, git).
+  **Node/npm/curl are absent in that guest**: the default Vite/Next scaffolding
+  flow has not been demonstrated. Use an appropriate pre-registered image for
+  Node work; this PoC does not build images or install guest runtimes.
+- Measured user/home/cwd: root, `/root`, `/root`; prompt paths now use `/root`.
+  `envVars` maps to `env`; labels were recovered through a fresh client lookup.
+  Filesystem write/read/stat/list/find/search/replace passed live, including a
+  UTF-8 roundtrip. List/find/search/replace now unwrap v2 `.items` pages.
+- v2 creation is ephemeral by default. `autoStopInterval` remains the tool input
+  in minutes (default 15; 0 disables idle expiry), but maps to
+  `lifecyclePolicy.idleExpirySeconds` and **delete**, not a resumable stop.
+  A separate 1200-second/delete lifetime is always applied, even with idle
+  expiry disabled. These policies were accepted, not waited out experimentally.
+- Sandbox-wide `public: true` becomes per-port
+  `ports.expose(port, { public: true })` before `ports.previewLink(port)`.
+  **Live preview measured on port 3000:** host curl returned **200 without a
+  token and 200 with `X-Daytona-Preview-Token`**; the public endpoint returned
+  `token === ''`. The plain URL therefore supports the existing iframe contract.
+  Private-port rejection/token semantics were not measured by this public flow.
+- Both background tools now use v2 `process.createSession({name})` and
+  `session.start`, retaining the real session ID and ProcessHandle ID. The one
+  live session create returned HTTP 422 from DAYTONA_DAEMON:
+  ``unknown variant `session`, expected one of `exec`, `pty`, `code` ``.
+  No stub or session fallback is installed. Session start/logs remain blocked;
+  log polling is bounded and never drains a live-tail cursor. Preview was
+  measured independently with a non-session `python3 -m http.server 3000`, not
+  misrepresented as a successful `startWebServer` session flow.
+- Fresh `new Daytona().v2.get(id)` plus exec passed seconds after creation;
+  `get('does-not-exist')` raised v2 `NotFoundError` (404). One sandbox was created
+  and deleted in finally; the component-label sweep found zero active leftovers.
+
+Durable measurements, exact call mappings and limitations are in the task's
+`stripe-coding-agent-template/v2-ledger.md` and `smoke-v2.log` evidence. No
+deployment, OpenRouter call, or `scripts/test.mjs` run was performed.
+
 ## Stack
 
 `@copilotkit/react-core` + `@copilotkit/runtime` (v2 `BuiltInAgent` / `defineTool`) · `@daytona/sdk` · `@ai-sdk/openai` · Next.js (App Router) · React · `zod`.
