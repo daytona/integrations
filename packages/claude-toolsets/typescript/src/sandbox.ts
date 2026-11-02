@@ -3,7 +3,7 @@ import type {
   CreateSandboxFromImageParams,
   CreateSandboxFromSnapshotParams,
   Sandbox,
-} from "@daytona/sdk";
+} from "@daytona/sdk/v0";
 
 import { errorName, warn } from "./logging.js";
 
@@ -56,7 +56,7 @@ const createWithDaytona = async (
   daytona: Daytona,
   params: CreateParams,
   timeout: number,
-): Promise<Sandbox> => daytona.create(params, { timeout });
+): Promise<Sandbox> => daytona.v0.create(params, { timeout });
 
 export const withDefaults = (
   params: CreateParams | undefined,
