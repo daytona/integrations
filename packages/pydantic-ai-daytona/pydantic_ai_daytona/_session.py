@@ -57,8 +57,6 @@ class DaytonaSandboxSession:
         auto_stop_interval: int | None = None,
         auto_delete_interval: int | None = None,
         api_key: str | None = None,
-        api_url: str | None = None,
-        target: str | None = None,
         create_timeout: float = DEFAULT_SANDBOX_CREATE_TIMEOUT,
     ) -> None:
         if snapshot is not None and image is not None:
@@ -77,8 +75,6 @@ class DaytonaSandboxSession:
         self._auto_stop_interval = auto_stop_interval
         self._auto_delete_interval = auto_delete_interval
         self._api_key = api_key
-        self._api_url = api_url
-        self._target = target
         self._create_timeout = create_timeout
         self._daytona: AsyncDaytona | None = None
         self._sandbox: AsyncSandbox | None = None
@@ -98,12 +94,7 @@ class DaytonaSandboxSession:
     async def __aenter__(self) -> Self:
         if self._sandbox is not None:
             raise DaytonaSandboxError("The session is already open.")
-        config = None
-        if self._api_key or self._api_url or self._target:
-            config = DaytonaConfig(
-                api_key=self._api_key, api_url=self._api_url, target=self._target
-            )
-        daytona = AsyncDaytona(config)
+        daytona = AsyncDaytona(DaytonaConfig(api_key=self._api_key) if self._api_key else None)
         sandbox: AsyncSandbox | None = None
         try:
             if self._attach_id is not None:

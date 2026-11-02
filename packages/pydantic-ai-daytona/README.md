@@ -16,7 +16,7 @@ Get your API key from the [Daytona Dashboard](https://app.daytona.io/dashboard/k
 export DAYTONA_API_KEY="your-daytona-api-key"
 ```
 
-You can also pass `api_key` (plus optional `api_url` / `target`) directly to `DaytonaSandbox`.
+You can also pass `api_key` directly to `DaytonaSandbox`; otherwise the SDK reads `DAYTONA_API_KEY`.
 
 ## Quickstart
 
@@ -117,8 +117,6 @@ async def main():
 | `auto_stop_interval` | `None` | Minutes of inactivity before Daytona stops an owned sandbox. |
 | `auto_delete_interval` | `None` | Minutes after stopping before Daytona deletes an owned sandbox (`0` = immediately, `-1` = never). |
 | `api_key` | `None` | Daytona API key (falls back to `DAYTONA_API_KEY`). |
-| `api_url` | `None` | Daytona API URL (falls back to `DAYTONA_API_URL`). |
-| `target` | `None` | Daytona target region (falls back to `DAYTONA_TARGET`). |
 | `default_command_timeout` | `60.0` | Seconds a command may run when the model omits `timeout_seconds`. |
 | `max_command_timeout` | `300` | Hard ceiling in seconds for any single command. |
 | `max_output_bytes` | `51200` | Byte cap per command stream (cut before transfer, even on timeout) or file read. Labels/truncation markers are additional. |

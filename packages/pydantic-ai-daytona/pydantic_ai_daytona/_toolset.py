@@ -51,8 +51,6 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
         auto_stop_interval: int | None,
         auto_delete_interval: int | None,
         api_key: str | None,
-        api_url: str | None,
-        target: str | None,
         default_command_timeout: float,
         max_command_timeout: int,
         max_output_bytes: int,
@@ -76,8 +74,6 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
         self._auto_stop_interval = auto_stop_interval
         self._auto_delete_interval = auto_delete_interval
         self._api_key = api_key
-        self._api_url = api_url
-        self._target = target
         self._default_command_timeout = default_command_timeout
         self._max_command_timeout = max_command_timeout
         self._max_output_bytes = max_output_bytes
@@ -111,8 +107,6 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
             auto_stop_interval=self._auto_stop_interval,
             auto_delete_interval=self._auto_delete_interval,
             api_key=self._api_key,
-            api_url=self._api_url,
-            target=self._target,
             default_command_timeout=self._default_command_timeout,
             max_command_timeout=self._max_command_timeout,
             max_output_bytes=self._max_output_bytes,
@@ -148,8 +142,6 @@ class DaytonaSandboxToolset(FunctionToolset[AgentDepsT]):
             auto_stop_interval=self._auto_stop_interval,
             auto_delete_interval=self._auto_delete_interval,
             api_key=self._api_key,
-            api_url=self._api_url,
-            target=self._target,
         )
         await session.__aenter__()
         self._session = session
