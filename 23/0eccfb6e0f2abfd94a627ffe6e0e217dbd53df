@@ -1,0 +1,23 @@
+packages/langchain-data-analysis/README.md
+  s_fd43e8706063ff::t_21b9d76fc3a8d8 59,70-75,85-89
+packages/langchain-data-analysis/langchain_daytona_data_analysis/tools.py
+  s_fd43e8706063ff::t_a74bb8c4933008 3,89-90,161,167,177,239
+packages/langchain-data-analysis/tests/unit_tests/test_tool_output.py
+  s_fd43e8706063ff::t_3b5df18dd3e513 150-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "230eccfb6e0f2abfd94a627ffe6e0e217dbd53df",
+  "prompts": {},
+  "sessions": {
+    "s_fd43e8706063ff": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6156db85ffeSCAZi0yNZJOt47",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
