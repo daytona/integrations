@@ -1,0 +1,61 @@
+packages/pi-extension/README.md
+  s_45dda8291bac57::t_e94b4be187bb95 34-35
+  s_45dda8291bac57::t_e1eed75fcb160b 46,50
+  s_45dda8291bac57::t_a707b36853e1d3 51
+packages/pi-extension/index.ts
+  s_dbad681c1b5822::t_a9cd924ca5eadd 16-17,248,271,494
+packages/pi-extension/package-lock.json
+  s_dbad681c1b5822::t_bfe9feb68a627f 12,20-22,29-31,34-37,45-47,50-59,67-69,72-77,86-88,91-94,102-104,107-112,120-122,125-136,144-146,149-153,161-163,166-175,183-185,188-191,199-201,204-209,217-219,222-226,234-236,239-240,250,254-256,259-263,271-273,276-282,290-292,295-297,305-307,310-314,322-324,327,335-337,340,348-350,356-364,366-368,375-377,380-384,386-395,402-417,421-423,2528-2530,2631-2633,2643-2645,2648-2649,2659-2661,2671-2673,2686-2688,2691-2694,2704-2706,2709-2711,2721-2723,2726-2728,2738-2740,2743-2745,2755-2757,2760-2764,2774-2776,2779-2781,2791-2793,2796-2798,2809-2811,2814-2817,2827-2829,2832-2834,2844-2846,2849-2851,2861-2863,2866-2868,2879-2881,2884,2896-2898,2901-2902,2914-2916,2919-2920,2930-2932,2936-2938,2948-2950,2953-2958,2968-2970,2973,2983-2986,2989,2999-3001,3004,3015-3017,3020-3022,3033-3035,3038-3039,3049-3051,3054-3079,3090-3111,3114-3115,3126-3129,3132-3134,3145-3147,3160-3162,3165-3182,3193-3196,3199-3201,3211-3214,3217-3219,3230-3232,3290-3292,3296-3298,3301,3309-3311,3314-3315,3323-3325,3328-3329,3337-3339,3342-3343,3351-3353,3356-3357,3365-3367,3376-3380,3391-3394,3396-3397,3443-3445,3449,3475-3477,3536-3538,3631-3673,3692-3697,3793-3795,3998-4000,4004,4190-4192,4198-4200,4204,4206,4331-4333,4342-4369,4424-4426,4452-4454,4508-4510,4528-4535,4555-4557
+packages/pi-extension/package.json
+  s_dbad681c1b5822::t_923b121cd0b089 43-46
+packages/pi-extension/scripts/bash-bg.mjs
+  s_d406ef6ffd6650::t_660cb0abdf1296 52
+packages/pi-extension/scripts/cwd.mjs
+  s_d406ef6ffd6650::t_db37eea1f46398 50
+packages/pi-extension/scripts/recovery.mjs
+  s_dbad681c1b5822::t_e55c9525b102bd 30-31,50
+packages/pi-extension/src/find-tool.ts
+  s_d406ef6ffd6650::t_7c0065f1a26bff 21
+packages/pi-extension/src/grep-tool.ts
+  s_d406ef6ffd6650::t_017f3d5c93077e 18
+packages/pi-extension/src/ops.ts
+  s_d406ef6ffd6650::t_9e05f41c300a2a 21
+packages/pi-extension/src/sandbox.ts
+  s_d406ef6ffd6650::t_91ba91bb366648 21
+packages/pi-extension/src/sync.ts
+  s_d406ef6ffd6650::t_f264a88a969e50 16
+packages/pi-extension/src/tools.ts
+  s_d406ef6ffd6650::t_febd56ccc2c400 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "185cb9c1c0c8ef58158c40dabb2dbff128836ab1",
+  "prompts": {},
+  "sessions": {
+    "s_45dda8291bac57": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e61dee196ffe2OPQEqhHwD0Ipb",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_d406ef6ffd6650": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61e1ff60ffeTZG6mNxm1bwQHD",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_dbad681c1b5822": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61dee196ffe2OPQEqhHwD0Ipb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
