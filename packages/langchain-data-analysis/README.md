@@ -56,7 +56,7 @@ def receive_result(result: InterpreterResult) -> None:
             print("PNG bytes:", len(base64.b64decode(output.png)))
 
 tool = DaytonaDataAnalysisTool(
-    image="img_YbqbxTpdfgCQ4RdEFYzvga",
+    image="img_<your-registered-image-id>",
     on_result=receive_result,
 )
 try:
@@ -67,10 +67,12 @@ finally:
 
 `image: str | None = None` is a new optional constructor argument forwarded to
 `v2.create`. It must name a registered v2 image (not a registry tag) unless the
-organization has a platform default. This environment has **no default image**;
-the retained PoC image above includes Python 3.12, pandas, matplotlib and numpy.
-That organization-specific ID is not portable; provide your own registered image
-with the packages your code needs. No image build is performed. The alpha.5 image
+organization has a platform default. The readiness organization has **no default
+image**; its run used a registered image with Python 3.12, pandas, matplotlib and
+numpy. Provide your own registered image with the packages your code needs.
+Optional `create_kwargs` (e.g. `labels`, `lifecycle_policy`) are forwarded
+unchanged to `v2.create`; by default only `image` is passed. No image build is
+performed. The alpha.5 image
 list/get/build-follow-up decoders have known `region_id` gaps in the reference
 probe; this PoC bypasses them by creating directly from the retained image ID.
 
@@ -80,10 +82,11 @@ uploaded file, and `download_file` still returns bytes. The v2 filesystem uses
 `write_bytes`, `read_bytes` and `delete`; package installation uses v2 `exec`.
 Code runs remain isolated per invocation, with files shared across invocations.
 
-PoC safety policy: creates carry `sdk2-readiness=langchain-daytona-data-analysis`
-and auto-delete after 600 seconds; code/exec calls are bounded at 60 seconds.
-`close()` requests deletion, not synchronous destruction. The live check passed
-stdout, actual PNG decoding, CSV upload/read/download/delete, package execution,
+As in v0, the tool sets no lifecycle policy or code/exec timeout of its own.
+`close()` requests deletion, not synchronous destruction. The live check ran on
+the previous PoC revision, which hard-coded a readiness label, a 600-second
+auto-delete and 60-second bounds; the smoke now supplies its label and lifecycle
+through `create_kwargs`. It passed stdout, actual PNG decoding, CSV upload/read/download/delete, package execution,
 live `get_sandbox()`, missing-ID `NotFoundError`, deletion and a zero-leftover
 label sweep. The anticipated live-get decoder gap did **not** occur. Differences
 and measured evidence are recorded in the migration evidence `v2-ledger.md`;

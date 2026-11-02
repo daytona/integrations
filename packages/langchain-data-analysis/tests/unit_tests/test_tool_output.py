@@ -147,3 +147,20 @@ def test_interpreter_error_is_reported_when_process_exits_zero(sandbox: MagicMoc
     assert "NameError: missing" in content
     assert result.error is not None
     callback.assert_not_called()
+
+
+def test_default_create_passes_only_the_image() -> None:
+    with patch("langchain_daytona_data_analysis.tools.Daytona") as daytona:
+        DaytonaDataAnalysisTool(daytona_api_key="test-key", image="img_test")
+
+    daytona.return_value.v2.create.assert_called_once_with("img_test")
+
+
+def test_create_kwargs_are_forwarded_to_create() -> None:
+    options = {"labels": {"team": "data"}, "lifecycle_policy": {"timeout_seconds": 300}}
+    with patch("langchain_daytona_data_analysis.tools.Daytona") as daytona:
+        DaytonaDataAnalysisTool(daytona_api_key="test-key", create_kwargs=options)
+
+    daytona.return_value.v2.create.assert_called_once_with(
+        None, labels={"team": "data"}, lifecycle_policy={"timeout_seconds": 300}
+    )

@@ -1,6 +1,6 @@
 import ast
 import os
-from typing import IO, Any, Callable, List, Literal, Optional, Tuple, Type, Union
+from typing import IO, Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 
 from daytona import (
     Daytona,
@@ -86,6 +86,8 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
             Chart images are MIME-keyed results, not Chart metadata objects.
         image: Optional[str]
             Registered v2 image name or ID; otherwise uses the platform default.
+        create_kwargs: Optional[Dict[str, Any]]
+            Extra keyword options forwarded unchanged to ``v2.create`` (e.g. labels).
         max_output_chars: int
             Maximum characters of printed output returned to the model (default 20000).
             Longer output keeps its beginning and end.
@@ -156,17 +158,13 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         daytona_api_key: Optional[str] = None,
         on_result: Optional[Callable[[InterpreterResult], Any]] = None,
         image: str | None = None,
+        create_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ):
         super().__init__(description=tool_base_description, **kwargs)
         daytona_api_key = daytona_api_key or os.environ.get("DAYTONA_API_KEY")
         self._daytonaClient = Daytona(DaytonaConfig(api_key=daytona_api_key))
-        self._sandbox = self._daytonaClient.v2.create(
-            image,
-            labels={"sdk2-readiness": "langchain-daytona-data-analysis"},
-            lifecycle_policy={"timeout_seconds": 600, "on_timeout": "delete"},
-            create_timeout_seconds=60,
-        )
+        self._sandbox = self._daytonaClient.v2.create(image, **(create_kwargs or {}))
         self._on_result = on_result
 
     def _run(
@@ -176,7 +174,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
     ) -> Tuple[str, InterpreterResult]:
         python_code_to_exec = self._add_last_line_print(data_analysis_python_code)
 
-        execution = self._sandbox.run_code(python_code_to_exec, isolated=True, timeout=60)
+        execution = self._sandbox.run_code(python_code_to_exec, isolated=True)
         if execution.error is not None or execution.process.exit_code != 0:
             output = execution.logs.stdout + execution.logs.stderr
             if execution.error is not None:
@@ -238,7 +236,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         else:
             packages_str = " ".join(package_names)
         command = f"pip install {packages_str}"
-        self._sandbox.exec(command, timeout=60, execution_timeout=60)
+        self._sandbox.exec(command)
 
     def download_file(self, remote_path: str) -> bytes:
         """Download file from the sandbox."""
