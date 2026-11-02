@@ -15,16 +15,23 @@ import { z } from 'zod'
  * The Stripe Projects Daytona provider exports prefixed vars after
  * `stripe projects add daytona/sandbox` + `stripe projects env --pull`:
  *   DAYTONA_SANDBOX_API_KEY, DAYTONA_SANDBOX_API_URL, DAYTONA_SANDBOX_ORGANIZATION_ID
- * The Daytona SDK reads the unprefixed DAYTONA_API_KEY / DAYTONA_API_URL /
- * DAYTONA_ORGANIZATION_ID. We bridge both forms here, so the template runs
- * whether you provisioned through Stripe Projects or set raw DAYTONA_* keys.
+ * The Daytona SDK reads the unprefixed DAYTONA_API_KEY / DAYTONA_ORGANIZATION_ID.
+ * We bridge both forms here, so the template runs whether you provisioned
+ * through Stripe Projects or set raw DAYTONA_* keys.
+ *
+ * DAYTONA_SANDBOX_API_URL is intentionally not bridged: a custom API URL is not
+ * supported by SDK 2.x, which targets Daytona Cloud. Stay on the 0.x release of
+ * this template for self-hosted Daytona.
  */
+if (!process.env.DAYTONA_API_KEY && process.env.DAYTONA_SANDBOX_API_KEY) {
+  process.env.DAYTONA_API_KEY = process.env.DAYTONA_SANDBOX_API_KEY
+}
+if (!process.env.DAYTONA_ORGANIZATION_ID && process.env.DAYTONA_SANDBOX_ORGANIZATION_ID) {
+  process.env.DAYTONA_ORGANIZATION_ID = process.env.DAYTONA_SANDBOX_ORGANIZATION_ID
+}
+
 const daytona = new Daytona({
   apiKey: process.env.DAYTONA_API_KEY || process.env.DAYTONA_SANDBOX_API_KEY,
-  apiUrl:
-    process.env.DAYTONA_API_URL ||
-    process.env.DAYTONA_SANDBOX_API_URL ||
-    'https://app.daytona.io/api',
   organizationId:
     process.env.DAYTONA_ORGANIZATION_ID || process.env.DAYTONA_SANDBOX_ORGANIZATION_ID,
 })

@@ -64,7 +64,7 @@ The SDKs and the Stripe Projects providers use different variable names, so the 
 | SDK expects | Stripe Projects exports (`env --pull`) | Bridged in code |
 |---|---|---|
 | `DAYTONA_API_KEY` | `DAYTONA_SANDBOX_API_KEY` | ✅ |
-| `DAYTONA_API_URL` | `DAYTONA_SANDBOX_API_URL` (public: `https://app.daytona.io/api`) | ✅ |
+| — | `DAYTONA_SANDBOX_API_URL` | ❌ not used: custom API URL is not supported by SDK 2.x; stay on 0.x for self-hosted |
 | `DAYTONA_ORGANIZATION_ID` | `DAYTONA_SANDBOX_ORGANIZATION_ID` | ✅ |
 | `OPENROUTER_API_KEY` | `OPENROUTER_*_API_KEY` (service-prefixed) | ✅ (auto-discovered) |
 

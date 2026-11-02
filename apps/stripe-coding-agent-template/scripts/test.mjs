@@ -53,10 +53,6 @@ const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-sonnet-4.5'
 // ── Daytona wiring (mirrors route.ts) ───────────────────────────────────────
 const daytona = new Daytona({
   apiKey: process.env.DAYTONA_API_KEY || process.env.DAYTONA_SANDBOX_API_KEY,
-  apiUrl:
-    process.env.DAYTONA_API_URL ||
-    process.env.DAYTONA_SANDBOX_API_URL ||
-    'https://app.daytona.io/api',
   organizationId:
     process.env.DAYTONA_ORGANIZATION_ID || process.env.DAYTONA_SANDBOX_ORGANIZATION_ID,
 })
