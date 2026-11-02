@@ -1,0 +1,33 @@
+packages/adk-plugin/README.md
+  s_316bd557554380::t_bca13f4162d398 11-14
+packages/adk-plugin/pyproject.toml
+  s_316bd557554380::t_a66f6468cec70c 28
+packages/adk-plugin/daytona_adk/plugin.py
+  s_70b8ef37020bd6::t_00a3157d3d9695 16-17,73,146
+packages/adk-plugin/daytona_adk/tools.py
+  s_70b8ef37020bd6::t_f9d93ab931b728 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "836178f57a38b8b93635dc2fea5bb039c04e57d6",
+  "prompts": {},
+  "sessions": {
+    "s_316bd557554380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e6216e2e4ffej4mfuExjJBGclk",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_70b8ef37020bd6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6216e2e4ffej4mfuExjJBGclk",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
