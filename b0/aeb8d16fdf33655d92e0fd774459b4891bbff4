@@ -1,0 +1,60 @@
+packages/claude-toolsets/python/pyproject.toml
+  s_a9cda296a86751::t_484b6796bca597 41
+packages/claude-toolsets/python/README.md
+  s_a9cda296a86751::t_8c6013af146b6f 17-20
+  s_a9cda296a86751::t_afed5ceceb7e0d 58
+packages/claude-toolsets/python/daytona_claude_toolsets/_chromium.py
+  s_b92e326f291b01::t_ee6b5372136b79 13
+packages/claude-toolsets/python/daytona_claude_toolsets/_sandbox.py
+  s_b92e326f291b01::t_ff861ea5c7e6e6 8-9,53
+packages/claude-toolsets/python/daytona_claude_toolsets/_xtest.py
+  s_b92e326f291b01::t_b3becfa227812c 23
+packages/claude-toolsets/python/daytona_claude_toolsets/async_computer.py
+  s_b92e326f291b01::t_eefe78c0a8eb2b 40
+packages/claude-toolsets/python/daytona_claude_toolsets/browser.py
+  s_b92e326f291b01::t_2bf36fc302ae16 86-87
+packages/claude-toolsets/python/daytona_claude_toolsets/computer.py
+  s_b92e326f291b01::t_bbeda657b3d892 42-43
+packages/claude-toolsets/python/examples/exercise_browser.py
+  s_b92e326f291b01::t_39428cc908b416 33-34,461,467
+packages/claude-toolsets/python/examples/exercise_computer.py
+  s_b92e326f291b01::t_6f6baca3e44280 29-30,277,299,321
+packages/claude-toolsets/python/tests/unit_tests/test_browser.py
+  s_5fb711b3cb58db::t_a9288bcd42292b 316,963
+packages/claude-toolsets/python/tests/unit_tests/test_computer.py
+  s_5fb711b3cb58db::t_f84d764fa234ea 14,534,536,549,553,561,568,579
+packages/claude-toolsets/python/tests/unit_tests/test_examples.py
+  s_5fb711b3cb58db::t_5d580ad45d4d86 15,67,70,78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b0aeb8d16fdf33655d92e0fd774459b4891bbff4",
+  "prompts": {},
+  "sessions": {
+    "s_5fb711b3cb58db": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6214b558ffeTTTN5Nfld4j9ep",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_a9cda296a86751": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e6214b558ffeTTTN5Nfld4j9ep",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_b92e326f291b01": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6215fefbffex2n22dvbbKPGyC",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
