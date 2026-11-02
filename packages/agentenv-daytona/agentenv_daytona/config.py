@@ -16,7 +16,7 @@ from agentenv_daytona.image import DEFAULT_BASE_IMAGE, HOST_IMAGE_VERSION, host_
 
 SECTION = "[sandbox.providers.daytona.config]"
 DEFAULT_API_URL = "https://app.daytona.io/api"
-CONFIG_KEYS = ("api_key", "api_url", "target", "snapshot", "base_image", "egress_hosts")
+CONFIG_KEYS = ("api_key", "snapshot", "base_image", "egress_hosts")
 
 # Docker-in-Docker needs at least 2 vCPU and 4 GiB (Daytona's guidance); 10 GiB holds images.
 MIN_CPU = 2
@@ -42,8 +42,6 @@ class Settings:
     """``[sandbox.providers.daytona.config]``, parsed. The key never appears in ``repr``."""
 
     api_key: str = field(repr=False)
-    api_url: str = DEFAULT_API_URL
-    target: str | None = None
     snapshot: str | None = None
     base_image: str = DEFAULT_BASE_IMAGE
     egress_hosts: tuple[str, ...] = ()
@@ -79,8 +77,6 @@ def parse_settings(config: Mapping[str, Any]) -> Settings:
         raise ConfigError(f"{SECTION} 'egress_hosts' must be a list of hostnames (no bare '*')")
     return Settings(
         api_key=api_key.strip(),
-        api_url=_optional_string(config, "api_url") or DEFAULT_API_URL,
-        target=_optional_string(config, "target"),
         snapshot=snapshot,
         base_image=base_image or DEFAULT_BASE_IMAGE,
         egress_hosts=tuple(h.strip() for h in hosts),
