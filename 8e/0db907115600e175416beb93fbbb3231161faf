@@ -1,0 +1,26 @@
+packages/adk-plugin/tests/test_v2_plugin.py
+  s_cfca1b56eeaeb9::t_c179919377bcdb 1-28
+packages/adk-plugin/pyproject.toml
+  s_cfca1b56eeaeb9::t_b38dfe3f441771 28
+packages/adk-plugin/daytona_adk/plugin.py
+  s_cfca1b56eeaeb9::t_9b1a944808b75e 8,11,80-85,170-171
+  s_cfca1b56eeaeb9::t_0f475a44b12dad 19,90-98,100
+  s_cfca1b56eeaeb9::t_7a65b22c48a4d2 50-51
+  s_cfca1b56eeaeb9::t_f1f7a602869c0d 18,52,64,69-79,162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8e0db907115600e175416beb93fbbb3231161faf",
+  "prompts": {},
+  "sessions": {
+    "s_cfca1b56eeaeb9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61751165ffeZN9dO1Ed36zm4U",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
