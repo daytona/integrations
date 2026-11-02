@@ -1,0 +1,22 @@
+apps/stripe-coding-agent-template/.env.example
+  s_c8626798d2b0d1::t_2c361a2f9cf8ad 25-27
+apps/stripe-coding-agent-template/README.md
+  s_c8626798d2b0d1::t_2c361a2f9cf8ad 146-189
+  s_c8626798d2b0d1::t_9a42148a86e923 190
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b169c7fa65ecdfb465dfcb0a76e538dc3fe1d2ee",
+  "prompts": {},
+  "sessions": {
+    "s_c8626798d2b0d1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6160d141ffejR8BXhQmWFwXCa",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
