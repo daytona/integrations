@@ -1,0 +1,49 @@
+apps/dify-plugin/README.md
+  s_564d6247141f4e::t_2997b3a49f75fc 33-36
+apps/dify-plugin/_client.py
+  s_ec8aee02bcd001::t_5ff7143817d3be 4-5,40
+apps/dify-plugin/provider/daytona.py
+  s_ec8aee02bcd001::t_0af3e4859c2ee4 6,17
+apps/dify-plugin/pyproject.toml
+  s_ec8aee02bcd001::t_12bfabbd0faf7a 15
+apps/dify-plugin/requirements.txt
+  s_ec8aee02bcd001::t_fea93c4f3419ca 2
+apps/dify-plugin/tools/create_sandbox.py
+  s_ec8aee02bcd001::t_b03aa202912cae 8,57
+apps/dify-plugin/tools/destroy_sandbox.py
+  s_ec8aee02bcd001::t_0fcb5c951dc8c8 18
+apps/dify-plugin/tools/list_sandboxes.py
+  s_ec8aee02bcd001::t_d11eb8a1a9f021 5,25
+apps/dify-plugin/tools/run_code.py
+  s_ec8aee02bcd001::t_7dfff7e254ff7c 8,26
+apps/dify-plugin/tools/run_command.py
+  s_ec8aee02bcd001::t_09a59496d78473 32
+apps/dify-plugin/tools/start_service.py
+  s_ec8aee02bcd001::t_9ee85d8edaeb83 5
+apps/dify-plugin/uv.lock
+  s_ec8aee02bcd001::t_066b5a0b405054 25,34,37-162,221-229,367,370-382,385-386,402,404,408-435,437,442,450,452,457,466,468,473,481,483,488,497,499,519,525,1326,1334,1336,1341,1346-1442,1480-1491,1494,1496,1498-1520,1672-1683,1760,1762,1764,1769,1774,1776,1781-1929,2022,2029-2133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7071601b2545cfea4b7c0dfcbfac32d40f60efa8",
+  "prompts": {},
+  "sessions": {
+    "s_564d6247141f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e621439eefferxA9s3UHg1t2vA",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_ec8aee02bcd001": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e621439eefferxA9s3UHg1t2vA",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
