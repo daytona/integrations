@@ -2,7 +2,7 @@ from collections.abc import Generator
 from itertools import islice
 from typing import Any
 
-from daytona import ListSandboxesQuery
+from daytona.v0 import ListSandboxesQuery
 
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
@@ -22,7 +22,7 @@ class ListSandboxesTool(Tool):
         # ListSandboxesQuery.limit is the page size, and iterating the result
         # pages through the whole account — cap what we actually collect.
         query = ListSandboxesQuery(limit=limit)
-        sandboxes = list(islice(daytona.list(query), limit))
+        sandboxes = list(islice(daytona.v0.list(query), limit))
 
         result = []
         for sb in sandboxes:

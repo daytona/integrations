@@ -5,7 +5,7 @@ from typing import Any
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from daytona import (
+from daytona.v0 import (
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
     Resources,
@@ -54,7 +54,7 @@ class CreateSandboxTool(Tool):
         else:
             params = CreateSandboxFromSnapshotParams(**common_kwargs)
 
-        sandbox = daytona.create(params, timeout=180)
+        sandbox = daytona.v0.create(params, timeout=180)
 
         yield self.create_json_message({
             "sandbox_id": sandbox.id,

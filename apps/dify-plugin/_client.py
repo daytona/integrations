@@ -1,7 +1,8 @@
 import hashlib
 from typing import Any
 
-from daytona import Daytona, DaytonaConfig, DaytonaError, DaytonaNotFoundError, Sandbox
+from daytona import Daytona, DaytonaConfig
+from daytona.v0 import DaytonaError, DaytonaNotFoundError, Sandbox
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
@@ -36,7 +37,7 @@ def get_sandbox(client: Daytona, sandbox_id: str) -> Sandbox:
     if not sandbox_id:
         raise ValueError("sandbox_id is required")
     try:
-        sandbox = client.get(sandbox_id)
+        sandbox = client.v0.get(sandbox_id)
     except DaytonaNotFoundError as e:
         raise ValueError(f"Sandbox '{sandbox_id}' not found") from e
     except DaytonaError as e:

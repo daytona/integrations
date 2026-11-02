@@ -5,7 +5,7 @@ from typing import Any
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from daytona import CreateSandboxFromSnapshotParams
+from daytona.v0 import CreateSandboxFromSnapshotParams
 
 from _client import build_client, get_sandbox
 
@@ -23,7 +23,7 @@ class RunCodeTool(Tool):
             language = tool_parameters.get("language", "python")
             if language not in ("python", "typescript", "javascript"):
                 raise ValueError(f"Invalid language: {language}. Must be python, typescript, or javascript.")
-            sandbox = daytona.create(CreateSandboxFromSnapshotParams(language=language))
+            sandbox = daytona.v0.create(CreateSandboxFromSnapshotParams(language=language))
 
         try:
             response = sandbox.process.code_run(tool_parameters["code"])
