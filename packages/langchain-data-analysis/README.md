@@ -31,6 +31,64 @@ You must configure credentials for Daytona. You can do this in one of three ways
 	tool = DaytonaDataAnalysisTool(daytona_api_key="your-daytona-api-key")
 	```
 
+## v2 PoC
+
+This stacked branch runs the complete tool workflow on `daytona.v2` microVMs with
+SDK `2.0.0a5`. The v0 examples below describe the parent branch, not this PoC.
+
+**Breaking change:** `on_result` now receives `daytona.v2.InterpreterResult`, and
+the result is also the artifact returned by `_run` / a `ToolMessage`. Read stdout
+from `result.logs.stdout` and errors from `result.error` / `result.process`.
+Charts are MIME-keyed `result.results[].data["image/png"]` (also `.png`), not
+`Chart` objects: chart types/titles are unavailable. Model-facing content retains
+bounded stdout and image MIME summaries; image payloads stay application-side.
+
+```python
+import base64
+
+from daytona.v2 import InterpreterResult
+from langchain_daytona_data_analysis import DaytonaDataAnalysisTool
+
+def receive_result(result: InterpreterResult) -> None:
+    print(result.logs.stdout)
+    for output in result.results:
+        if output.png:
+            print("PNG bytes:", len(base64.b64decode(output.png)))
+
+tool = DaytonaDataAnalysisTool(
+    image="img_YbqbxTpdfgCQ4RdEFYzvga",
+    on_result=receive_result,
+)
+try:
+    tool.invoke({"data_analysis_python_code": "print('hello')"})
+finally:
+    tool.close()
+```
+
+`image: str | None = None` is a new optional constructor argument forwarded to
+`v2.create`. It must name a registered v2 image (not a registry tag) unless the
+organization has a platform default. This environment has **no default image**;
+the retained PoC image above includes Python 3.12, pandas, matplotlib and numpy.
+That organization-specific ID is not portable; provide your own registered image
+with the packages your code needs. No image build is performed. The alpha.5 image
+list/get/build-follow-up decoders have known `region_id` gaps in the reference
+probe; this PoC bypasses them by creating directly from the retained image ID.
+
+Uploads now go to the measured default user's home, `/root`, rather than
+`/home/daytona`. `SandboxUploadedFile.remote_path` still identifies the actual
+uploaded file, and `download_file` still returns bytes. The v2 filesystem uses
+`write_bytes`, `read_bytes` and `delete`; package installation uses v2 `exec`.
+Code runs remain isolated per invocation, with files shared across invocations.
+
+PoC safety policy: creates carry `sdk2-readiness=langchain-daytona-data-analysis`
+and auto-delete after 600 seconds; code/exec calls are bounded at 60 seconds.
+`close()` requests deletion, not synchronous destruction. The live check passed
+stdout, actual PNG decoding, CSV upload/read/download/delete, package execution,
+live `get_sandbox()`, missing-ID `NotFoundError`, deletion and a zero-leftover
+label sweep. The anticipated live-get decoder gap did **not** occur. Differences
+and measured evidence are recorded in the migration evidence `v2-ledger.md`;
+no unsupported feature is stubbed.
+
 ## Instantiation
 
 Import and instantiate the tool:
