@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
-from daytona import DaytonaConnectionTimeoutError, DaytonaError
+from daytona.v0 import DaytonaConnectionTimeoutError, DaytonaError
 
 from pydantic_ai_daytona import DaytonaSandboxError, DaytonaSandboxSession
 

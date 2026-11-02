@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import pytest
-from daytona import DaytonaError, SandboxState
+from daytona.v0 import DaytonaError, SandboxState
 
 from pydantic_ai_daytona import (
     DaytonaSandboxError,

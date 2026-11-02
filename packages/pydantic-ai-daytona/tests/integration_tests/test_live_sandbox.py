@@ -13,6 +13,8 @@ import pytest
 import pytest_asyncio
 from daytona import (
     AsyncDaytona,
+)
+from daytona.v0 import (
     AsyncSandbox,
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
@@ -127,7 +129,7 @@ async def test_attach_by_sandbox_id_reuses_sandbox_and_leaves_it_running(
 
 
 async def test_attach_starts_a_stopped_sandbox(backend: AsyncDaytona) -> None:
-    sandbox = await backend.create(CreateSandboxFromSnapshotParams(labels=LABELS), timeout=120)
+    sandbox = await backend.v0.create(CreateSandboxFromSnapshotParams(labels=LABELS), timeout=120)
     try:
         await sandbox.stop()
         async with DaytonaSandboxSession(sandbox_id=sandbox.id) as attached:
@@ -231,10 +233,12 @@ async def test_cancelled_creation_leaves_no_orphan(
     labels = {**LABELS, "case": f"cancel-{uuid.uuid4().hex}"}
     create_started = asyncio.Event()
     created: list[str] = []
-    original_create = AsyncDaytona.create
+    # SDK 2.x: sessions create through the `.v0` client, so patch its class.
+    v0_class = type(backend.v0)
+    original_create = v0_class.create
 
     async def create(
-        client: AsyncDaytona,
+        client: object,
         params: CreateSandboxFromSnapshotParams | CreateSandboxFromImageParams,
         *,
         timeout: float,
@@ -244,7 +248,7 @@ async def test_cancelled_creation_leaves_no_orphan(
         created.append(sandbox.id)
         return sandbox
 
-    monkeypatch.setattr(AsyncDaytona, "create", create)
+    monkeypatch.setattr(v0_class, "create", create)
     entering = asyncio.create_task(DaytonaSandboxSession(labels=labels).__aenter__())
     await asyncio.wait_for(create_started.wait(), timeout=30)
     assert not entering.done(), "Creation finished before cancellation could exercise it"
@@ -261,7 +265,7 @@ async def test_cancelled_creation_leaves_no_orphan(
 async def test_out_of_band_deletion_is_terminal(backend: AsyncDaytona) -> None:
     async with DaytonaSandboxSession(labels=LABELS) as session:
         assert session.sandbox_id is not None
-        sandbox = await backend.get(session.sandbox_id)
+        sandbox = await backend.v0.get(session.sandbox_id)
         await sandbox.delete(wait=True)
         with pytest.raises(DaytonaSandboxTerminalError):
             await session.exec("echo cannot-run", timeout=5)
