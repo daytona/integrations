@@ -18,6 +18,18 @@ export const configValidator = v.object({
 
 export type DaytonaConfig = Infer<typeof configValidator>;
 
+/** A Daytona volume to mount into a sandbox at creation (wire shape: `SandboxVolume`). */
+export const volumeMountValidator = v.object({
+  /** Volume ID or name — Daytona resolves a name to its ID on create. */
+  volumeId: v.string(),
+  /** Absolute path inside the sandbox where the volume is mounted. */
+  mountPath: v.string(),
+  /** Mount only this prefix within the volume. Omit to mount the entire volume. */
+  subpath: v.optional(v.string()),
+});
+
+export type VolumeMount = Infer<typeof volumeMountValidator>;
+
 export const DEFAULT_API_URL = "https://app.daytona.io/api";
 
 /** Mirrors the Daytona API SandboxState enum (wire values, api-client v0.214). */
@@ -73,6 +85,7 @@ export interface CreateSandboxRequest {
   autoStopInterval?: number;
   autoArchiveInterval?: number;
   autoDeleteInterval?: number;
+  volumes?: VolumeMount[];
 }
 
 export interface ProcessExecutionResponse {

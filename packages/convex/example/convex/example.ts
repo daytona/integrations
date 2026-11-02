@@ -18,6 +18,15 @@ export const createSandbox = action({
     // Sandboxes for long background jobs should pass 0 (never idle-stop) —
     // a running background command does not reset the idle timer.
     autoStopInterval: v.optional(v.number()),
+    volumes: v.optional(
+      v.array(
+        v.object({
+          volumeId: v.string(),
+          mountPath: v.string(),
+          subpath: v.optional(v.string()),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     return await daytona.createSandbox(ctx, {
@@ -25,6 +34,7 @@ export const createSandbox = action({
       labels: { "created-by": "convex-example" },
       autoStopInterval: args.autoStopInterval ?? 15,
       autoDeleteInterval: -1,
+      volumes: args.volumes,
     });
   },
 });

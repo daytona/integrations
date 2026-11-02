@@ -108,6 +108,17 @@ Sandboxes are created from a **snapshot** (yours, or the org default) *or* built
 await daytona.createSandbox(ctx, { image: "python:3.12", cpu: 2, memory: 4 });
 ```
 
+To share or persist files across sandboxes, mount [Daytona volumes](https://www.daytona.io/docs/en/volumes). Volumes can only be mounted when a sandbox is created; create the volume itself with the Daytona SDK, CLI, or dashboard, and wait until it's `ready`:
+
+```ts
+await daytona.createSandbox(ctx, {
+  volumes: [
+    { volumeId: "shared-models", mountPath: "/home/daytona/models" }, // volume ID or name
+    { volumeId: "tenants", mountPath: "/home/daytona/data", subpath: "users/alice" }, // only this prefix
+  ],
+});
+```
+
 Also available: `startSandbox`, `stopSandbox`, `deleteSandbox`, and `refreshSandbox` (re-syncs remote state into the component's tables; returns `null` if the sandbox no longer exists).
 
 ### Run commands and code

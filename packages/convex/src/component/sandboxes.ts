@@ -21,7 +21,7 @@ import {
 } from "./_generated/server.js";
 import { DaytonaApiError, DaytonaClient } from "./daytona.js";
 import { sandboxFields } from "./schema.js";
-import { clampLimit, configValidator } from "./types.js";
+import { clampLimit, configValidator, volumeMountValidator } from "./types.js";
 
 export const sandboxDoc = v.object({
   ...sandboxFields,
@@ -224,6 +224,8 @@ export const create = action({
     autoArchiveInterval: v.optional(v.number()),
     /** Minutes before auto-delete; -1 disables. */
     autoDeleteInterval: v.optional(v.number()),
+    /** Volumes to mount. Daytona only attaches volumes at creation, never afterwards. */
+    volumes: v.optional(v.array(volumeMountValidator)),
     /** Opaque owner/tenant key from the host app (see schema). */
     userKey: v.optional(v.string()),
     /** Wait until the sandbox is started (default true). */
@@ -265,6 +267,7 @@ export const create = action({
       autoStopInterval: args.autoStopInterval,
       autoArchiveInterval: args.autoArchiveInterval,
       autoDeleteInterval: args.autoDeleteInterval,
+      volumes: args.volumes,
     });
     await ctx.runMutation(internal.sandboxes.upsertSandbox, {
       sandboxId: created.id,

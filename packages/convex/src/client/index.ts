@@ -24,6 +24,16 @@ export interface DaytonaOptions {
   apiUrl?: string;
 }
 
+/** A Daytona volume to mount into a sandbox when it is created. */
+export interface VolumeMount {
+  /** Volume ID or name. Create volumes with the Daytona SDK, CLI, or dashboard. */
+  volumeId: string;
+  /** Absolute path inside the sandbox where the volume is mounted. */
+  mountPath: string;
+  /** Mount only this prefix within the volume. Omit to mount the entire volume. */
+  subpath?: string;
+}
+
 export interface CreateSandboxArgs {
   name?: string;
   /** Snapshot (ID or name) to base the sandbox on. Mutually exclusive with `image`. */
@@ -41,6 +51,8 @@ export interface CreateSandboxArgs {
   autoStopInterval?: number;
   autoArchiveInterval?: number;
   autoDeleteInterval?: number;
+  /** Volumes to mount. Daytona attaches volumes only at creation, not afterwards. */
+  volumes?: VolumeMount[];
   userKey?: string;
   wait?: boolean;
   waitTimeoutMs?: number;
