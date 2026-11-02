@@ -1,0 +1,19 @@
+packages/adk-plugin/README.md
+  s_e07bb1709c4f60::t_8270bb8ae6ceb8 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4f928ea8eabb788999b205871862b66ef30c9fe0",
+  "prompts": {},
+  "sessions": {
+    "s_e07bb1709c4f60": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61811498ffesD1hdHDhZ5O754",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
