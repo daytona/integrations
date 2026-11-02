@@ -1,0 +1,20 @@
+packages/langchain-data-analysis/README.md
+  s_4b2040927e4ade::t_37195bf0307b4c 47-48,56
+  s_4b2040927e4ade::t_12fb0b87e58664 34-46,49-55,57-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f1281a19a671dd6873cb042aa67288a7e86334ca",
+  "prompts": {},
+  "sessions": {
+    "s_4b2040927e4ade": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6174a994ffeoqBRbyQY7K2FdM",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
