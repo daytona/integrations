@@ -63,8 +63,11 @@ describe('opencode-plugin', () => {
     // deleted here, so a red test does not also burn money.
     afterAll(async () => {
       for (const id of leakedIds) {
+        // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.get(...)` (SDK 2.x moved client methods to .v0)
         const sandbox = await daytona.get(id).catch(() => undefined)
-        if (sandbox) await daytona.delete(sandbox).catch(() => undefined)
+        if (sandbox)
+        // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.delete(...)` (SDK 2.x moved client methods to .v0)
+        await daytona.delete(sandbox).catch(() => undefined)
       }
     })
 
@@ -82,6 +85,7 @@ describe('opencode-plugin', () => {
       // the failed create() is identifiable as a leak. opencode assigns a
       // random petname for `config.name`, so we cannot predict the sandbox
       // name up front.
+      // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.list(...)` (SDK 2.x moved client methods to .v0)
       const before = new Set((await daytona.list()).items.map((s) => s.id))
 
       try {
@@ -101,6 +105,7 @@ describe('opencode-plugin', () => {
         const start = Date.now()
         let leaks: Array<{ id: string; name: string }> = []
         while (Date.now() - start < 30_000) {
+          // FIXME(daytona-upgrade): if `daytona` is a Daytona client, use `daytona.v0.list(...)` (SDK 2.x moved client methods to .v0)
           const after = (await daytona.list()).items
           leaks = after
             .filter((s) => !before.has(s.id))

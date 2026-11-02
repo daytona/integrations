@@ -107,7 +107,7 @@ function debug(msg: string): void {
   }
 }
 
-type SandboxHandle = Awaited<ReturnType<Daytona['get']>>
+type SandboxHandle = Awaited<ReturnType<Daytona['v0']['get']>>
 
 // Build the workspace target opencode connects to (tool calls + the global-sync
 // /global/event stream both go here).
@@ -227,7 +227,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
       debug(
         `create: calling d.create() sandbox=${sandboxName(config.name)} snapshot=${snapshot ?? '(default)'} envKeys=${Object.keys(toEnvVars(env)).join(',')}`,
       )
-      const sandbox = await d.create({
+      const sandbox = await d.v0.create({
         name: sandboxName(config.name),
         envVars: toEnvVars(env),
         // Never auto-delete. A deleted sandbox orphans its OpenCode workspace
@@ -329,7 +329,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
       } catch (err) {
         debug(`create: ERROR ${err instanceof Error ? err.message : String(err)}`)
         // Don't leak the sandbox if anything after Daytona.create() throws.
-        await d.delete(sandbox).catch(() => undefined)
+        await d.v0.delete(sandbox).catch(() => undefined)
         throw err
       } finally {
         if (temp) await rm(temp, { recursive: true, force: true }).catch(() => undefined)
@@ -340,12 +340,12 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
     async remove(config) {
       debug(`remove: start name=${config.name}`)
       const d = getDaytona()
-      const sandbox = await d.get(sandboxName(config.name)).catch(() => undefined)
+      const sandbox = await d.v0.get(sandboxName(config.name)).catch(() => undefined)
       if (!sandbox) {
         debug(`remove: no sandbox found for ${sandboxName(config.name)}; nothing to do`)
         return
       }
-      await d.delete(sandbox)
+      await d.v0.delete(sandbox)
       previewCache.delete(config.name)
       debug(`remove: deleted sandbox id=${sandbox.id}`)
     },
@@ -362,7 +362,7 @@ export const DaytonaWorkspacePlugin = async (input: PluginInput) => {
         return toTarget(cached)
       }
 
-      const sandbox = await getDaytona().get(sandboxName(config.name))
+      const sandbox = await getDaytona().v0.get(sandboxName(config.name))
       debug(`target: name=${config.name} state=${sandbox.state}`)
       if (sandbox.state !== 'started') {
         debug(`target: resuming ${sandboxName(config.name)} (state=${sandbox.state})`)
