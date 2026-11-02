@@ -91,8 +91,42 @@ async def test_background_returns_actual_ids_when_started():
     sandbox = create_autospec(Sandbox, instance=True)
     session = sandbox.process.create_session.return_value
     session.id = "server-session-id"
-    session.start.return_value.id = "server-process-id"
     # When
     result = await StartLongRunningCommandTool(sandbox).run_async(args={"command": "sleep 10", "timeout": 2}, tool_context=create_autospec(ToolContext))
     # Then
-    assert result == {"session_id": "server-session-id", "process_id": "server-process-id", "output": "", "exit_code": None}
+    assert result == {"session_id": "server-session-id", "output": "", "exit_code": None}
+    session.start.assert_called_once_with("sleep 10", execution_timeout=2)
+
+
+@pytest.mark.asyncio
+async def test_upload_returns_error_dict_when_sdk_raises_non_daytona_error():
+    # Given: the Step A contract catches every exception.
+    sandbox = create_autospec(Sandbox, instance=True)
+    sandbox.fs.write_bytes.side_effect = RuntimeError("boom")
+    # When
+    result = await UploadFileTool(sandbox).run_async(args={"file_path": "/tmp/a", "content": "x"}, tool_context=create_autospec(ToolContext))
+    # Then
+    assert result == {"error": "boom", "success": False}
+
+
+@pytest.mark.asyncio
+async def test_upload_writes_empty_bytes_when_content_is_missing():
+    # Given
+    sandbox = create_autospec(Sandbox, instance=True)
+    # When
+    result = await UploadFileTool(sandbox).run_async(args={"file_path": "/tmp/a"}, tool_context=create_autospec(ToolContext))
+    # Then
+    assert result == {"success": True, "path": "/tmp/a"}
+    sandbox.fs.write_bytes.assert_called_once_with("/tmp/a", b"")
+
+
+@pytest.mark.asyncio
+async def test_read_returns_error_dict_when_file_path_is_missing_and_sdk_raises():
+    # Given
+    sandbox = create_autospec(Sandbox, instance=True)
+    sandbox.fs.read_bytes.side_effect = RuntimeError("no path")
+    # When
+    result = await ReadFileTool(sandbox).run_async(args={}, tool_context=create_autospec(ToolContext))
+    # Then
+    assert result == {"error": "no path", "content": None}
+    sandbox.fs.read_bytes.assert_called_once_with("")

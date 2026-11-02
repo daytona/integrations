@@ -3,8 +3,8 @@
 Provides ADK tool implementations for code execution in Daytona sandbox.
 """
 
-import logging
 import json
+import logging
 import shlex
 import uuid
 from functools import partial
@@ -14,8 +14,6 @@ import anyio
 from daytona.v2 import Sandbox
 from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
-
-from daytona_adk._file_tools import ReadFileTool as ReadFileTool, UploadFileTool as UploadFileTool
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +206,107 @@ class ExecuteCommandTool(BaseTool):
             return {"error": str(e), "exit_code": -1}
 
 
+class UploadFileTool(BaseTool):
+    """Tool for uploading files to the Daytona sandbox."""
+
+    def __init__(self, sandbox: Sandbox):
+        super().__init__(
+            name="upload_file_to_daytona",
+            description=(
+                "Upload a file to the Daytona sandbox. Provide the file path and content."
+            ),
+        )
+        self.sandbox = sandbox
+
+    def _get_declaration(self) -> types.FunctionDeclaration:
+        return types.FunctionDeclaration(
+            name=self.name,
+            description=self.description,
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "file_path": types.Schema(
+                        type=types.Type.STRING,
+                        description="The destination path in the sandbox.",
+                    ),
+                    "content": types.Schema(
+                        type=types.Type.STRING,
+                        description="The file content to upload.",
+                    ),
+                },
+                required=["file_path", "content"],
+            ),
+        )
+
+    async def run_async(
+        self,
+        *,
+        args: Dict[str, Any],
+        tool_context: ToolContext,
+    ) -> Dict[str, Any]:
+        """Upload a file to the Daytona sandbox."""
+        file_path = args.get("file_path", "")
+        content = args.get("content", "")
+
+        logger.debug(f"Uploading file to: {file_path} (size: {len(content)} bytes)")
+
+        try:
+            content_bytes = content.encode("utf-8")
+            await anyio.to_thread.run_sync(lambda: self.sandbox.fs.write_bytes(file_path, content_bytes))
+            logger.debug(f"File uploaded successfully: {file_path}")
+            return {"success": True, "path": file_path}
+        except Exception as e:
+            logger.error(f"File upload failed for {file_path}: {e}")
+            return {"error": str(e), "success": False}
+
+
+class ReadFileTool(BaseTool):
+    """Tool for reading files from the Daytona sandbox."""
+
+    def __init__(self, sandbox: Sandbox):
+        super().__init__(
+            name="read_file_from_daytona",
+            description="Read a file from the Daytona sandbox. Provide the file path.",
+        )
+        self.sandbox = sandbox
+
+    def _get_declaration(self) -> types.FunctionDeclaration:
+        return types.FunctionDeclaration(
+            name=self.name,
+            description=self.description,
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "file_path": types.Schema(
+                        type=types.Type.STRING,
+                        description="The path of the file to read.",
+                    ),
+                },
+                required=["file_path"],
+            ),
+        )
+
+    async def run_async(
+        self,
+        *,
+        args: Dict[str, Any],
+        tool_context: ToolContext,
+    ) -> Dict[str, Any]:
+        """Read a file from the Daytona sandbox."""
+        file_path = args.get("file_path", "")
+
+        logger.debug(f"Reading file: {file_path}")
+
+        try:
+            content_bytes = await anyio.to_thread.run_sync(lambda: self.sandbox.fs.read_bytes(file_path))
+            content = content_bytes.decode("utf-8")
+            logger.debug(f"File read successfully: {file_path} (size: {len(content)} bytes)")
+            return {"content": content, "path": file_path}
+        except Exception as e:
+            logger.error(f"File read failed for {file_path}: {e}")
+            return {"error": str(e), "content": None}
+
+
 class StartLongRunningCommandTool(BaseTool):
     """Tool for starting long-running commands (e.g., dev servers)."""
 
@@ -258,11 +357,10 @@ class StartLongRunningCommandTool(BaseTool):
 
         try:
             session = await anyio.to_thread.run_sync(lambda: self.sandbox.process.create_session(name=session_id))
-            process = await anyio.to_thread.run_sync(partial(session.start, command, execution_timeout=timeout))
+            await anyio.to_thread.run_sync(partial(session.start, command, execution_timeout=timeout))
             logger.debug(f"Long-running command started with session_id: {session_id}")
             return {
                 "session_id": session.id,
-                "process_id": process.id,
                 "output": "",
                 "exit_code": None,
             }

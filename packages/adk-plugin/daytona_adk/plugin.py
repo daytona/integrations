@@ -15,8 +15,8 @@ from google.adk.plugins import BasePlugin
 from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
 
-from daytona import Daytona, DaytonaConfig
-from daytona.v2 import LifecyclePolicyConfig, Sandbox, SandboxNotRunningError
+from daytona import Daytona, DaytonaConfig  # type: ignore
+from daytona.v2 import LifecyclePolicyConfig
 
 from daytona_adk.tools import (
     ExecuteCodeTool,
@@ -79,7 +79,7 @@ class DaytonaPlugin(BasePlugin):
             policy["on_timeout"] = "delete"
         # The public constructor stays synchronous, including inside ADK async apps.
         with ThreadPoolExecutor(max_workers=1) as worker:
-            self._sandbox: Sandbox | None = worker.submit(
+            self._sandbox = worker.submit(
                 self._daytona.v2.create, image, name=sandbox_name, env=env_vars,
                 labels=labels, lifecycle_policy=policy or None,
             ).result()
@@ -87,17 +87,13 @@ class DaytonaPlugin(BasePlugin):
 
     def get_tools(self) -> list[BaseTool]:
         """Get all Daytona tools with shared sandbox instance."""
-        sandbox = self._sandbox
-        if sandbox is None:
-            raise SandboxNotRunningError("Plugin sandbox has been deleted")
-        tools: list[BaseTool] = [
-            ExecuteCodeTool(sandbox),
-            ExecuteCommandTool(sandbox),
-            UploadFileTool(sandbox),
-            ReadFileTool(sandbox),
-            StartLongRunningCommandTool(sandbox),
+        return [
+            ExecuteCodeTool(self._sandbox),
+            ExecuteCommandTool(self._sandbox),
+            UploadFileTool(self._sandbox),
+            ReadFileTool(self._sandbox),
+            StartLongRunningCommandTool(self._sandbox),
         ]
-        return tools
 
     async def before_agent_callback(
         self,
