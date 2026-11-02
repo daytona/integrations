@@ -76,7 +76,7 @@ const SYSTEM_PROMPT = `You are a coding agent with shell access to a fresh Dayto
 
 The user can ask you anything a developer might do at a terminal: build apps, debug or analyze code, run scripts, work with data, install packages, write tests, whatever fits the request.
 
-Work under /root by default. Reuse the same sandboxId across every tool call. The sandbox is ephemeral and auto-deletes after a period of inactivity or its maximum lifetime; if a tool call fails because the sandbox no longer exists, call createSandbox again and continue with the new sandboxId.
+Work under /root by default. Reuse the same sandboxId across every tool call. The sandbox auto-deletes after a period of inactivity; if a tool call fails because the sandbox no longer exists, call createSandbox again and continue with the new sandboxId.
 
 When the user wants to see a running web app:
 
@@ -122,11 +122,7 @@ const createSandbox = defineTool({
       lifecyclePolicy: {
         idleExpirySeconds: idleMinutes === 0 ? -1 : idleMinutes * 60,
         ...(idleMinutes > 0 ? { onIdleTimeout: 'delete' as const } : {}),
-        timeoutSeconds: 1200,
-        onTimeout: 'delete',
       },
-      waitSeconds: 90,
-      createTimeoutSeconds: 90,
     })
     return { sandboxId: sandbox.id }
   },
@@ -150,10 +146,10 @@ const runCommand = defineTool({
     const sandbox = await daytona.v2.get(sandboxId)
     if (background) {
       const session = await sandbox.process.createSession({ name: `bg-${Date.now()}` })
-      const result = await session.start(command, { executionTimeout: 1200_000 })
+      const result = await session.start(command)
       return { background: true, sessionId: session.id, cmdId: result.id, command }
     }
-    const result = await sandbox.exec(command, { timeout: 240_000, executionTimeout: 240_000 })
+    const result = await sandbox.exec(command)
     switch (result.reason) {
       case 'exited':
         return { exitCode: result.exitCode, stdout: result.output, command }
@@ -319,7 +315,7 @@ const startWebServer = defineTool({
   execute: async ({ sandboxId, command, port }) => {
     const sandbox = await daytona.v2.get(sandboxId)
     const session = await sandbox.process.createSession({ name: `web-${Date.now()}` })
-    const bg = await session.start(command, { executionTimeout: 1200_000 })
+    const bg = await session.start(command)
 
     {
       const urlPattern = new RegExp(`https?:\\/\\/[\\w\\.\\-\\[\\]:]+:${port}\\b`, 'i')

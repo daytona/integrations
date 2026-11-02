@@ -151,11 +151,11 @@ table and v0 prerequisites above describe the Step A branch; this PoC changes
 only sandbox operations, not the CopilotKit/OpenRouter/renderers. It is **not
 end-to-end ready: BLOCKED-BY-V2-GAP(sessions)**.
 
-- Set `DAYTONA_V2_IMAGE` to a registered v2 image name/id before creating a
-  sandbox. No default image is configured in the measured environment. The live
-  smoke used `img_YbqbxTpdfgCQ4RdEFYzvga` (Debian 13, Python 3.12.16, git).
-  **Node/npm/curl are absent in that guest**: the default Vite/Next scaffolding
-  flow has not been demonstrated. Use an appropriate pre-registered image for
+- Set `DAYTONA_V2_IMAGE` to a registered v2 image id
+  (`img_<your-registered-image-id>`) before creating a sandbox; no default image
+  is configured, any registered image id works. The live smoke used a
+  Debian 13 / Python 3.12.16 / git image. **Node/npm/curl are absent in that
+  guest**: the default Vite/Next scaffolding flow has not been demonstrated. Use an appropriate pre-registered image for
   Node work; this PoC does not build images or install guest runtimes.
 - Measured user/home/cwd: root, `/root`, `/root`; prompt paths now use `/root`.
   `envVars` maps to `env`; labels were recovered through a fresh client lookup.
@@ -164,8 +164,11 @@ end-to-end ready: BLOCKED-BY-V2-GAP(sessions)**.
 - v2 creation is ephemeral by default. `autoStopInterval` remains the tool input
   in minutes (default 15; 0 disables idle expiry), but maps to
   `lifecyclePolicy.idleExpirySeconds` and **delete**, not a resumable stop.
-  A separate 1200-second/delete lifetime is always applied, even with idle
-  expiry disabled. These policies were accepted, not waited out experimentally.
+  The app sets no wall-clock lifetime (v0 had none); v2 cannot disable
+  `timeoutSeconds`, so the project/platform default lifetime applies. Create
+  waiting uses SDK defaults. Shell commands and background session commands
+  carry no caller or server deadline, as in v0. These policies were accepted,
+  not waited out experimentally.
 - Sandbox-wide `public: true` becomes per-port
   `ports.expose(port, { public: true })` before `ports.previewLink(port)`.
   **Live preview measured on port 3000:** host curl returned **200 without a
