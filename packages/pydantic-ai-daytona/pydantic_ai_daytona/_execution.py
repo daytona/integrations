@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import uuid4
 
-from daytona import (
+from daytona.v0 import (
     AsyncSandbox,
     DaytonaConnectionTimeoutError,
     DaytonaError,

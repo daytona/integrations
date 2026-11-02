@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
-from daytona import DaytonaConnectionTimeoutError, DaytonaError, SandboxState
+from daytona.v0 import DaytonaConnectionTimeoutError, DaytonaError, SandboxState
 
 from pydantic_ai_daytona import DaytonaSandboxSession
 

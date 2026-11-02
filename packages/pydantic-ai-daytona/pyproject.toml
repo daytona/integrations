@@ -29,7 +29,8 @@ dependencies = [
     "pydantic-ai-slim>=2.22.0",
     # Wide on purpose: a one-minor pin can't share an environment with other
     # Daytona SDK users, such as pydantic-ai-harness[daytona].
-    "daytona>=0.203.0,<1",
+    # Exact pre-release pin until 2.0.0 is stable; restore >=2,<3 at GA.
+    "daytona[v0-sdk]==2.0.0a5",
 ]
 
 [project.optional-dependencies]

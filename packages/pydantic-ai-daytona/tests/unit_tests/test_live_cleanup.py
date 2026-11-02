@@ -4,8 +4,10 @@ from types import SimpleNamespace
 import pytest
 from daytona import (
     AsyncDaytona,
-    AsyncSandbox,
     DaytonaConfig,
+)
+from daytona.v0 import (
+    AsyncSandbox,
     DaytonaError,
     DaytonaGoneError,
     DaytonaNotFoundError,
@@ -31,8 +33,8 @@ async def test_live_verification_propagates_when_deletion_is_inconclusive(
         raise error
 
     async with AsyncDaytona(DaytonaConfig(api_key="test")) as client:
-        monkeypatch.setattr(client, "list", listed)
-        monkeypatch.setattr(client, "get", get)
+        monkeypatch.setattr(client.v0, "list", listed)
+        monkeypatch.setattr(client.v0, "get", get)
 
         with pytest.raises(type(error)) as caught:
             await listed_sandboxes(client, {"pai-upgrade": "test"})
@@ -50,8 +52,8 @@ async def test_live_verification_omits_when_sandbox_is_not_found(
         raise DaytonaNotFoundError("deleted")
 
     async with AsyncDaytona(DaytonaConfig(api_key="test")) as client:
-        monkeypatch.setattr(client, "list", listed)
-        monkeypatch.setattr(client, "get", get)
+        monkeypatch.setattr(client.v0, "list", listed)
+        monkeypatch.setattr(client.v0, "get", get)
 
         remaining = await listed_sandboxes(client, {"pai-upgrade": "test"})
 
@@ -89,8 +91,8 @@ async def test_cleanup_continues_past_a_failing_sandbox_and_reports_it(
             yield item
 
     async with AsyncDaytona(DaytonaConfig(api_key="test")) as client:
-        monkeypatch.setattr(client, "list", listed)
-        monkeypatch.setattr(client, "get", flaky_get(deleted))
+        monkeypatch.setattr(client.v0, "list", listed)
+        monkeypatch.setattr(client.v0, "get", flaky_get(deleted))
 
         with pytest.raises(AssertionError, match="a-flaky"):
             await cleanup_sandboxes(client, ["a-flaky", "b-ok"], {"pai-upgrade": "test"})
@@ -109,8 +111,8 @@ async def test_label_sweep_keeps_partial_results_past_errors(
         raise DaytonaError("pagination failed")
 
     async with AsyncDaytona(DaytonaConfig(api_key="test")) as client:
-        monkeypatch.setattr(client, "list", listed)
-        monkeypatch.setattr(client, "get", flaky_get(deleted))
+        monkeypatch.setattr(client.v0, "list", listed)
+        monkeypatch.setattr(client.v0, "get", flaky_get(deleted))
 
         with pytest.raises(AssertionError) as caught:
             await cleanup_sandboxes(client, [], {"pai-upgrade": "test"})
@@ -139,8 +141,8 @@ async def test_error_superseded_by_a_later_success_does_not_fail_cleanup(
         return RecordingSandbox(sandbox_id, deleted)
 
     async with AsyncDaytona(DaytonaConfig(api_key="test")) as client:
-        monkeypatch.setattr(client, "list", listed)
-        monkeypatch.setattr(client, "get", get)
+        monkeypatch.setattr(client.v0, "list", listed)
+        monkeypatch.setattr(client.v0, "get", get)
 
         assert await cleanup_sandboxes(client, ["retried"], {"pai-upgrade": "test"}) == 1
 

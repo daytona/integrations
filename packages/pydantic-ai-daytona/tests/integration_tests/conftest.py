@@ -7,6 +7,8 @@ import pytest
 import pytest_asyncio
 from daytona import (
     AsyncDaytona,
+)
+from daytona.v0 import (
     AsyncSandbox,
     DaytonaError,
     DaytonaNotFoundError,
@@ -22,7 +24,7 @@ CREATED_IDS: set[str] = set()
 
 async def is_gone(client: AsyncDaytona, sandbox_id: str) -> bool:
     try:
-        sandbox = await client.get(sandbox_id)
+        sandbox = await client.v0.get(sandbox_id)
     except DaytonaNotFoundError:
         return True
     return sandbox.state == SandboxState.DESTROYED
@@ -31,9 +33,9 @@ async def is_gone(client: AsyncDaytona, sandbox_id: str) -> bool:
 async def listed_sandboxes(client: AsyncDaytona, labels: dict[str, str]) -> list[AsyncSandbox]:
     # Label-filtered lists can retain deleted records after delete(wait=True), verified live.
     sandboxes = []
-    async for listed in client.list(ListSandboxesQuery(labels=labels)):
+    async for listed in client.v0.list(ListSandboxesQuery(labels=labels)):
         try:
-            current = await client.get(listed.id)
+            current = await client.v0.get(listed.id)
         except DaytonaNotFoundError:
             continue
         if current.state != SandboxState.DESTROYED:
@@ -57,7 +59,7 @@ async def cleanup_sandboxes(
     async def label_ids(phase: str) -> list[str]:
         ids: list[str] = []
         try:
-            async for listed in client.list(ListSandboxesQuery(labels=labels)):
+            async for listed in client.v0.list(ListSandboxesQuery(labels=labels)):
                 ids.append(listed.id)
         except DaytonaError as error:
             errors[f"{phase} label sweep"] = repr(error)
@@ -65,7 +67,7 @@ async def cleanup_sandboxes(
 
     async def delete(sandbox_id: str) -> None:
         try:
-            sandbox = await client.get(sandbox_id)
+            sandbox = await client.v0.get(sandbox_id)
             if sandbox.state != SandboxState.DESTROYED:
                 await sandbox.delete(wait=True, timeout=60)
         except DaytonaNotFoundError:
@@ -103,17 +105,19 @@ async def cleanup_sandboxes(
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
 async def backend() -> AsyncGenerator[AsyncDaytona, None]:
-    original_create = AsyncDaytona.create
+    client = AsyncDaytona()
+    # SDK 2.x: sandboxes are created through the `.v0` client, so record on its class.
+    v0_class = type(client.v0)
+    original_create = v0_class.create
 
-    async def recording_create(client: AsyncDaytona, *args: Any, **kwargs: Any) -> AsyncSandbox:
-        sandbox = await original_create(client, *args, **kwargs)
+    async def recording_create(v0_client: Any, *args: Any, **kwargs: Any) -> AsyncSandbox:
+        sandbox = await original_create(v0_client, *args, **kwargs)
         CREATED_IDS.add(sandbox.id)
         return sandbox
 
-    client = AsyncDaytona()
     print(f"\nLive sandbox labels: {LABELS}")
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(AsyncDaytona, "create", recording_create)
+        patch.setattr(v0_class, "create", recording_create)
         try:
             yield client
         finally:

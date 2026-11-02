@@ -10,10 +10,12 @@ from types import TracebackType
 
 from daytona import (
     AsyncDaytona,
+    DaytonaConfig,
+)
+from daytona.v0 import (
     AsyncSandbox,
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
-    DaytonaConfig,
     DaytonaError,
     SandboxState,
 )
@@ -98,7 +100,7 @@ class DaytonaSandboxSession:
         sandbox: AsyncSandbox | None = None
         try:
             if self._attach_id is not None:
-                sandbox = await daytona.get(self._attach_id)
+                sandbox = await daytona.v0.get(self._attach_id)
                 if sandbox.state in (SandboxState.DESTROYING, SandboxState.DESTROYED):
                     raise DaytonaSandboxTerminalError("The sandbox is gone (it was deleted).")
                 if sandbox.state in (
@@ -114,7 +116,7 @@ class DaytonaSandboxSession:
 
                 async def create() -> None:
                     nonlocal sandbox
-                    sandbox = await daytona.create(
+                    sandbox = await daytona.v0.create(
                         self._create_params(), timeout=self._create_timeout
                     )
                     self._owned = True
