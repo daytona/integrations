@@ -1,0 +1,19 @@
+apps/inngest-agentkit-coding-agent/.env.example
+  s_e6bec9da90ebe1::t_9fa5125a5dfc1b 2-3,7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "930f285f01380ae68c3bb0ece529419a2e0cb84d",
+  "prompts": {},
+  "sessions": {
+    "s_e6bec9da90ebe1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e617445e6ffeiKTvpe3yJEtDVV",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
