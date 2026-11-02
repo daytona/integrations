@@ -5,6 +5,8 @@ from typing import IO, Any, Callable, List, Literal, Optional, Tuple, Type, Unio
 from daytona import (  # type: ignore
     Daytona,
     DaytonaConfig,
+)
+from daytona.v0 import (
     ExecutionArtifacts,
     Sandbox,
 )
@@ -158,7 +160,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
         super().__init__(description=tool_base_description, **kwargs)
         daytona_api_key = daytona_api_key or os.environ.get("DAYTONA_API_KEY")
         self._daytonaClient = Daytona(DaytonaConfig(api_key=daytona_api_key))
-        self._sandbox = self._daytonaClient.create()
+        self._sandbox = self._daytonaClient.v0.create()
         self._on_result = on_result
 
     def _run(
@@ -218,7 +220,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
     def close(self) -> None:
         """Close and delete sandbox."""
         self._sandbox_uploaded_files = []
-        self._daytonaClient.delete(self._sandbox)
+        self._daytonaClient.v0.delete(self._sandbox)
 
     def install_python_packages(self, package_names: Union[str, List[str]]) -> None:
         """Install python packages in the sandbox."""
@@ -266,7 +268,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
     def get_sandbox(self) -> Sandbox:
         """Get the current sandbox instance."""
-        return self._daytonaClient.get(self._sandbox.id)
+        return self._daytonaClient.v0.get(self._sandbox.id)
     
     def _unparse(self, tree: ast.AST) -> str:
         """Unparse the AST back into source code."""

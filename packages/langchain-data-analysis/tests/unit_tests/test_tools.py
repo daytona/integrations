@@ -14,7 +14,7 @@ class TestDaytonaDataAnalysisToolUnit(ToolsUnitTests):
         with patch(
             "langchain_daytona_data_analysis.tools.Daytona"
         ) as mock_daytona:
-            mock_daytona.return_value.create.return_value = MagicMock()
+            mock_daytona.return_value.v0.create.return_value = MagicMock()
             yield mock_daytona
 
     @property

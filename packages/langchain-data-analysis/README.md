@@ -8,6 +8,10 @@ This package provides the `DaytonaDataAnalysisTool` - LangChain tool integration
 pip install -U langchain-daytona-data-analysis
 ```
 
+Requires Python 3.10+. This release depends on the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]`), pinned to the pre-release `2.0.0a5` until 2.0.0 is stable.
+
+Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
+
 You must configure credentials for Daytona. You can do this in one of three ways:
 
 1. Set the `DAYTONA_API_KEY` environment variable:
@@ -33,7 +37,7 @@ Import and instantiate the tool:
 
 ```python
 from langchain_daytona_data_analysis import DaytonaDataAnalysisTool
-from daytona import ExecutionArtifacts
+from daytona.v0 import ExecutionArtifacts
 
  # Optionally, you can pass an on_result callback.
  # This callback lets you apply custom logic to the data analysis result.

@@ -4,7 +4,7 @@ from typing import Type
 from unittest.mock import Mock
 
 import pytest  # type: ignore
-from daytona import ExecuteResponse, ExecutionArtifacts  # type: ignore
+from daytona.v0 import ExecuteResponse, ExecutionArtifacts  # type: ignore
 from langchain_core.messages import ToolMessage
 from langchain_tests.integration_tests import ToolsIntegrationTests  # type: ignore
 
