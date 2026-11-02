@@ -8,6 +8,10 @@ Google ADK plugin for secure code execution in [Daytona](https://www.daytona.io)
 pip install daytona-adk
 ```
 
+This release uses the Daytona SDK 2.x `v0` namespace and pins the pre-release `daytona[v0-sdk]==2.0.0a5` until 2.0.0 is stable.
+
+Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
+
 ## Configuration
 
 You must configure credentials for both Daytona (sandbox infrastructure) and Google Gemini (the LLM model used by ADK agents).
