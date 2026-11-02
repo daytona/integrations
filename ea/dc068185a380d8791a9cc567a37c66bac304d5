@@ -1,0 +1,21 @@
+apps/stripe-coding-agent-template/AGENTS.md
+  s_1972b179aad4cb::t_d02a00a30fd457 27
+apps/stripe-coding-agent-template/README.md
+  s_1972b179aad4cb::t_923125983b30c1 142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eadc068185a380d8791a9cc567a37c66bac304d5",
+  "prompts": {},
+  "sessions": {
+    "s_1972b179aad4cb": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61820152ffeu5UcgpvZzXVIE6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
