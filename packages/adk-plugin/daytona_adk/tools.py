@@ -4,13 +4,18 @@ Provides ADK tool implementations for code execution in Daytona sandbox.
 """
 
 import logging
+import json
 import shlex
 import uuid
-from typing import Any, Dict, Optional
+from functools import partial
+from typing import Any, Dict
 
-from daytona.v0 import CodeRunParams, Sandbox, SessionExecuteRequest  # type: ignore
+import anyio
+from daytona.v2 import Sandbox
 from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
+
+from daytona_adk._file_tools import ReadFileTool as ReadFileTool, UploadFileTool as UploadFileTool
 
 logger = logging.getLogger(__name__)
 
@@ -84,17 +89,22 @@ class ExecuteCodeTool(BaseTool):
 
         try:
             if language == "python":
-                params: Optional[CodeRunParams] = None
-                if env or argv:
-                    params = CodeRunParams(env=env, argv=argv)
-                response = self.sandbox.process.code_run(code, params, timeout)
-                logger.debug(f"Code execution completed with exit_code: {response.exit_code}")
-                return {"result": response.result, "exit_code": response.exit_code}
+                if argv:
+                    code = f"import sys; sys.argv = {json.dumps(['-c', *argv])}\n" + code
+                response = await anyio.to_thread.run_sync(partial(
+                    self.sandbox.run_code, code, language="python", isolated=True, env=env, timeout=timeout
+                ))
+                output = response.logs.stdout + response.logs.stderr
+                if response.error is not None:
+                    return {"result": output, "error": "\n".join(response.error.traceback), "exit_code": -1}
+                if response.process.reason != "exited":
+                    return {"result": output, "error": str(response.process.reason), "exit_code": -1}
+                return {"result": output, "exit_code": response.process.exit_code}
 
             elif language in ("javascript", "typescript"):
                 ext = "js" if language == "javascript" else "ts"
                 script_path = f"/tmp/script_{uuid.uuid4().hex}.{ext}"
-                self.sandbox.fs.upload_file(code.encode("utf-8"), script_path)
+                await anyio.to_thread.run_sync(lambda: self.sandbox.fs.write_bytes(script_path, code.encode("utf-8")))
 
                 try:
                     if language == "javascript":
@@ -110,12 +120,15 @@ class ExecuteCodeTool(BaseTool):
                     if argv:
                         cmd += " " + " ".join(shlex.quote(str(arg)) for arg in argv)
 
-                    response = self.sandbox.process.exec(cmd, env=env, timeout=timeout)
+                    response = await anyio.to_thread.run_sync(partial(self.sandbox.exec, cmd, env=env, execution_timeout=timeout))
                     logger.debug(f"Code execution completed with exit_code: {response.exit_code}")
-                    return {"result": response.result, "exit_code": response.exit_code}
+                    if response.reason != "exited":
+                        return {"result": response.output, "error": str(response.reason), "exit_code": -1}
+                    return {"result": response.output, "exit_code": response.exit_code}
                 finally:
                     try:
-                        self.sandbox.fs.delete_file(script_path)
+                        with anyio.CancelScope(shield=True):
+                            await anyio.to_thread.run_sync(lambda: self.sandbox.fs.delete(script_path))
                     except Exception as cleanup_error:
                         logger.warning(
                             f"Failed to delete temp script {script_path}: {cleanup_error}"
@@ -185,113 +198,14 @@ class ExecuteCommandTool(BaseTool):
         logger.debug(f"Executing command: {command[:100]}{'...' if len(command) > 100 else ''}")
 
         try:
-            response = self.sandbox.process.exec(command, cwd, env, timeout)
+            response = await anyio.to_thread.run_sync(partial(self.sandbox.exec, command, cwd=cwd, env=env, execution_timeout=timeout))
             logger.debug(f"Command completed with exit_code: {response.exit_code}")
-            return {"result": response.result, "exit_code": response.exit_code}
+            if response.reason != "exited":
+                return {"result": response.output, "error": str(response.reason), "exit_code": -1}
+            return {"result": response.output, "exit_code": response.exit_code}
         except Exception as e:
             logger.error(f"Command execution failed: {e}")
             return {"error": str(e), "exit_code": -1}
-
-
-class UploadFileTool(BaseTool):
-    """Tool for uploading files to the Daytona sandbox."""
-
-    def __init__(self, sandbox: Sandbox):
-        super().__init__(
-            name="upload_file_to_daytona",
-            description=(
-                "Upload a file to the Daytona sandbox. Provide the file path and content."
-            ),
-        )
-        self.sandbox = sandbox
-
-    def _get_declaration(self) -> types.FunctionDeclaration:
-        return types.FunctionDeclaration(
-            name=self.name,
-            description=self.description,
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    "file_path": types.Schema(
-                        type=types.Type.STRING,
-                        description="The destination path in the sandbox.",
-                    ),
-                    "content": types.Schema(
-                        type=types.Type.STRING,
-                        description="The file content to upload.",
-                    ),
-                },
-                required=["file_path", "content"],
-            ),
-        )
-
-    async def run_async(
-        self,
-        *,
-        args: Dict[str, Any],
-        tool_context: ToolContext,
-    ) -> Dict[str, Any]:
-        """Upload a file to the Daytona sandbox."""
-        file_path = args.get("file_path", "")
-        content = args.get("content", "")
-
-        logger.debug(f"Uploading file to: {file_path} (size: {len(content)} bytes)")
-
-        try:
-            content_bytes = content.encode("utf-8")
-            self.sandbox.fs.upload_file(content_bytes, file_path)
-            logger.debug(f"File uploaded successfully: {file_path}")
-            return {"success": True, "path": file_path}
-        except Exception as e:
-            logger.error(f"File upload failed for {file_path}: {e}")
-            return {"error": str(e), "success": False}
-
-
-class ReadFileTool(BaseTool):
-    """Tool for reading files from the Daytona sandbox."""
-
-    def __init__(self, sandbox: Sandbox):
-        super().__init__(
-            name="read_file_from_daytona",
-            description="Read a file from the Daytona sandbox. Provide the file path.",
-        )
-        self.sandbox = sandbox
-
-    def _get_declaration(self) -> types.FunctionDeclaration:
-        return types.FunctionDeclaration(
-            name=self.name,
-            description=self.description,
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    "file_path": types.Schema(
-                        type=types.Type.STRING,
-                        description="The path of the file to read.",
-                    ),
-                },
-                required=["file_path"],
-            ),
-        )
-
-    async def run_async(
-        self,
-        *,
-        args: Dict[str, Any],
-        tool_context: ToolContext,
-    ) -> Dict[str, Any]:
-        """Read a file from the Daytona sandbox."""
-        file_path = args.get("file_path", "")
-
-        logger.debug(f"Reading file: {file_path}")
-
-        try:
-            content_bytes = self.sandbox.fs.download_file(file_path)
-            content = content_bytes.decode("utf-8")
-            logger.debug(f"File read successfully: {file_path} (size: {len(content)} bytes)")
-            return {"content": content, "path": file_path}
-        except Exception as e:
-            logger.error(f"File read failed for {file_path}: {e}")
-            return {"error": str(e), "content": None}
 
 
 class StartLongRunningCommandTool(BaseTool):
@@ -343,16 +257,14 @@ class StartLongRunningCommandTool(BaseTool):
         logger.debug(f"Starting long-running command: {command[:100]}{'...' if len(command) > 100 else ''}")
 
         try:
-            self.sandbox.process.create_session(session_id)
-            request = SessionExecuteRequest(command=command, runAsync=True)
-            response = self.sandbox.process.execute_session_command(
-                session_id, request, timeout
-            )
+            session = await anyio.to_thread.run_sync(lambda: self.sandbox.process.create_session(name=session_id))
+            process = await anyio.to_thread.run_sync(partial(session.start, command, execution_timeout=timeout))
             logger.debug(f"Long-running command started with session_id: {session_id}")
             return {
-                "session_id": session_id,
-                "output": response.output if response.output else "",
-                "exit_code": response.exit_code,
+                "session_id": session.id,
+                "process_id": process.id,
+                "output": "",
+                "exit_code": None,
             }
         except Exception as e:
             logger.error(f"Failed to start long-running command: {e}")
