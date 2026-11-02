@@ -17,7 +17,7 @@ This project demonstrates a fully autonomous coding agent capable of performing 
 ## Requirements
 
 - **Node.js:** Version 22.4 or higher is required.
-- **Daytona SDK:** `@daytona/sdk` 2.x (v0 namespace), pinned to the pre-release `2.0.0-alpha.5` until 2.0.0 is stable; `npm install` installs the pinned version.
+- **Daytona SDK:** `@daytona/sdk` 2.x (v2 namespace on this PoC branch), pinned to the pre-release `2.0.0-alpha.5` until 2.0.0 is stable; `npm install` installs the pinned version.
 - Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 ## Environment Variables
@@ -105,6 +105,38 @@ When the agent finishes, you should see terminal output like:
 You can view the app on the given preview link above. The image below shows the result generated in this run:
 
 ![Notes App Demo](./assets/notes-app-demo.png)
+
+## v2 PoC
+
+This stacked branch ports sandbox creation, Python code execution, shell execution,
+file/directory tools, session-based servers, command logs, previews and deletion to
+`daytona.v2`. It does not run a mixed v0/v2 sandbox workflow.
+
+Set **`DAYTONA_V2_IMAGE`** to a registered v2 image ID or name before creating a
+sandbox. No platform default image is configured in the measured environment.
+The readiness run uses retained image `img_YbqbxTpdfgCQ4RdEFYzvga` (Debian 13,
+Python 3.12.16, home/cwd `/root`, user root); it has no Node, npm or curl.
+Python execution and filesystem operations passed live; the autonomous React
+agent loop was not run. The deployed daemon rejected session creation with HTTP
+422 (`kind: session` unsupported), so the server flow is
+`BLOCKED-BY-V2-GAP(sessions)`. A separate exec-handle diagnostic reached a listening
+HTTP server but timed out reading logs before the preview request; preview HTTP
+status remains unverified. To run the React example, supply a v2 image containing Node/npm;
+this PoC neither builds images nor installs those guest tools.
+
+Ledgered differences: interpreter `argv` has no v2 equivalent
+(`BLOCKED-BY-V2-GAP(argv)`). The tool retains the parameter and returns an explicit
+unsupported error whenever it is set (including an empty array); send `null`
+without arguments, or use the shell tool. Interpreter stdout is `logs.stdout`,
+timeouts are milliseconds, bulk writes report partial errors, and session commands
+return process handles with channel-tagged log pages. Health checks read a bounded
+snapshot of up to 1000 frames rather than following a live tail cursor. Private previews require
+the `X-Daytona-Preview-Token` header; the token is never printed. Creation labels
+the PoC and sets a 20-minute delete lifecycle safety net; dev server commands have
+a 10-minute deadline. These are bounded ephemeral sandboxes, not durable workspaces.
+
+Full live evidence and call-by-call differences are retained in the migration
+run's `inngest-agentkit-coding-agent/v2-ledger.md` (outside the branch).
 
 ## License
 
