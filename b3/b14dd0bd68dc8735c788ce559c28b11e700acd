@@ -1,0 +1,41 @@
+packages/claude-toolsets/typescript/README.md
+  s_cba23c4a40b394::t_1f7ad262bf3cdb 16-17,79,82
+packages/claude-toolsets/typescript/examples/exerciseBrowser.ts
+  s_cba23c4a40b394::t_bb3fc36d2dad5f 39
+packages/claude-toolsets/typescript/examples/support.ts
+  s_cba23c4a40b394::t_4097510d20118b 13-15,79,90,100,104
+packages/claude-toolsets/typescript/package-lock.json
+  s_cba23c4a40b394::t_eb371c026286cc 12,25,392-394,401-403,410-412,417-419,429,437,440,442-452,456-458,2181-2189,2358-2360,2824-2826
+packages/claude-toolsets/typescript/package.json
+  s_cba23c4a40b394::t_5d0c5b44b0de6b 43,57
+packages/claude-toolsets/typescript/src/browser.ts
+  s_cba23c4a40b394::t_15e3e6c00fd33f 34-35
+packages/claude-toolsets/typescript/src/computer.ts
+  s_cba23c4a40b394::t_ca671b68a9c15d 29-31
+packages/claude-toolsets/typescript/src/sandbox.ts
+  s_cba23c4a40b394::t_f8425a23518625 6,59
+packages/claude-toolsets/typescript/tests/computer.test.ts
+  s_cba23c4a40b394::t_c5a83332ce7954 2
+packages/claude-toolsets/typescript/tests/helpers.ts
+  s_cba23c4a40b394::t_c495eca0561bb1 2
+packages/claude-toolsets/typescript/tests/logging.test.ts
+  s_cba23c4a40b394::t_ce7d4b80a3b675 2
+packages/claude-toolsets/typescript/tests/sandbox.test.ts
+  s_cba23c4a40b394::t_3c78de5859b63c 1-2,78,80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b3b14dd0bd68dc8735c788ce559c28b11e700acd",
+  "prompts": {},
+  "sessions": {
+    "s_cba23c4a40b394": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61dfd14cffe9Lvx72bw1wuXsG",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
