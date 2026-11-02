@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/daytona/integrations/compare/convex-v2.1.0...convex-v2.2.0) (2026-11-02)
+
+
+### Features
+
+* **convex:** mount volumes when creating a sandbox ([#101](https://github.com/daytona/integrations/issues/101)) ([8431903](https://github.com/daytona/integrations/commit/8431903e77fc6802fa274a2bb7a95d999075a1b0))
+
 ## [2.1.0](https://github.com/daytona/integrations/compare/convex-v2.0.0...convex-v2.1.0) (2026-10-09)
 
 
