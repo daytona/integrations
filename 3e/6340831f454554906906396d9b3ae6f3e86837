@@ -1,0 +1,19 @@
+packages/langchain-data-analysis/tests/integration_tests/test_tools.py
+  s_4b2040927e4ade::t_3ae5af8417ff9d 7,26-27,84-85,91-92,118-120,132-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3e6340831f454554906906396d9b3ae6f3e86837",
+  "prompts": {},
+  "sessions": {
+    "s_4b2040927e4ade": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6174a994ffeoqBRbyQY7K2FdM",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
