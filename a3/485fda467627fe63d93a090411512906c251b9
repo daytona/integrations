@@ -1,0 +1,58 @@
+apps/inngest-agentkit-coding-agent/src/utils.ts
+  s_42cfcf1423efe0::t_969ef994ea03b2 20-21,25-26,28-37,40,44
+  s_42cfcf1423efe0::t_5ddb0c98f5ae9d 22-24
+  s_42cfcf1423efe0::t_19376b7c52686a 2
+  s_42cfcf1423efe0::t_7a05f7faa9701f 3-4
+  s_42cfcf1423efe0::t_889b9fbe8e1de9 41-43
+  s_42cfcf1423efe0::t_4dc5ba1cd76f2d 45
+  s_d5e84aa316733d::t_1cf9533502c2be 11,50-53
+apps/inngest-agentkit-coding-agent/src/index.ts
+  s_42cfcf1423efe0::t_9782a7a24c974c 338
+  s_42cfcf1423efe0::t_01455c86bdd276 20-41
+  s_42cfcf1423efe0::t_3834c43c9dcb43 70,111-112,127,208,233,260,290-297,301-313,398
+  s_42cfcf1423efe0::t_2fbc0aa1a4aa63 414
+  s_42cfcf1423efe0::t_261b6c56bdb8eb 298-300
+  s_42cfcf1423efe0::t_ffda36d37472c3 128-133
+  s_42cfcf1423efe0::t_182a16e4ed9083 234
+  s_42cfcf1423efe0::t_64f22c24dcdde9 261-268
+  s_42cfcf1423efe0::t_2c51c18192b7aa 71-72
+  s_42cfcf1423efe0::t_f0e6211a7e5380 182
+  s_7a5363bda30253::t_54d83bc00389ef 2,4-9,11-12,15-19,42-69,73-110,113-126,134-181,183-207,209-232,235-259,269-289,314-325,328-329,333,352-368,376-380,382-397,399,409,415-419,426
+apps/inngest-agentkit-coding-agent/README.md
+  s_42cfcf1423efe0::t_36fff74a599163 116-119
+  s_42cfcf1423efe0::t_1208862703e1bd 130-137
+apps/inngest-agentkit-coding-agent/.env.example
+  s_d5e84aa316733d::t_f3648b857e7e05 3,7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a3485fda467627fe63d93a090411512906c251b9",
+  "prompts": {},
+  "sessions": {
+    "s_42cfcf1423efe0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e61574beeffeS0YfySAotDmHfW",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_7a5363bda30253": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6156284affemHz56qWUeWfCCn",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_d5e84aa316733d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61574beeffeS0YfySAotDmHfW",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
