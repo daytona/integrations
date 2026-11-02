@@ -1,0 +1,25 @@
+packages/agentenv-daytona/README.md
+  s_818aa1631a83f7::t_b55d60455946ba 86
+packages/agentenv-daytona/agentenv_daytona/config.py
+  s_818aa1631a83f7::t_ee9c08f9ff11fc 19
+packages/agentenv-daytona/agentenv_daytona/provider.py
+  s_818aa1631a83f7::t_7aded4850e8227 28,62,89,113,118
+packages/agentenv-daytona/tests/unit_tests/test_provider_config.py
+  s_818aa1631a83f7::t_3d363802877472 24,37,49-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "afd10b7a078aba1da100b6732b35860486a1de3b",
+  "prompts": {},
+  "sessions": {
+    "s_818aa1631a83f7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e619a03efffeMfcuF406eV1nMG",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
