@@ -10,6 +10,8 @@ import { Daytona } from '@daytona/sdk'
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
 
+// allow: SIZE_OK — existing declarative CopilotKit tool registry; splitting it is outside this sandbox-only PoC.
+
 /*
  * ── Daytona: code execution ────────────────────────────────────────────────
  * The Stripe Projects Daytona provider exports prefixed vars after
@@ -74,7 +76,7 @@ const SYSTEM_PROMPT = `You are a coding agent with shell access to a fresh Dayto
 
 The user can ask you anything a developer might do at a terminal: build apps, debug or analyze code, run scripts, work with data, install packages, write tests, whatever fits the request.
 
-Work under /home/daytona by default. Reuse the same sandboxId across every tool call. The sandbox auto-deletes after a period of inactivity; if a tool call fails because the sandbox no longer exists, call createSandbox again and continue with the new sandboxId.
+Work under /root by default. Reuse the same sandboxId across every tool call. The sandbox is ephemeral and auto-deletes after a period of inactivity or its maximum lifetime; if a tool call fails because the sandbox no longer exists, call createSandbox again and continue with the new sandboxId.
 
 When the user wants to see a running web app:
 
@@ -111,12 +113,20 @@ const createSandbox = defineTool({
       .describe('Minutes of inactivity before the sandbox auto-stops. 0 disables, default 15.'),
   }),
   execute: async ({ envVars, labels, autoStopInterval }) => {
-    const sandbox = await daytona.v0.create({
-      public: true,
-      ephemeral: true,
-      envVars,
+    const image = process.env.DAYTONA_V2_IMAGE
+    if (!image) throw new TypeError('DAYTONA_V2_IMAGE must name a registered v2 image')
+    const idleMinutes = autoStopInterval ?? 15
+    const sandbox = await daytona.v2.create(image, {
+      env: envVars,
       labels,
-      autoStopInterval,
+      lifecyclePolicy: {
+        idleExpirySeconds: idleMinutes === 0 ? -1 : idleMinutes * 60,
+        ...(idleMinutes > 0 ? { onIdleTimeout: 'delete' as const } : {}),
+        timeoutSeconds: 1200,
+        onTimeout: 'delete',
+      },
+      waitSeconds: 90,
+      createTimeoutSeconds: 90,
     })
     return { sandboxId: sandbox.id }
   },
@@ -128,7 +138,7 @@ const runCommand = defineTool({
     'Execute a shell command in the sandbox. Set background:true for long-lived fire-and-forget processes (test watchers, build watchers, log followers) the agent will not need to interact with again. Use plain commands (rm, mv, mkdir, chmod, ...) for filesystem ops that do not need structured output. For dev servers the user should see in a browser, use startWebServer instead — it returns the preview URL atomically.',
   parameters: z.object({
     sandboxId: z.string(),
-    command: z.string().describe('Shell command. Use && to chain. Absolute paths or `cd /home/daytona && ...`.'),
+    command: z.string().describe('Shell command. Use && to chain. Absolute paths or `cd /root && ...`.'),
     background: z
       .boolean()
       .optional()
@@ -137,18 +147,25 @@ const runCommand = defineTool({
       ),
   }),
   execute: async ({ sandboxId, command, background }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
+    const sandbox = await daytona.v2.get(sandboxId)
     if (background) {
-      const sessionId = `bg-${Date.now()}`
-      await sandbox.process.createSession(sessionId)
-      const result = await sandbox.process.executeSessionCommand(sessionId, {
-        command,
-        runAsync: true,
-      })
-      return { background: true, sessionId, cmdId: result.cmdId, command }
+      const session = await sandbox.process.createSession({ name: `bg-${Date.now()}` })
+      const result = await session.start(command, { executionTimeout: 1200_000 })
+      return { background: true, sessionId: session.id, cmdId: result.id, command }
     }
-    const result = await sandbox.process.executeCommand(command)
-    return { exitCode: result.exitCode, stdout: result.result, command }
+    const result = await sandbox.exec(command, { timeout: 240_000, executionTimeout: 240_000 })
+    switch (result.reason) {
+      case 'exited':
+        return { exitCode: result.exitCode, stdout: result.output, command }
+      case 'signaled':
+      case 'timed_out':
+      case 'lost':
+      case 'failed':
+      case 'unknown':
+        return { exitCode: -1, stdout: result.output, command, reason: result.reason }
+      default:
+        throw new TypeError(`Unexpected process result: ${result satisfies never}`)
+    }
   },
 })
 
@@ -157,12 +174,12 @@ const writeFile = defineTool({
   description: 'Write a file with the FULL new content. Overwrites if it exists.',
   parameters: z.object({
     sandboxId: z.string(),
-    path: z.string().describe('Absolute path, e.g. "/home/daytona/app/src/App.tsx".'),
+    path: z.string().describe('Absolute path, e.g. "/root/app/src/App.tsx".'),
     content: z.string().describe('Complete new file content.'),
   }),
   execute: async ({ sandboxId, path, content }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    await sandbox.fs.uploadFile(Buffer.from(content), path)
+    const sandbox = await daytona.v2.get(sandboxId)
+    await sandbox.fs.write(path, Buffer.from(content))
     return { path, bytesWritten: Buffer.byteLength(content) }
   },
 })
@@ -175,9 +192,9 @@ const readFile = defineTool({
     path: z.string().describe('Absolute path to the file in the sandbox.'),
   }),
   execute: async ({ sandboxId, path }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const buf = await sandbox.fs.downloadFile(path)
-    return { path, content: buf.toString('utf-8'), bytes: buf.length }
+    const sandbox = await daytona.v2.get(sandboxId)
+    const buf = await sandbox.fs.read(path)
+    return { path, content: Buffer.from(buf).toString('utf-8'), bytes: buf.length }
   },
 })
 
@@ -186,14 +203,14 @@ const listFiles = defineTool({
   description: 'List the contents of a directory in the sandbox.',
   parameters: z.object({
     sandboxId: z.string(),
-    path: z.string().describe('Absolute directory path, e.g. "/home/daytona/app".'),
+    path: z.string().describe('Absolute directory path, e.g. "/root/app".'),
   }),
   execute: async ({ sandboxId, path }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const files = await sandbox.fs.listFiles(path)
+    const sandbox = await daytona.v2.get(sandboxId)
+    const files = await sandbox.fs.list(path)
     return {
       path,
-      entries: files.map((f) => ({
+      entries: files.items.map((f) => ({
         name: f.name,
         isDir: f.isDir,
         size: f.size,
@@ -212,9 +229,9 @@ const findFiles = defineTool({
     pattern: z.string().describe('Regex pattern to match against file contents.'),
   }),
   execute: async ({ sandboxId, path, pattern }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const matches = await sandbox.fs.findFiles(path, pattern)
-    return { pattern, matches }
+    const sandbox = await daytona.v2.get(sandboxId)
+    const matches = await sandbox.fs.find(path, pattern)
+    return { pattern, matches: matches.items }
   },
 })
 
@@ -227,9 +244,9 @@ const searchFiles = defineTool({
     pattern: z.string().describe('Glob pattern for file names, e.g. "**/*.tsx".'),
   }),
   execute: async ({ sandboxId, path, pattern }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const result = await sandbox.fs.searchFiles(path, pattern)
-    return { pattern, files: result.files }
+    const sandbox = await daytona.v2.get(sandboxId)
+    const result = await sandbox.fs.search(path, pattern)
+    return { pattern, files: result.items }
   },
 })
 
@@ -244,12 +261,12 @@ const replaceInFiles = defineTool({
     newValue: z.string().describe('Replacement text.'),
   }),
   execute: async ({ sandboxId, files, pattern, newValue }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const results = await sandbox.fs.replaceInFiles(files, pattern, newValue)
+    const sandbox = await daytona.v2.get(sandboxId)
+    const results = await sandbox.fs.replace(files, pattern, newValue)
     return {
       pattern,
       newValue,
-      results: results.map((r) => ({
+      results: results.items.map((r) => ({
         file: r.file,
         success: r.success,
         error: r.error,
@@ -266,8 +283,8 @@ const getFileDetails = defineTool({
     path: z.string(),
   }),
   execute: async ({ sandboxId, path }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const info = await sandbox.fs.getFileDetails(path)
+    const sandbox = await daytona.v2.get(sandboxId)
+    const info = await sandbox.fs.stat(path)
     return {
       path,
       name: info.name,
@@ -291,7 +308,7 @@ const startWebServer = defineTool({
     command: z
       .string()
       .describe(
-        "Shell command that starts the dev server, e.g. 'cd /home/daytona/app && npm run dev'. Bind to 0.0.0.0 so the Daytona proxy can reach it.",
+        "Shell command that starts the dev server, e.g. 'cd /root/app && npm run dev'. Bind to 0.0.0.0 so the Daytona proxy can reach it.",
       ),
     port: z
       .number()
@@ -300,15 +317,11 @@ const startWebServer = defineTool({
       ),
   }),
   execute: async ({ sandboxId, command, port }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const sessionId = `web-${Date.now()}`
-    await sandbox.process.createSession(sessionId)
-    const bg = await sandbox.process.executeSessionCommand(sessionId, {
-      command,
-      runAsync: true,
-    })
+    const sandbox = await daytona.v2.get(sandboxId)
+    const session = await sandbox.process.createSession({ name: `web-${Date.now()}` })
+    const bg = await session.start(command, { executionTimeout: 1200_000 })
 
-    if (bg.cmdId) {
+    {
       const urlPattern = new RegExp(`https?:\\/\\/[\\w\\.\\-\\[\\]:]+:${port}\\b`, 'i')
       const phrasePattern = new RegExp(
         `\\b(?:ready|listening|listen|started|running|serving)\\b[^\\n]{0,80}\\b${port}\\b|\\b${port}\\b[^\\n]{0,80}\\b(?:ready|listening|listen|started|running|serving)\\b`,
@@ -316,20 +329,25 @@ const startWebServer = defineTool({
       )
       const deadline = Date.now() + 90_000
       while (Date.now() < deadline) {
-        const logs = await sandbox.process.getSessionCommandLogs(sessionId, bg.cmdId)
-        const output = logs.output ?? ''
+        // One snapshot per poll: nextCursor can be a live tail, never drain it.
+        const logs = await bg.logs({ limit: 1000 })
+        const output = logs.items
+          .filter((frame) => frame.channel === 'stdout' || frame.channel === 'stderr')
+          .map((frame) => frame.encoding === 'base64' ? Buffer.from(frame.data, 'base64').toString('utf-8') : frame.data)
+          .join('')
         if (urlPattern.test(output) || phrasePattern.test(output)) break
         await new Promise((r) => setTimeout(r, 750))
       }
     }
 
-    const preview = await sandbox.getPreviewLink(port)
+    await sandbox.ports.expose(port, { public: true })
+    const preview = await sandbox.ports.previewLink(port)
     return {
       sandboxId,
       port,
       url: preview.url,
-      sessionId,
-      cmdId: bg.cmdId,
+      sessionId: session.id,
+      cmdId: bg.id,
       command,
     }
   },
@@ -344,8 +362,9 @@ const getPreviewUrl = defineTool({
     port: z.number().describe('Port the hosted process is listening on.'),
   }),
   execute: async ({ sandboxId, port }) => {
-    const sandbox = await daytona.v0.get(sandboxId)
-    const preview = await sandbox.getPreviewLink(port)
+    const sandbox = await daytona.v2.get(sandboxId)
+    await sandbox.ports.expose(port, { public: true })
+    const preview = await sandbox.ports.previewLink(port)
     return { url: preview.url, port }
   },
 })
