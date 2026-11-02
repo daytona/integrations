@@ -1,0 +1,19 @@
+apps/stripe-coding-agent-template/app/api/copilotkit/route.ts
+  s_c8626798d2b0d1::t_7bedb4a5d3ce21 13-14,79,116-120,122-129,141,150,152-167,177,181-182,195-197,206,209-210,213,232-234,247-249,264-265,269,286-287,311,320-322,324,332-337,343-344,349-350,365-367
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2685ec89882da9a32f3f15f0b4f801ae59039ffe",
+  "prompts": {},
+  "sessions": {
+    "s_c8626798d2b0d1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6160d141ffejR8BXhQmWFwXCa",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
