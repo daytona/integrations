@@ -4,7 +4,7 @@ from typing import Type
 from unittest.mock import Mock
 
 import pytest  # type: ignore
-from daytona.v0 import ExecuteResponse, ExecutionArtifacts  # type: ignore
+from daytona.v2 import InterpreterResult, ProcessResult
 from langchain_core.messages import ToolMessage
 from langchain_tests.integration_tests import ToolsIntegrationTests  # type: ignore
 
@@ -23,7 +23,8 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
     @property
     def tool_constructor_params(self) -> dict:
         return { 'daytona_api_key': os.environ.get('DAYTONA_API_KEY', ''),
-                 'on_result': None}
+                 'on_result': None,
+                 'image': os.environ.get('DAYTONA_IMAGE')}
 
     @property
     def tool_invoke_params_example(self) -> dict:
@@ -80,15 +81,15 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
         code = "print('Integration test')"
         content, artifacts = tool._run(code)
         assert content == "Integration test"
-        assert isinstance(artifacts, ExecutionArtifacts)
-        assert "Integration test" in artifacts.stdout
+        assert isinstance(artifacts, InterpreterResult)
+        assert "Integration test" in artifacts.logs.stdout
 
         assert mock_on_result.called
         args, kwargs = mock_on_result.call_args
         result_arg = args[0]
 
-        assert isinstance(result_arg, ExecutionArtifacts)
-        assert "Integration test" in result_arg.stdout
+        assert isinstance(result_arg, InterpreterResult)
+        assert "Integration test" in result_arg.logs.stdout
 
     def test_chart_image_data_stays_out_of_tool_message(
         self, tool: DaytonaDataAnalysisTool
@@ -114,9 +115,9 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
         assert isinstance(message, ToolMessage)
         assert isinstance(message.content, str)
         assert message.content.startswith("done\n\nGenerated 1 chart(s).")
-        assert message.content.endswith("- scatter: 50k points")
-        assert isinstance(message.artifact, ExecutionArtifacts)
-        assert message.artifact.charts and message.artifact.charts[0].png
+        assert "image/png" in message.content
+        assert isinstance(message.artifact, InterpreterResult)
+        assert any(output.data.get("image/png") for output in message.artifact.results)
 
     def test_close(self, tool: DaytonaDataAnalysisTool) -> None:
         try:
@@ -128,5 +129,5 @@ class TestDaytonaDataAnalysisToolIntegration(ToolsIntegrationTests):
     def test_install_python_packages(self, tool: DaytonaDataAnalysisTool) -> None:
         package_name = "hello-world-py"
         tool.install_python_packages(package_name)
-        response: ExecuteResponse = tool._sandbox.process.exec(f"pip show {package_name}")
-        assert package_name in response.result
+        response: ProcessResult = tool._sandbox.exec(f"pip show {package_name}")
+        assert package_name in response.stdout
