@@ -20,8 +20,8 @@ import { z } from 'zod'
  * through Stripe Projects or set raw DAYTONA_* keys.
  *
  * DAYTONA_SANDBOX_API_URL is intentionally not bridged: a custom API URL is not
- * supported by SDK 2.x, which targets Daytona Cloud. Stay on the 0.x release of
- * this template for self-hosted Daytona.
+ * supported by SDK 2.x, which targets Daytona Cloud. Self-hosted Daytona needs a
+ * release of this template built on Daytona SDK 0.x.
  */
 if (!process.env.DAYTONA_API_KEY && process.env.DAYTONA_SANDBOX_API_KEY) {
   process.env.DAYTONA_API_KEY = process.env.DAYTONA_SANDBOX_API_KEY
