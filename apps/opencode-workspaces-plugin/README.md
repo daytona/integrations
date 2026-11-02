@@ -33,7 +33,7 @@ pwd   # note this path; it is used below
 
 `npm ci` installs the Daytona SDK 2.x (sandboxes are managed through its `v0` namespace), pinned to the pre-release `@daytona/sdk@2.0.0-alpha.5` until 2.0.0 is stable.
 
-Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 Add a `file://` plugin spec to your project's `.opencode/opencode.jsonc`:
 
