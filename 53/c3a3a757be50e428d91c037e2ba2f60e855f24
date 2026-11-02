@@ -1,0 +1,31 @@
+packages/langchain-data-analysis/README.md
+  s_b2d66e361241fa::t_ff578c43fd1b4f 11-14,40
+packages/langchain-data-analysis/docs/tools.ipynb
+  s_b2d66e361241fa::t_7bb0147799a1b7 58,123
+packages/langchain-data-analysis/langchain_daytona_data_analysis/tools.py
+  s_b2d66e361241fa::t_a3ac972b955996 8-9,163,223,271
+packages/langchain-data-analysis/pyproject.toml
+  s_b2d66e361241fa::t_17df7b51ce57ed 24
+packages/langchain-data-analysis/tests/integration_tests/test_tools.py
+  s_b2d66e361241fa::t_3af208f95acd91 7
+packages/langchain-data-analysis/tests/unit_tests/test_tool_output.py
+  s_b2d66e361241fa::t_2bc7c5667c0067 5,16
+packages/langchain-data-analysis/tests/unit_tests/test_tools.py
+  s_b2d66e361241fa::t_70948943447eb0 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "53c3a3a757be50e428d91c037e2ba2f60e855f24",
+  "prompts": {},
+  "sessions": {
+    "s_b2d66e361241fa": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e62166cb2ffeRZrj3ZwyQzVSYA",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
