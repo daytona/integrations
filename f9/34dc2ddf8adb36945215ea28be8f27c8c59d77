@@ -1,0 +1,25 @@
+apps/stripe-coding-agent-template/.env.example
+  s_5eafe1b95b4e13::t_91c33a72fbae98 17-19
+apps/stripe-coding-agent-template/app/api/copilotkit/route.ts
+  s_5eafe1b95b4e13::t_d88634b4f9638a 18-24,26-32
+apps/stripe-coding-agent-template/README.md
+  s_5eafe1b95b4e13::t_45f81cabca3c09 67
+apps/stripe-coding-agent-template/.env.local.example
+  s_5eafe1b95b4e13::t_005508aa4da217 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f934dc2ddf8adb36945215ea28be8f27c8c59d77",
+  "prompts": {},
+  "sessions": {
+    "s_5eafe1b95b4e13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e61d742e9ffeb098Wo7ki96DSN",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
