@@ -1,0 +1,51 @@
+packages/agentenv-daytona/README.md
+  s_818aa1631a83f7::t_16ae0ee41eb21b 22-26
+packages/agentenv-daytona/agentenv_daytona/config.py
+  s_8f5664f88617e1::t_470fecfbc49c10 13
+packages/agentenv-daytona/agentenv_daytona/image.py
+  s_8f5664f88617e1::t_73f49b39909c77 12
+packages/agentenv-daytona/agentenv_daytona/lifecycle.py
+  s_818aa1631a83f7::t_1b5b5a7de4adbe 18,185,222,225
+packages/agentenv-daytona/agentenv_daytona/provider.py
+  s_818aa1631a83f7::t_0d624be912229a 24-25,133,264
+packages/agentenv-daytona/agentenv_daytona/sandbox.py
+  s_8f5664f88617e1::t_e94957696ffb1f 22
+packages/agentenv-daytona/pyproject.toml
+  s_818aa1631a83f7::t_2d7821cd73f2c2 30-31
+packages/agentenv-daytona/tests/integration_tests/conftest.py
+  s_818aa1631a83f7::t_d5ded932cff934 43-44,51-53
+packages/agentenv-daytona/tests/integration_tests/test_live_provider.py
+  s_8f5664f88617e1::t_267abcd420eebc 16
+packages/agentenv-daytona/tests/unit_tests/fakes.py
+  s_818aa1631a83f7::t_7ce977103377e2 15,141-142,151-164,169-172,178-179,182,186-188
+packages/agentenv-daytona/tests/unit_tests/test_provider_create.py
+  s_8f5664f88617e1::t_85f1908245f467 14,367,382
+packages/agentenv-daytona/tests/unit_tests/test_sandbox_exec.py
+  s_818aa1631a83f7::t_2ba0e540332002 7-12
+packages/agentenv-daytona/tests/unit_tests/test_sandbox_files.py
+  s_8f5664f88617e1::t_f9aefbb1d8f1d4 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "12a551768b180b67afafd16ea7bf8d9060f4b8ab",
+  "prompts": {},
+  "sessions": {
+    "s_818aa1631a83f7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e619a03efffeMfcuF406eV1nMG",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    },
+    "s_8f5664f88617e1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6196b2edffehMgswxq2yJk9SE",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
