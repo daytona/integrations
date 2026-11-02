@@ -30,7 +30,7 @@ To install the plugin globally, edit `~/.config/opencode/opencode.json`.
 
 - Node.js 22.4 or newer.
 - The plugin uses the Daytona SDK 2.x `v0` namespace (`@daytona/sdk/v0`) and is pinned to the pre-release `@daytona/sdk@2.0.0-alpha.5` until 2.0.0 is stable.
-- Self-hosted / custom API URL: stay on the 0.x release (SDK 2.x targets Daytona Cloud).
+- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 ### Environment Configuration
 
