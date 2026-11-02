@@ -18,7 +18,7 @@
  * searchFiles). Those run inside the sandbox via `grep-tool.ts` / `find-tool.ts`.
  */
 
-import type { Sandbox } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import type {
   BashOperations,
   EditOperations,

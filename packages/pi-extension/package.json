@@ -40,7 +40,10 @@
     "test:live": "npm run test:bash-bg && npm run test:recovery && npm run test:cwd"
   },
   "dependencies": {
-    "@daytona/sdk": "^0.184.0"
+    "@daytona/sdk": "2.0.0-alpha.5"
+  },
+  "engines": {
+    "node": ">=22.4.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.79.0",

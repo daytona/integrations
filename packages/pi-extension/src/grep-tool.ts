@@ -15,7 +15,7 @@
  * of Pi's grep output closely enough for the model.
  */
 
-import type { Sandbox } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import { execCommand } from './sandbox.ts'
 import { shellQuote } from './util.ts'
 

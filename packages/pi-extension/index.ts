@@ -13,7 +13,8 @@
  * Blueprint: examples/extensions/ssh.ts from @earendil-works/pi-coding-agent.
  */
 
-import { Daytona, DaytonaNotFoundError, type Sandbox } from '@daytona/sdk'
+import { Daytona } from '@daytona/sdk'
+import { DaytonaNotFoundError, type Sandbox } from '@daytona/sdk/v0'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { resolveApiKey } from './src/auth.ts'
@@ -244,7 +245,7 @@ export default function (pi: ExtensionAPI) {
         if (prev) {
           try {
             setStatus(ctx, '☁ daytona · resuming sandbox…')
-            const sandbox = await dt.get(prev.sandboxId)
+            const sandbox = await dt.v0.get(prev.sandboxId)
             await ensureStarted(sandbox)
             active = { sandbox, cwd: prev.cwd, git: prev.git }
             ctx.ui.notify(
@@ -267,7 +268,7 @@ export default function (pi: ExtensionAPI) {
       const snapshot = stringFlag(pi.getFlag('snapshot'))
       const isPublic = pi.getFlag('public') === true
 
-      const sandbox = await dt.create({
+      const sandbox = await dt.v0.create({
         // Full session id for a globally-unique sandbox name (branches stay short).
         name: `pi-${sessionId}`,
         snapshot,
@@ -490,7 +491,7 @@ async function reapOrphans(daytona: Daytona): Promise<void> {
   try {
     const live = new Set((await SessionManager.listAll()).map((s) => s.id))
     const orphans: Sandbox[] = []
-    for await (const sandbox of daytona.list({ labels: { 'created-by': 'pi-daytona' } })) {
+    for await (const sandbox of daytona.v0.list({ labels: { 'created-by': 'pi-daytona' } })) {
       let labels = sandbox.labels
       if (!labels || Object.keys(labels).length === 0) {
         try {

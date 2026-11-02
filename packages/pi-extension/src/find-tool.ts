@@ -18,7 +18,7 @@
  * A POSIX `find` basename fallback covers images without ripgrep.
  */
 
-import type { Sandbox } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import { execCommand } from './sandbox.ts'
 import { joinPath, shellQuote } from './util.ts'
 
