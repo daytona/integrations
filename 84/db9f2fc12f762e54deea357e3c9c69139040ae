@@ -1,0 +1,19 @@
+SDK2-MIGRATION.md
+  s_f8f83e267fec1d::t_2d01d4f6e60ed9 47,76,102,157,166,182,196,205,230-231,254,395,525
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "84db9f2fc12f762e54deea357e3c9c69139040ae",
+  "prompts": {},
+  "sessions": {
+    "s_f8f83e267fec1d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61269cb9ffeWNFLf1X00S5Cgu",
+        "model": "gpt-6-luna-fast"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
