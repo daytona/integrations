@@ -26,8 +26,6 @@ registered Python image in `ash-1`; substitute your own image ID:
 ```python
 plugin = DaytonaPlugin(
     image="img_<your-registered-image-id>",
-    labels={"sdk2-readiness": "daytona-adk"},
-    auto_delete_interval=20,
 )
 ```
 
@@ -36,6 +34,7 @@ execution and server-side timeout, UTF-8 file upload/read, root access to `/tmp`
 and plugin deletion. v2 results are mapped to the tools' `result`/`exit_code`
 contract; interpreter errors and non-exited process reasons are failures.
 Tool arguments and error dictionaries are otherwise unchanged from the Step A release.
+The live run used the PoC revision d671fb5; the later minimal-port fix kept every v2 call identical and was verified offline.
 Synchronous SDK operations, including lazy service access, run off the ADK event
 loop. The synchronous constructor still waits for creation.
 
