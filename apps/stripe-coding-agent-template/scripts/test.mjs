@@ -117,20 +117,26 @@ try {
 console.log(`\n[3/3] Daytona sandbox lifecycle`)
 let sandbox
 try {
-  sandbox = await daytona.v0.create({ public: true, ephemeral: true })
+  const image = process.env.DAYTONA_V2_IMAGE
+  if (!image) throw new TypeError('DAYTONA_V2_IMAGE must name a registered v2 image')
+  // Same default lifecycle as route.ts createSandbox (15 idle minutes, then delete).
+  sandbox = await daytona.v2.create(image, {
+    lifecyclePolicy: { idleExpirySeconds: 15 * 60, onIdleTimeout: 'delete' },
+  })
   ok(`createSandbox → ${sandbox.id}`)
 
-  const r = await sandbox.process.executeCommand('echo hello-from-daytona')
-  if (r.exitCode === 0 && /hello-from-daytona/.test(r.result)) ok(`runCommand → "${r.result.trim()}"`)
+  const r = await sandbox.exec('echo hello-from-daytona')
+  if (r.reason === 'exited' && r.exitCode === 0 && /hello-from-daytona/.test(r.output)) ok(`runCommand → "${r.output.trim()}"`)
   else {
-    fail(`runCommand unexpected (exit ${r.exitCode}): ${r.result}`)
+    fail(`runCommand unexpected (${r.reason}, exit ${r.exitCode}): ${r.output}`)
     failures++
   }
 
-  const preview = await sandbox.getPreviewLink(5173)
+  await sandbox.ports.expose(5173, { public: true })
+  const preview = await sandbox.ports.previewLink(5173)
   if (preview?.url?.startsWith('http')) ok(`getPreviewUrl → ${preview.url}`)
   else {
-    fail(`getPreviewLink returned no url`)
+    fail(`ports.previewLink returned no url`)
     failures++
   }
 } catch (e) {
@@ -139,7 +145,7 @@ try {
 } finally {
   if (sandbox) {
     try {
-      await sandbox.delete()
+      await daytona.v2.delete(sandbox)
       ok(`cleaned up sandbox ${sandbox.id}`)
     } catch (e) {
       fail(`cleanup failed (delete manually): ${e?.message ?? e}`)
