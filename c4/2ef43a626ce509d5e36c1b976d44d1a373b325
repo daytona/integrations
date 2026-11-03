@@ -1,0 +1,19 @@
+apps/stripe-coding-agent-template/scripts/test.mjs
+  s_e30a5a57ce5988::t_638306429fde5e 120-125,128-129,131,135-136,139,148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c42ef43a626ce509d5e36c1b976d44d1a373b325",
+  "prompts": {},
+  "sessions": {
+    "s_e30a5a57ce5988": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61307adaffeBbbe2XXuYp6W7Q",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
