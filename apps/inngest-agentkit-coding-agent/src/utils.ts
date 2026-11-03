@@ -33,11 +33,7 @@ export async function createSandbox(
   const daytona = client ?? new Daytona();
   let sandbox: Sandbox;
   try {
-    sandbox = await daytona.v2.create(image, {
-      ...options,
-      waitSeconds: 90,
-      createTimeoutSeconds: 90,
-    });
+    sandbox = await daytona.v2.create(image, options);
   } catch (error) {
     throw new Error(`Failed to create Daytona sandbox: ${error}`, {
       cause: error,
