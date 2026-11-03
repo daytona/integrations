@@ -1,0 +1,19 @@
+packages/langchain-data-analysis/docs/tools.ipynb
+  s_0b276c8774a09f::t_74f98c9ba96ac9 122-124,128-134,138-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "095a06679cf87409d541f9c55daeac2cfdb4c555",
+  "prompts": {},
+  "sessions": {
+    "s_0b276c8774a09f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61189edaffes3XV5nk2ocUWBQ",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
