@@ -44,7 +44,7 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 | opencode-workspaces-plugin | READY-WITH-CHANGES (Node >=22.4.0; 14 test FIXMEs fixed) | `feat/opencode-workspaces-plugin-sdk2@f9dc243` | BLOCKED-BY-V2-GAP | never-delete lifecycle; stop/start persistence; preview token |
 | stripe-coding-agent-template | READY-WITH-CHANGES (apiUrl dropped; Node >=22.4.0) | `feat/stripe-coding-agent-template-sdk2@53b2350` | BLOCKED-BY-V2-GAP | sessions (422) |
 
-The four PoC branches stacked on Step A are `feat/daytona-adk-sdk2-v2@76813ba`, `feat/langchain-daytona-data-analysis-sdk2-v2@230eccf`, `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` and `feat/stripe-coding-agent-template-sdk2-v2@2765800` (§5). No pull request exists for any branch.
+The four PoC branches stacked on Step A are `feat/daytona-adk-sdk2-v2@76813ba`, `feat/langchain-daytona-data-analysis-sdk2-v2@230eccf`, `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` and `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` (§5). No pull request exists for any branch.
 
 ## 3. Step A details per integration
 
@@ -73,7 +73,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 - Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/pydantic-ai-daytona-sdk2 (`af0d42a`, 3 commits). Evidence: `packages/pydantic-ai-daytona/pyproject.toml:33` (exact pin; the "Wide on purpose" comment is kept with a note to restore `>=2,<3` at GA); the root config rejects `api_url` with a TypeError (ref: sdk-py:daytona/_client.py:202).
 - Forced breaks: `api_url` and `target` options removed from the session, capability and toolset (`feat!`, commit #1). The session config was inlined so the codemod could verify it.
-- Codemod: dry refused twice with exit 2 (`custom-api-url`), then exit 0 after commit #1; apply exit 0, 12 files, 13 manual items, 0 FIXMEs. One codemod miss fixed by hand: integration create-recorders at `tests/integration_tests/conftest.py:108,118` retargeted to the v0 client class.
+- Codemod: dry refused twice with exit 2 (`custom-api-url`), then exit 0 after commit #1; apply exit 0, 12 files, 13 manual items, 0 FIXMEs. One codemod miss fixed by hand: integration create-recorders at `tests/integration_tests/conftest.py:108-111,120` retargeted to the v0 client class.
 - FIXMEs: 0; manual items 13 = 12 `mock-target` resolved (unit fakes gained a `FakeV0` facade) + 1 `types-unresolved` ledgered.
 - CI parity: ruff 0; pytest 165 passed (baseline 165); mypy 0. `black --check` exits 1 before and after, but the failing file count went from 3 to 4 because the codemod wrote a 104-character import in `tests/unit_tests/conftest.py`; CI runs only ruff and pytest for this package, so it isn't a blocker. Reformat before GA.
 - Live v0 smoke: SMOKE_OK, NOTFOUND_OK, DELETE_CONFIRMED. Sandboxes 1 / 1.
@@ -99,7 +99,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 ### claude-toolsets
 
 - Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/claude-toolsets-sdk2 (`2169287`, 2 commits). Evidence: `packages/claude-toolsets/typescript/package.json:43` (`"node": ">=22.4.0"`) and `:57` (exact pin, was `^0.223.0`); the alpha's engine floor (ref: sdk-ts:package.json:167).
-- Forced breaks: Node floor `>=22.4.0`; a test fixture's `apiUrl` removed because the root constructor throws on it (ref: sdk-ts:Daytona.js:168).
+- Forced breaks: Node floor `>=22.4.0`; a test fixture's `apiUrl` removed because the root constructor throws on it (ref: sdk-ts:Daytona.js:173).
 - Codemod: **tool defect**: `@daytona/upgrade@0.1.0` hangs on a whole-package scan (exit 124 at the 900 s cap, three times; a minimal repro throws `RangeError: Invalid array length` while analysing `vi.fn().mockResolvedValue`). It was applied per folder (`src/`, `examples/`). `tests/` was migrated by hand (the codemod refused on the fixture `apiUrl` literal) and confirmed by a zero-change dry run afterwards.
 - FIXMEs: 1 inserted / 1 resolved / 0 remaining.
 - CI parity: 15 files / 344 tests pass before and after; typecheck and build exit 0; V0_ESM_OK.
@@ -154,7 +154,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### stripe-coding-agent-template
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/stripe-coding-agent-template-sdk2 (`53b2350`, 4 commits). Evidence: `apps/stripe-coding-agent-template/package.json:7` (Node floor) and `:35` (exact pin, was `0.184.0`); the root rejects `apiUrl` (ref: sdk-ts:Daytona.js:168).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/stripe-coding-agent-template-sdk2 (`53b2350`, 4 commits). Evidence: `apps/stripe-coding-agent-template/package.json:7` (Node floor) and `:35` (exact pin, was `0.184.0`); the root rejects `apiUrl` (ref: sdk-ts:Daytona.js:173).
 - Forced breaks: `apiUrl` / `DAYTONA_SANDBOX_API_URL` dropped from `app/api/copilotkit/route.ts` (`feat!`, commit #1); `organizationId` stays (it's a valid root field). Node floor. Residual "stay on 0.x" wording in README, `.env.example`, `.env.local.example`, `AGENTS.md` and a route comment was aligned afterwards.
 - Codemod: exit 2 (`custom-api-url`) before commit #1, exit 0 after (no `--drop-api-url`, no `--force`); apply exit 0; 0 FIXMEs; 2 `env-api-url` items reviewed.
 - CI parity (not in `ci.yml`): `npm ci`, `npx tsc --noEmit`, `next build` exit 0. The baseline build needed a placeholder key; the branch builds without one. The CJS-only `./v0` entry is in the Next server output via the nft trace. Next prints a non-fatal "Critical dependency" warning from the SDK's v2 events module (the baseline had the same warning class). npm prints the same `@opentelemetry/api` ERESOLVE peer warnings as inngest (not added).
@@ -163,7 +163,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ## 4. Who is excluded by SDK 2
 
-**Every self-hosted or custom-endpoint user is excluded.** SDK 2.x targets Daytona Cloud only: the TS root constructor throws a TypeError on `apiUrl` (ref: sdk-ts:Daytona.js:168), the Python root config raises a TypeError on `api_url` (ref: sdk-py:daytona/_client.py:202), and both SDKs carry the message "SDK 2.x targets Daytona Cloud. For a custom API URL, stay on SDK 0.x." (ref: sdk-ts:Daytona.js:71) (ref: MIGRATION:32). Both codemods refuse a project with a custom URL (exit 2) and say the same.
+**Every self-hosted or custom-endpoint user is excluded.** SDK 2.x targets Daytona Cloud only: the TS root constructor throws a TypeError on `apiUrl` (ref: sdk-ts:Daytona.js:173), the Python root config raises a TypeError on `api_url` (ref: sdk-py:daytona/_client.py:202), and both SDKs carry the message "SDK 2.x targets Daytona Cloud. For a custom API URL, stay on SDK 0.x." (ref: sdk-ts:Daytona.js:71) (ref: MIGRATION:32). Both codemods refuse a project with a custom URL (exit 2) and say the same.
 
 Four packages had to remove an option to migrate:
 
@@ -179,7 +179,7 @@ Four packages had to remove an option to migrate:
 - The `.v0` client created by the root reads only `DAYTONA_V0_API_URL` and otherwise uses `https://app.daytona.io/api`; it never reads `DAYTONA_API_URL` (ref: sdk-ts:Daytona.js:19) (ref: sdk-ts:Daytona.js:11) (ref: sdk-py:daytona/_client.py:55) (ref: sdk-py:daytona/_client.py:52). The root passes that URL explicitly, so the bundled v0 constructor's own `DAYTONA_API_URL` fallback never runs (ref: sdk-ts:Daytona.js:275) (ref: sdk-ts:v0/Daytona.js:234).
 - v2 reads `DAYTONA_V2_API_URL`, then `DAYTONA_API_URL` (ref: sdk-ts:v2/Daytona.js:447) (ref: sdk-py:daytona/_client.py:165).
 - **Consequence:** a user who upgrades with `DAYTONA_API_URL` still pointing at a self-hosted install sends every v0 call to Daytona Cloud. Their key will usually fail there, but nothing warns them. Measured offline in the pi-extension lane: with `DAYTONA_API_URL` set to a custom URL, the root `.v0` client had `apiUrl=https://app.daytona.io/api`.
-- `DAYTONA_TARGET` still applies to v0: the root passes `target: undefined`, so the bundled v0 env fallback reads it (ref: sdk-ts:Daytona.js:274) (ref: sdk-ts:v0/Daytona.js:235). The same pi-extension probe saw `target=eu`.
+- `DAYTONA_TARGET` still applies to v0: the root passes `this.config.target` (undefined unless the deprecated root `target` is set), so the bundled v0 env fallback reads it (ref: sdk-ts:Daytona.js:274) (ref: sdk-ts:v0/Daytona.js:235). The same pi-extension probe saw `target=eu`.
 - `DAYTONA_V0_API_URL` is an undocumented override present in alpha.5. **It wasn't tested**, and the tool and SDK messages direct custom-endpoint users to stay on SDK 0.x, so this report doesn't recommend it.
 
 Every Step A branch README now says the last self-hosted-capable release is the one built on Daytona SDK 0.x. The REST-only convex and n8n packages keep their base-URL fields for now; a v2 rewrite would have to decide the same question (§7).
@@ -193,7 +193,7 @@ Four integrations got a real `daytona.v2` port on a branch stacked on their Step
 | daytona-adk | `feat/daytona-adk-sdk2-v2@76813ba` | `4f928ea` | BLOCKED-BY-V2-GAP(sessions:create_session) | `d671fb5` -> `76813ba` |
 | langchain-daytona-data-analysis | `feat/langchain-daytona-data-analysis-sdk2-v2@230eccf` | `b3dfaa6` | READY-WITH-CHANGES (breaking) | `f1281a1` -> `230eccf` |
 | inngest-agentkit-coding-agent | `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` | `42eeb60` | BLOCKED-BY-V2-GAP(sessions) | `85d4a0b` -> `ae51d35` |
-| stripe-coding-agent-template | `feat/stripe-coding-agent-template-sdk2-v2@2765800` | `53b2350` | BLOCKED-BY-V2-GAP(sessions) | `b169c7f` -> `2765800` |
+| stripe-coding-agent-template | `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` | `53b2350` | BLOCKED-BY-V2-GAP(sessions) | `b169c7f` -> `c42ef43` |
 
 **Honest note on revisions.** Each PoC's live run used the earlier revision in the last column. Review rounds then removed readiness-harness values from app code (hard-coded labels, lifecycle limits, create waits, exec deadlines) and restored v0 tool contracts. Those fixes kept the v2 call shapes and were verified offline only (build, unit tests, call-shape repros); the budget didn't allow another live run.
 
@@ -202,7 +202,7 @@ Four integrations got a real `daytona.v2` port on a branch stacked on their Step
 - Create latency 786 ms (Python) and 853 ms (TypeScript) from a registered image id; inngest app creates took 790 ms and 340 ms.
 - Default user `root`, home `/root`, cwd `/root` in both SDKs (v0 used `daytona` and `/home/daytona`).
 - Labels are accepted on create (recovered by exact label match); region `ash-1`.
-- No default image is configured for the org: an imageless create fails with `DEFAULT_IMAGE_NOT_CONFIGURED`, so a registered `img_` id is required. A raw registry string isn't a create source (ref: mapping:3767). An image built from `python:3.12-slim` plus pandas, matplotlib and numpy was registered and used by every PoC (Debian 13, Python 3.12.16; no node, npm, curl or `free`).
+- No default image is configured for the org: an imageless create fails with `DEFAULT_IMAGE_NOT_CONFIGURED`, so a registered `img_` id is required. A raw registry string isn't a create source (ref: mapping:3773) (ref: mapping:3782). An image built from `python:3.12-slim` plus pandas, matplotlib and numpy was registered and used by every PoC (Debian 13, Python 3.12.16; no node, npm, curl or `free`).
 - `run_code` returns an `InterpreterResult` with `process`, `results`, `logs` and optional `error` (ref: sdk-ts:v2/types.d.ts:990) (ref: sdk-py:daytona/v2/types.py:1163); results are MIME-keyed, and a matplotlib plot came back as one `image/png` result.
 - Public-port preview returned HTTP 200 without a token and 200 with the preview header; the token is empty for public ports (ref: sdk-ts:v2/Ports.d.ts:75). Private-port token preview is **unmeasured**.
 - A fresh client's `v2.get(id)` works (TS GET_FRESH_CLIENT_OK, Python LIVE_GET_OK); a missing id raises v2 `NotFoundError` (404).
@@ -227,7 +227,8 @@ Four integrations got a real `daytona.v2` port on a branch stacked on their Step
 ### stripe-coding-agent-template PoC
 
 - Verdict: BLOCKED-BY-V2-GAP(sessions). Evidence: `apps/stripe-coding-agent-template/app/api/copilotkit/route.ts:142-143` (Step A lines, background `createSession`) (ref: sdk-ts:v2/Process.d.ts:60).
-- Ledger: 26 call rows, 4 BLOCKED (session create on both callers, session start, session logs). Live: file system checks, fresh-client get plus exec, NotFoundError, and the public preview measurement (200 / 200, empty token) passed; `runCommand(background)` and `startWebServer` stop at the 422. Private-preview auth is unmeasured because the route makes ports public. 1 sandbox created / 1 deleted.
+- Ledger: 27 call rows, 4 BLOCKED (session create on both callers, session start, session logs). Live: file system checks, fresh-client get plus exec, NotFoundError, and the public preview measurement (200 / 200, empty token) passed; `runCommand(background)` and `startWebServer` stop at the 422. Private-preview auth is unmeasured because the route makes ports public. 1 sandbox created / 1 deleted.
+- A follow-up commit (`c42ef43`) ported the app's own `scripts/test.mjs` sandbox step to the same v2 calls (offline-checked; the script needs an OpenRouter key and was not run).
 
 ## 6. v2 outlines for the other integrations
 
@@ -250,7 +251,7 @@ Ready now: exec -> `process.run`, file system (`stat`, `read_bytes`, `write_byte
 
 Verdict BLOCKED-BY-V2-GAP. Blockers:
 
-1. Image build: `packages/agentenv-daytona/agentenv_daytona/image.py:48-55` builds a host image with `Image.base(...)`; v2 needs `create_from_build` (ref: mapping:3767), whose follow-up `images.get` raises `KeyError('region_id')` in alpha.5 (ref: sdk-py:daytona/v2/_core.py:1262), and the `USER daytona` step isn't carried (ref: docs:images:586). Waits on a decoder fix plus Python `create(user=...)` or a root recipe.
+1. Image build: `packages/agentenv-daytona/agentenv_daytona/image.py:48-55` builds a host image with `Image.base(...)`; v2 needs `create_from_build` (ref: mapping:3772), whose follow-up `images.get` raises `KeyError('region_id')` in alpha.5 (ref: sdk-py:daytona/v2/_core.py:1262), and the `USER daytona` step isn't carried (ref: docs:images:586). Waits on a decoder fix plus Python `create(user=...)` or a root recipe.
 2. Docker-in-Docker: `agentenv_daytona/sandbox.py:163-201` starts `dockerd`; never run inside a v2 microVM. Waits on one live DinD verification.
 3. Sessions: `agentenv_daytona/sandbox.py:140-156` is the only exec path, including the dockerd start (ref: sdk-py:daytona/v2/process.py:401). Workaround: `process.run` / `process.start` (ref: sdk-py:daytona/v2/process.py:424); whether a detached dockerd outlives an exec process is unmeasured.
 4. Network policy: `agentenv_daytona/sandbox.py:220-230` `update_network_settings` becomes an etag read-modify-write of the whole policy (ref: mapping:5331).
@@ -391,7 +392,7 @@ Range notes:
 ### 8b. GA order of operations
 
 1. Wait for stable `@daytona/sdk@2.0.0` and `daytona==2.0.0`. Re-run the §10 checks against them.
-2. Rebase each branch on origin/main. Drift today (from `14cfd49` to `ec6f147`): langchain must absorb b31cb0b (#100) and ae236b6 (#104), both of which touch `tools.py` and tests (a trial merge was conflict-free); every other branch has none. Recheck the others at GA.
+2. Rebase each branch on origin/main. Drift today (from `14cfd49` to `ec6f147`): b31cb0b (#100) touches `tools.py` and tests; ae236b6 (#104) is the 0.2.1 release commit (CHANGELOG.md, the pyproject version line, the release-please manifest); a trial merge of the Step A branch onto origin/main was conflict-free. Every other branch has none. Recheck the others at GA.
 3. Flip the pin (§8a).
 4. Regenerate the lock where one exists.
 5. Run the CI-parity commands.
@@ -521,4 +522,4 @@ Every live sandbox was labelled `sdk2-readiness=<component>`, journaled on creat
 - **dify venv on Python 3.14** via uv; CI-equivalent Python 3.12 wasn't exercised for the app.
 - **Python v2 create has no `user` argument** while TS does; don't forward `user=` from Python code.
 - **Persistent Linux sandboxes need org enablement** even after the SDK exposes them (ref: docs:linux-sandboxes:309).
-- **Untested app suites:** opencode-workspaces-plugin bun tests (typecheck-only proof), the adk pytest suite (live-gated, all skipped offline), and the stripe live preflight script.
+- **Untested app suites:** opencode-workspaces-plugin bun tests (typecheck-only proof), the adk pytest suite (live-gated, all skipped offline), and the stripe app's `scripts/test.mjs` sandbox step (offline-checked but not run; it requires an OpenRouter key).
