@@ -44,7 +44,7 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 | opencode-workspaces-plugin | READY-WITH-CHANGES (Node >=22.4.0; 14 test FIXMEs fixed) | `feat/opencode-workspaces-plugin-sdk2@f9dc243` | BLOCKED-BY-V2-GAP | never-delete lifecycle; stop/start persistence; preview token |
 | stripe-coding-agent-template | READY-WITH-CHANGES (apiUrl dropped; Node >=22.4.0) | `feat/stripe-coding-agent-template-sdk2@53b2350` | BLOCKED-BY-V2-GAP | sessions (422) |
 
-The four PoC branches stacked on Step A are `feat/daytona-adk-sdk2-v2@76813ba`, `feat/langchain-daytona-data-analysis-sdk2-v2@230eccf`, `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` and `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` (§5). No pull request exists for any branch.
+The four PoC branches stacked on Step A are `feat/daytona-adk-sdk2-v2@76813ba`, `feat/langchain-daytona-data-analysis-sdk2-v2@095a066`, `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` and `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` (§5). No pull request exists for any branch.
 
 ## 3. Step A details per integration
 
@@ -191,7 +191,7 @@ Four integrations got a real `daytona.v2` port on a branch stacked on their Step
 | integration | `-v2` branch@sha | Step A parent | step_b verdict | live-proven sha -> final sha |
 |---|---|---|---|---|
 | daytona-adk | `feat/daytona-adk-sdk2-v2@76813ba` | `4f928ea` | BLOCKED-BY-V2-GAP(sessions:create_session) | `d671fb5` -> `76813ba` |
-| langchain-daytona-data-analysis | `feat/langchain-daytona-data-analysis-sdk2-v2@230eccf` | `b3dfaa6` | READY-WITH-CHANGES (breaking) | `f1281a1` -> `230eccf` |
+| langchain-daytona-data-analysis | `feat/langchain-daytona-data-analysis-sdk2-v2@095a066` | `b3dfaa6` | READY-WITH-CHANGES (breaking) | `f1281a1` -> `095a066` |
 | inngest-agentkit-coding-agent | `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` | `42eeb60` | BLOCKED-BY-V2-GAP(sessions) | `85d4a0b` -> `ae51d35` |
 | stripe-coding-agent-template | `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` | `53b2350` | BLOCKED-BY-V2-GAP(sessions) | `b169c7f` -> `c42ef43` |
 
@@ -218,6 +218,7 @@ Four integrations got a real `daytona.v2` port on a branch stacked on their Step
 
 - Verdict: READY-WITH-CHANGES (breaking). Evidence: `packages/langchain-data-analysis/langchain_daytona_data_analysis/tools.py:185` (Step A line, callback with `execution.artifacts`) (ref: sdk-py:daytona/v2/_sync/sandbox.py:339).
 - Ledger: 13 call rows, all `none`. `on_result` now receives the whole `InterpreterResult` instead of `ExecutionArtifacts`, and charts come from `results[].data['image/png']` (chart type/title metadata is gone): a breaking public contract change. The constructor gained an optional `image` argument and `create_kwargs`; uploads go to `/root`. Live: HELLO_OK, PNG_OK, CSV round trip, PIP_EXEC_OK, LIVE_GET_OK, delete. 1 sandbox created / 1 deleted.
+- A follow-up commit (`095a066`) updated `docs/tools.ipynb` to the `InterpreterResult` callback (not executed; it needs a live sandbox).
 
 ### inngest-agentkit-coding-agent PoC
 
@@ -402,11 +403,12 @@ The in-flight branches the plan listed for rebasing, `fix/langchain-data-analysi
 
 ### 8c. Reproduce Step A for one package (pi-extension)
 
-These are the commands from the pi-extension ledger. A self-test on a scratch copy reproduced the branch's `index.ts`, `package.json`, `scripts/` and `src/` byte for byte, and `package-lock.json` byte-identical on 2026-11-02 (later resolution drift is possible). README edits are docs-only and not reproduced. Set `R` to your clone and `W` to a scratch path. `npm ci --ignore-scripts` **must** run before the codemod: without installed types the TS codemod reports `types-unresolved` and inserts 3 extra FIXMEs (`index.ts:367`, `scripts/bash-bg.mjs:121`, `scripts/cwd.mjs:101`) that the fixes below don't remove.
+These are the commands from the pi-extension ledger. A self-test on a scratch copy reproduced the branch's `index.ts`, `package.json`, `scripts/` and `src/` byte for byte, and `package-lock.json` byte-identical on 2026-11-02 (later resolution drift is possible). README edits are docs-only and not reproduced. Run from inside your clone of daytona/integrations. `npm ci --ignore-scripts` **must** run before the codemod: without installed types the TS codemod reports `types-unresolved` and inserts 3 extra FIXMEs (`index.ts:367`, `scripts/bash-bg.mjs:121`, `scripts/cwd.mjs:101`) that the fixes below don't remove.
 
 ```bash
 export CI=true GIT_TERMINAL_PROMPT=0 GIT_EDITOR=: GIT_PAGER=cat PAGER=cat npm_config_yes=true npm_config_fund=false npm_config_audit=false
-R=/home/opencode/projects/integrations; W=/home/opencode/projects/integrations-wt/f3-pi
+R="$(git rev-parse --show-toplevel)"  # run inside your clone of daytona/integrations
+W="$R-wt/pi-sdk2"; REF="$W-ref"
 git -C $R fetch origin
 git -C $R worktree add --detach $W origin/main          # pi-extension is identical at 14cfd49 and ec6f147
 test ! -e $W/.env
@@ -436,11 +438,11 @@ npm ci --ignore-scripts && npm run typecheck && npm run smoke
 node -e "import('@daytona/sdk/v0').then(m=>{if(!m.DaytonaError)process.exit(1);console.log('V0_ESM_OK')})"
 # 8 compare with the pushed branch (expected: no output)
 git -C $R fetch origin feat/pi-extension-sdk2
-mkdir -p /tmp/f3-pi-ref && git -C $R archive origin/feat/pi-extension-sdk2 packages/pi-extension | tar -x -C /tmp/f3-pi-ref
-git diff --no-index --exit-code -- /tmp/f3-pi-ref/packages/pi-extension/index.ts index.ts
-for f in package.json scripts src; do git diff --no-index --exit-code -- /tmp/f3-pi-ref/packages/pi-extension/$f $f; done
+mkdir -p $REF && git -C $R archive origin/feat/pi-extension-sdk2 packages/pi-extension | tar -x -C $REF
+git diff --no-index --exit-code -- $REF/packages/pi-extension/index.ts index.ts
+for f in package.json scripts src; do git diff --no-index --exit-code -- $REF/packages/pi-extension/$f $f; done
 # 9 cleanup
-cd / && git -C $R worktree remove --force $W && rm -rf /tmp/f3-pi-ref
+cd / && git -C $R worktree remove --force $W && rm -rf $REF
 ```
 
 `npm run smoke` is the package's offline smoke. A live v0 smoke additionally needs a Daytona API key and creates one labelled sandbox.
@@ -498,12 +500,13 @@ Every live sandbox was labelled `sdk2-readiness=<component>`, journaled on creat
 | stripe-coding-agent-template | 1 | 1 | 1 | 1 |
 | convex, n8n-nodes-daytona | 0 | 0 | 0 | 0 |
 | v2 probe | 0 | 0 | 2 | 2 |
-| **total** | **13** | **13** | **8** | **8** |
+| final checks | 1 | 1 | 2 | 2 |
+| **total** | **14** | **14** | **10** | **10** |
 
-- v0: 13 created, 13 deleted (budget 14). v2: 8 created, 8 deleted (budget 10). Leftovers: 0.
+- v0: 14 created, 14 deleted (budget 14). v2: 10 created, 10 deleted (budget 10). Leftovers: 0.
 - Four sweep runs on 2026-11-03 each found 0 labelled v0 sandboxes for all 15 label values, all 8 recorded v2 ids absent (6 destroyed, 2 not found), and 0 active v2 sandboxes in a label search for all 15 values (`LEFTOVERS=0`).
 - 16 local worktrees (12 Step A, 4 PoC) were removed after a clean-and-pushed check; all 16 branches remain on origin.
-- One registered v2 image (the PoC image) is retained for the final checks, which add at most 1 v0 and 1 v2 sandbox. It is deleted in the final cleanup after the last check. A pre-existing image in the org was left untouched.
+- One registered v2 image (the PoC image) was retained for the final checks and deleted in final cleanup; a pre-existing image in the org was left untouched. The final checks used 1 v0 + 2 v2 sandboxes: the first v2 reproduction run tripped its own post-delete label check (a race with delete propagation; the sandbox was destroyed) and was re-run with a polling check (settled in 4.3 s) — no leaks.
 
 ## 10. Risks and unverified items
 
