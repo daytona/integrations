@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/daytona/integrations/compare/langchain-daytona-data-analysis-v0.2.1...langchain-daytona-data-analysis-v0.2.2) (2026-11-11)
+
+
+### Documentation
+
+* **langchain-data-analysis:** note the 0.2.1 breaking change for direct invoke() calls ([#106](https://github.com/daytona/integrations/issues/106)) ([0e54c1e](https://github.com/daytona/integrations/commit/0e54c1e20bbe2032cf2fe79b0a7bdb9fff84d787))
+
 ## [0.2.1](https://github.com/daytona/integrations/compare/langchain-daytona-data-analysis-v0.2.0...langchain-daytona-data-analysis-v0.2.1) (2026-11-02)
 
 
