@@ -3,6 +3,19 @@
 ## [0.2.1](https://github.com/daytona/integrations/compare/langchain-daytona-data-analysis-v0.2.0...langchain-daytona-data-analysis-v0.2.1) (2026-11-02)
 
 
+### ⚠ Breaking change for direct `invoke()` calls
+
+Calling `tool.invoke({...})` without a ToolCall now returns the text the model sees instead of an `ExecutionArtifacts` object: the code's printed output, capped at `max_output_chars` (default 20,000), plus a one-line summary per chart. Agents need no changes, and `on_result` still receives the full `ExecutionArtifacts`.
+
+If your code reads `.stdout` or `.charts` from the return value of `invoke()`, use `on_result` instead, or invoke with a ToolCall and read its artifact:
+
+```python
+message = tool.invoke({"args": {"data_analysis_python_code": code}, "id": "1", "name": tool.name, "type": "tool_call"})
+message.artifact.stdout, message.artifact.charts
+```
+
+If you subclassed the tool to keep chart data out of the model's context (the workaround in [#81](https://github.com/daytona/integrations/issues/81)), remove the subclass. 0.2.1 does this itself, and the workaround now raises `ValueError` because `_run` has to return a `(content, artifacts)` pair.
+
 ### Bug Fixes
 
 * **langchain-data-analysis:** don't print a trailing expression that evaluates to None ([#100](https://github.com/daytona/integrations/issues/100)) ([b31cb0b](https://github.com/daytona/integrations/commit/b31cb0be8f49a19fbaf13a2e73ee6cc8438ad799))
