@@ -1,0 +1,19 @@
+SDK2-MIGRATION.md
+  s_1c47a059c1e9e3::t_82892829dd70ae 200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "139c889872ac21bc3c925affd2d546b53e1b7dcb",
+  "prompts": {},
+  "sessions": {
+    "s_1c47a059c1e9e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e2a1fee26ffeTunwbkvYHRIUa7",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
