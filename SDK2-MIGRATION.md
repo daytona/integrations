@@ -16,7 +16,7 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 - Live smokes weren't re-run (the sandbox budget was used up). Every live measurement in this report is from alpha.5, and the `(ref: ...)` citations still point at the alpha.5 packages.
 - alpha.12 changes that don't affect our branches: the TS root config `requestTimeout` became `requestTimeoutSeconds`; `DaytonaValidationError` and `DaytonaAuthorizationError` are no longer exported from the root package; the `...V0` error aliases were removed; Python `DaytonaConfig(api_key=...)` is keyword-only; the API clients behind `.v0` moved from 0.224.0 to 0.231.1; a rejected URL field now raises `BadRequestError` instead of `TypeError` in TS.
 - v2 in alpha.12: volumes are now exposed; Linux persistent sandboxes and GPU are still not public; the Python image decoder still requires `region_id`; the v2 process/session API was renamed (for example millisecond `timeout` options became `timeoutSeconds`, and `RunResult` became `ProcessResult`).
-- The four `-v2` PoC branches were **not** re-pinned. They stay on alpha.5, stacked on the pre-re-pin Step A heads, and are out of date against alpha.12's v2 API.
+- The four v2 PoC ports (§5) were **not** re-pinned. They were throwaway ports built on alpha.5 on top of the pre-re-pin Step A code; their code is not published, and their call shapes predate the alpha.12 v2 renames listed above.
 - agentenv-daytona: on a fresh install its mypy check fails because agentenv-framework 0.9.1521 added an `env` parameter to `create_vm` (framework drift, unrelated to the SDK). The maintainers will release this package only after the upstream Scale PR moves the framework's built-in Daytona provider to `.v0`.
 
 **Citation legend.** `(ref: sdk-ts:<path>:<line>)` is the file at `dist/cjs/<path>` inside the npm package `@daytona/sdk@2.0.0-alpha.5` (`package.json` is at the package root). `(ref: sdk-py:<path>:<line>)` is the file inside the wheel `daytona==2.0.0a5`, for example `daytona/v2/process.py`. `(ref: mapping:<line>)` is a line of https://unpkg.com/@daytona/upgrade@0.1.0/dist/mapping.json. `(ref: docs:<page>:<line>)` is a line of https://www.daytona.com/docs/<page>.md. `(ref: MIGRATION:<line>)` is a line of `clients/upgrade/MIGRATION.md` in daytona/rlp@253e8e2. Repo code is cited as `<repo path>:<line>` at the branch named in the same row or bullet. Facts marked "measured 2026-11-02" come from live runs against Daytona Cloud with the alpha SDKs. Raw evidence (codemod reports, logs, ledgers, smoke scripts) is kept in the maintainers' local readiness evidence store and is not part of this repository.
@@ -55,7 +55,7 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 | opencode-workspaces-plugin | READY-WITH-CHANGES (Node >=22.15.0; 14 test FIXMEs fixed) | `feat/opencode-workspaces-plugin-sdk2@2a48b4d` | BLOCKED-BY-V2-GAP | never-delete lifecycle; stop/start persistence; preview token |
 | stripe-coding-agent-template | READY-WITH-CHANGES (apiUrl dropped; Node >=22.15.0) | `feat/stripe-coding-agent-template-sdk2@a1eed09` | BLOCKED-BY-V2-GAP | sessions (422) |
 
-The four PoC branches stacked on Step A are `feat/daytona-adk-sdk2-v2@76813ba`, `feat/langchain-daytona-data-analysis-sdk2-v2@095a066`, `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` and `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` (§5). They stay pinned to alpha.5 and stacked on the pre-re-pin Step A heads; they were not re-pinned to alpha.12. No pull request exists for any branch.
+The four v2 PoC ports (daytona-adk, langchain-daytona-data-analysis, inngest-agentkit-coding-agent, stripe-coding-agent-template) were throwaway ports on alpha.5, built on top of the pre-re-pin Step A code; their code is not published and they were not re-pinned to alpha.12 (§5). No pull request exists for any branch.
 
 ## 3. Step A details per integration
 
@@ -197,16 +197,16 @@ Every Step A branch README now says the last self-hosted-capable release is the 
 
 ## 5. v2 PoC results
 
-Four integrations got a real `daytona.v2` port on a branch stacked on their Step A branch, run live against microVMs. These branches aren't meant to merge.
+Four integrations got a real `daytona.v2` port, built on alpha.5 on top of their pre-re-pin Step A code and run live against microVMs. The ports were throwaway proofs of concept: their code is not published, and only the findings below are kept. Repo lines cited in this section are on the Step A branches named in §2.
 
-| integration | `-v2` branch@sha | Step A parent (pre-re-pin, alpha.5) | step_b verdict | live-proven sha -> final sha |
-|---|---|---|---|---|
-| daytona-adk | `feat/daytona-adk-sdk2-v2@76813ba` | `4f928ea` | BLOCKED-BY-V2-GAP(sessions:create_session) | `d671fb5` -> `76813ba` |
-| langchain-daytona-data-analysis | `feat/langchain-daytona-data-analysis-sdk2-v2@095a066` | `b3dfaa6` | READY-WITH-CHANGES (breaking) | `f1281a1` -> `095a066` |
-| inngest-agentkit-coding-agent | `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` | `42eeb60` | BLOCKED-BY-V2-GAP(sessions) | `85d4a0b` -> `ae51d35` |
-| stripe-coding-agent-template | `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` | `53b2350` | BLOCKED-BY-V2-GAP(sessions) | `b169c7f` -> `c42ef43` |
+| integration | step_b verdict |
+|---|---|
+| daytona-adk | BLOCKED-BY-V2-GAP(sessions:create_session) |
+| langchain-daytona-data-analysis | READY-WITH-CHANGES (breaking) |
+| inngest-agentkit-coding-agent | BLOCKED-BY-V2-GAP(sessions) |
+| stripe-coding-agent-template | BLOCKED-BY-V2-GAP(sessions) |
 
-**Honest note on revisions.** Each PoC's live run used the earlier revision in the last column. Review rounds then removed readiness-harness values from app code (hard-coded labels, lifecycle limits, create waits, exec deadlines) and restored v0 tool contracts. Those fixes kept the v2 call shapes and were verified offline only (build, unit tests, call-shape repros); the budget didn't allow another live run.
+**Honest note on revisions.** Each PoC's live run used an earlier revision of the port. Review rounds then removed readiness-harness values from app code (hard-coded labels, lifecycle limits, create waits, exec deadlines) and restored v0 tool contracts. Those fixes kept the v2 call shapes and were verified offline only (build, unit tests, call-shape repros); the budget didn't allow another live run.
 
 ### Measured v2 facts (measured 2026-11-02)
 
@@ -229,7 +229,7 @@ Four integrations got a real `daytona.v2` port on a branch stacked on their Step
 
 - Verdict: READY-WITH-CHANGES (breaking). Evidence: `packages/langchain-data-analysis/langchain_daytona_data_analysis/tools.py:185` (Step A line, callback with `execution.artifacts`) (ref: sdk-py:daytona/v2/_sync/sandbox.py:339).
 - Ledger: 13 call rows, all `none`. `on_result` now receives the whole `InterpreterResult` instead of `ExecutionArtifacts`, and charts come from `results[].data['image/png']` (chart type/title metadata is gone): a breaking public contract change. The constructor gained an optional `image` argument and `create_kwargs`; uploads go to `/root`. Live: HELLO_OK, PNG_OK, CSV round trip, PIP_EXEC_OK, LIVE_GET_OK, delete. 1 sandbox created / 1 deleted.
-- A follow-up commit (`095a066`) updated `docs/tools.ipynb` to the `InterpreterResult` callback (not executed; it needs a live sandbox).
+- A later revision of the port updated `docs/tools.ipynb` to the `InterpreterResult` callback (not executed; it needs a live sandbox).
 
 ### inngest-agentkit-coding-agent PoC
 
@@ -240,7 +240,7 @@ Four integrations got a real `daytona.v2` port on a branch stacked on their Step
 
 - Verdict: BLOCKED-BY-V2-GAP(sessions). Evidence: `apps/stripe-coding-agent-template/app/api/copilotkit/route.ts:142-143` (Step A lines, background `createSession`) (ref: sdk-ts:v2/Process.d.ts:60).
 - Ledger: 27 call rows, 4 BLOCKED (session create on both callers, session start, session logs). Live: file system checks, fresh-client get plus exec, NotFoundError, and the public preview measurement (200 / 200, empty token) passed; `runCommand(background)` and `startWebServer` stop at the 422. Private-preview auth is unmeasured because the route makes ports public. 1 sandbox created / 1 deleted.
-- A follow-up commit (`c42ef43`) ported the app's own `scripts/test.mjs` sandbox step to the same v2 calls (offline-checked; the script needs an OpenRouter key and was not run).
+- A later revision of the port moved the app's own `scripts/test.mjs` sandbox step to the same v2 calls (offline-checked; the script needs an OpenRouter key and was not run).
 
 ## 6. v2 outlines for the other integrations
 
@@ -408,7 +408,7 @@ Range notes:
 3. Flip the pin (§8a).
 4. Regenerate the lock where one exists.
 5. Run the CI-parity commands.
-6. Open one PR per branch. The `-v2` PoC branches are not meant to merge.
+6. Open one PR per Step A branch.
 
 The in-flight branches the plan listed for rebasing, `fix/langchain-data-analysis-chart-context`, `fix/langchain-data-analysis-stray-none` and `fix/pydantic-ai-daytona-sdk-range`, were merged as #99, #100 and #102 and no longer exist on origin. Only local copies remain in some checkouts.
 
@@ -516,7 +516,7 @@ Every live sandbox was labelled `sdk2-readiness=<component>`, journaled on creat
 
 - v0: 14 created, 14 deleted (budget 14). v2: 10 created, 10 deleted (budget 10). Leftovers: 0.
 - Four sweep runs on 2026-11-03 each found 0 labelled v0 sandboxes for all 15 label values, all 8 recorded v2 ids absent (6 destroyed, 2 not found), and 0 active v2 sandboxes in a label search for all 15 values (`LEFTOVERS=0`).
-- 16 local worktrees (12 Step A, 4 PoC) were removed after a clean-and-pushed check; all 16 branches remain on origin.
+- 16 local worktrees (12 Step A, 4 PoC) were removed after a clean-and-pushed check. The 12 Step A branches remain on origin; the four throwaway PoC ports are not published and are kept only in the maintainers' local readiness evidence store.
 - One registered v2 image (the PoC image) was retained for the final checks and deleted in final cleanup; a pre-existing image in the org was left untouched. The final checks used 1 v0 + 2 v2 sandboxes: the first v2 reproduction run tripped its own post-delete label check (a race with delete propagation; the sandbox was destroyed) and was re-run with a polling check (settled in 4.3 s) — no leaks.
 
 ## 10. Risks and unverified items
@@ -526,7 +526,7 @@ Every live sandbox was labelled `sdk2-readiness=<component>`, journaled on creat
 - **PyPI ordering.** `daytona` `2.0.0rc1` (published 2026-09-09) outranks `2.0.0a5` (2026-11-02) and `2.0.0a12` under PEP 440, so `pip install --pre daytona` or `uv --prerelease=allow` resolves rc1. Pins must stay exact until 2.0.0.
 - **No published GA date** for SDK 2.0.0.
 - **Session rejection may be a deployment state.** The 422 comes from the deployed daemon, while the SDK documents sessions. A daemon update could clear the dominant Step B blocker without any SDK change. Re-test before acting on the session verdicts.
-- **Offline-only fix rounds.** The final revision of each `-v2` branch wasn't re-run live (§5).
+- **Offline-only fix rounds.** The final revision of each v2 PoC port wasn't re-run live (§5).
 - **Private preview auth is unmeasured**; only public-port preview was measured. Signed preview links are unmeasured.
 - **Docker-in-Docker inside a microVM is unverified** (agentenv).
 - **Images decoder defects** in both SDKs and the Python list/search decoder (§5). Create by `img_` id and `v2.get` by id work.
