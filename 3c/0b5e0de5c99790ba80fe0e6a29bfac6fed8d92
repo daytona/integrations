@@ -1,0 +1,25 @@
+apps/dify-plugin/README.md
+  s_781b665d6a5e33::t_7b9bb9d959b0f1 33
+apps/dify-plugin/pyproject.toml
+  s_781b665d6a5e33::t_2f7ddea32e1f3c 15
+apps/dify-plugin/requirements.txt
+  s_781b665d6a5e33::t_647e9bb85e928a 2
+apps/dify-plugin/uv.lock
+  s_781b665d6a5e33::t_d763031cc91945 201,205,207,209,367,376,378,411,419,421,426,435,437,442,450,452,457,466,468,473,481,483,488,497,499,525
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3c0b5e0de5c99790ba80fe0e6a29bfac6fed8d92",
+  "prompts": {},
+  "sessions": {
+    "s_781b665d6a5e33": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e2a92e68affe9P1QtD8JaR6slz",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
