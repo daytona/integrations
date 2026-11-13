@@ -197,7 +197,7 @@ Every Step A branch README now says the last self-hosted-capable release is the 
 
 ## 5. v2 PoC results
 
-Four integrations got a real `daytona.v2` port, built on alpha.5 on top of their pre-re-pin Step A code and run live against microVMs. The ports were throwaway proofs of concept: their branches were deleted, and only the findings below are kept. Repo lines cited in this section are on the Step A branches named in §2.
+Four integrations got a real `daytona.v2` port, built on alpha.5 on top of their pre-re-pin Step A code and run live against microVMs. The ports were throwaway proofs of concept: their branches were deleted, and this section keeps their findings. Repo lines cited in this section are on the Step A branches named in §2.
 
 | integration | step_b verdict |
 |---|---|
