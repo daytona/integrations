@@ -2,11 +2,22 @@
 
 ## 1. Validity
 
-**Valid as of `@daytona/sdk@2.0.0-alpha.5` / `daytona==2.0.0a5` / `@daytona/upgrade@0.1.0` / `daytona-upgrade==0.1.0`; branches based on origin/main `14cfd49` (current origin/main is `ec6f147`, see §8b for the drift); facts captured 2026-11-02; PR daytona/rlp#3611 (draft) is the upgrade tool, not the v2 backend.**
+**Measurements captured on `@daytona/sdk@2.0.0-alpha.5` / `daytona==2.0.0a5` / `@daytona/upgrade@0.1.0` / `daytona-upgrade==0.1.0` on 2026-11-02; the Step A branches were re-pinned to `@daytona/sdk@2.0.0-alpha.12` / `daytona==2.0.0a12` on 2026-11-13 (see the update below); branches based on origin/main `14cfd49` (current origin/main is `ec6f147`, see §8b for the drift); facts captured 2026-11-02; PR daytona/rlp#3611 (draft) is the upgrade tool, not the v2 backend.**
 
 Local toolchain: Node v22.23.2, npm 10.9.8, Python 3.12.3, uv 0.12.9, Poetry 2.4.2. CI uses Node `lts/*` and Python `3.12` (pydantic-ai, agentenv, langchain, claude-toolsets python) or `3.x` (adk). The dify-plugin venv ran on Python 3.14 through uv.
 
 Every fact below is pinned to these alpha versions. The SDK says it may change between alphas, so re-check §10 before acting on a later alpha or on 2.0.0.
+
+### Update 2026-11-13: re-pinned to 2.0.0-alpha.12
+
+- All 12 Step A branches now pin `@daytona/sdk` `2.0.0-alpha.12` / `daytona[v0-sdk]==2.0.0a12`, with one extra signed commit each. The SHAs in §2, §3 and §8 are the new heads.
+- alpha.12 raised the SDK's `engines.node` to `>=22.15.0` (its OpenTelemetry 3.x dependencies), so the six TypeScript branches now declare `>=22.15.0`. The Python floor is unchanged (3.10).
+- Re-verification was offline. Every branch's CI-equivalent commands gave the same results as on alpha.5, and the upgrade tool, now released in step with the SDK (`@daytona/upgrade` / `daytona-upgrade` 2.0.0-alpha.12), proposes nothing beyond the pin.
+- Live smokes weren't re-run (the sandbox budget was used up). Every live measurement in this report is from alpha.5, and the `(ref: ...)` citations still point at the alpha.5 packages.
+- alpha.12 changes that don't affect our branches: the TS root config `requestTimeout` became `requestTimeoutSeconds`; `DaytonaValidationError` and `DaytonaAuthorizationError` are no longer exported from the root package; the `...V0` error aliases were removed; Python `DaytonaConfig(api_key=...)` is keyword-only; the API clients behind `.v0` moved from 0.224.0 to 0.231.1; a rejected URL field now raises `BadRequestError` instead of `TypeError` in TS.
+- v2 in alpha.12: volumes are now exposed; Linux persistent sandboxes and GPU are still not public; the Python image decoder still requires `region_id`; the v2 process/session API was renamed (for example millisecond `timeout` options became `timeoutSeconds`, and `RunResult` became `ProcessResult`).
+- The four `-v2` PoC branches were **not** re-pinned. They stay on alpha.5, stacked on the pre-re-pin Step A heads, and are out of date against alpha.12's v2 API.
+- agentenv-daytona: on a fresh install its mypy check fails because agentenv-framework 0.9.1521 added an `env` parameter to `create_vm` (framework drift, unrelated to the SDK). The maintainers will release this package only after the upstream Scale PR moves the framework's built-in Daytona provider to `.v0`.
 
 **Citation legend.** `(ref: sdk-ts:<path>:<line>)` is the file at `dist/cjs/<path>` inside the npm package `@daytona/sdk@2.0.0-alpha.5` (`package.json` is at the package root). `(ref: sdk-py:<path>:<line>)` is the file inside the wheel `daytona==2.0.0a5`, for example `daytona/v2/process.py`. `(ref: mapping:<line>)` is a line of https://unpkg.com/@daytona/upgrade@0.1.0/dist/mapping.json. `(ref: docs:<page>:<line>)` is a line of https://www.daytona.com/docs/<page>.md. `(ref: MIGRATION:<line>)` is a line of `clients/upgrade/MIGRATION.md` in daytona/rlp@253e8e2. Repo code is cited as `<repo path>:<line>` at the branch named in the same row or bullet. Facts marked "measured 2026-11-02" come from live runs against Daytona Cloud with the alpha SDKs. Raw evidence (codemod reports, logs, ledgers, smoke scripts) is kept in the maintainers' local readiness evidence store and is not part of this repository.
 
@@ -16,7 +27,7 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 
 1. **agentenv-daytona has an upstream blocker.** agentenv-framework (>=0.9.1417, allowed by the package's `>=0.9.1322,<0.10`) ships a built-in `daytona` provider that shadows this plugin, imports SDK 0.x root names (`CreateSandboxFromImageParams`, `CreateSandboxFromSnapshotParams`, `Resources`) and pins `daytona~=0.224.0` in its `daytona` extra. Under SDK 2.x those imports raise ImportError, so `build_sandbox_provider('daytona')` fails for every user and `agentenv-framework[daytona]` can't be installed next to this package. The fix has to ship in agentenv-framework (drop or defer the built-in, or migrate it to `daytona.v0` and widen its extra).
 2. **Self-hosted users are excluded.** SDK 2.x is Daytona-Cloud-only. Four packages lose their custom URL/target option (stripe, agentenv, dify, pydantic-ai) and every self-hosted user must stay on the 0.x releases (§4).
-3. **Breaking floors.** Node `>=22.4.0` for the six TypeScript consumers (claude-toolsets, pi-extension, opencode-plugin, opencode-workspaces-plugin, inngest, stripe) and Python `>=3.10` for langchain-daytona-data-analysis. These are `feat!` commits and drive the version bumps in §8d.
+3. **Breaking floors.** Node `>=22.15.0` for the six TypeScript consumers (claude-toolsets, pi-extension, opencode-plugin, opencode-workspaces-plugin, inngest, stripe) and Python `>=3.10` for langchain-daytona-data-analysis. These are `feat!` commits and drive the version bumps in §8d.
 4. **Rebase at GA.** langchain must absorb #100 and #104; the other branches have no drift today (§8b).
 
 **Step B (`.v2` on microVMs): not today.** Of 14 integrations, 0 are READY, 1 is READY-WITH-CHANGES (langchain-daytona-data-analysis, breaking callback type), and 13 are BLOCKED: 11 BLOCKED-BY-V2-GAP and 2 BLOCKED-BY-REWRITE (the REST-only convex and n8n). The dominant blockers:
@@ -29,22 +40,22 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 
 | integration | Step A verdict | branch@sha | Step B verdict | blocking v2 gap(s) |
 |---|---|---|---|---|
-| daytona-adk | READY | `feat/daytona-adk-sdk2@4f928ea` | BLOCKED-BY-V2-GAP | sessions (create_session 422) |
-| langchain-daytona-data-analysis | READY-WITH-CHANGES (Python >=3.10, exact pin) | `feat/langchain-daytona-data-analysis-sdk2@b3dfaa6` | READY-WITH-CHANGES (breaking) | `on_result` becomes `InterpreterResult`; registered image id required |
-| pydantic-ai-daytona | READY-WITH-CHANGES (api_url/target removed) | `feat/pydantic-ai-daytona-sdk2@af0d42a` | BLOCKED-BY-V2-GAP | persistence (attach/start); sessions; Python `user=`; default image |
-| agentenv-daytona | READY-WITH-CHANGES (api_url/target removed; upstream framework conflict) | `feat/agentenv-daytona-sdk2@438d154` | BLOCKED-BY-V2-GAP | image build decoder; DinD unverified; sessions; upstream provider |
-| daytona-claude-toolsets | READY-WITH-CHANGES (test doubles routed to `.v0`) | `feat/daytona-claude-toolsets-sdk2@22de00f` | BLOCKED-BY-V2-GAP | computer-use parity; desktop image; sessions (Chromium) |
-| claude-toolsets | READY-WITH-CHANGES (Node >=22.4.0; per-folder codemod) | `feat/claude-toolsets-sdk2@2169287` | BLOCKED-BY-V2-GAP | computer-use parity; signed preview; sessions; desktop image |
+| daytona-adk | READY | `feat/daytona-adk-sdk2@daaa58d` | BLOCKED-BY-V2-GAP | sessions (create_session 422) |
+| langchain-daytona-data-analysis | READY-WITH-CHANGES (Python >=3.10, exact pin) | `feat/langchain-daytona-data-analysis-sdk2@cbd50a4` | READY-WITH-CHANGES (breaking) | `on_result` becomes `InterpreterResult`; registered image id required |
+| pydantic-ai-daytona | READY-WITH-CHANGES (api_url/target removed) | `feat/pydantic-ai-daytona-sdk2@494a35e` | BLOCKED-BY-V2-GAP | persistence (attach/start); sessions; Python `user=`; default image |
+| agentenv-daytona | READY-WITH-CHANGES (api_url/target removed; upstream framework conflict) | `feat/agentenv-daytona-sdk2@dac1740` | BLOCKED-BY-V2-GAP | image build decoder; DinD unverified; sessions; upstream provider |
+| daytona-claude-toolsets | READY-WITH-CHANGES (test doubles routed to `.v0`) | `feat/daytona-claude-toolsets-sdk2@4b1abe1` | BLOCKED-BY-V2-GAP | computer-use parity; desktop image; sessions (Chromium) |
+| claude-toolsets | READY-WITH-CHANGES (Node >=22.15.0; per-folder codemod) | `feat/claude-toolsets-sdk2@6d510ee` | BLOCKED-BY-V2-GAP | computer-use parity; signed preview; sessions; desktop image |
 | convex | N/A (no SDK) | — (REST-only, no branch) | BLOCKED-BY-REWRITE | 23 CHANGED + 1 NO-V2-EQUIVALENT (volumes) |
 | n8n-nodes-daytona | N/A (no SDK) | — (REST-only, no branch) | BLOCKED-BY-REWRITE | 29 CHANGED + 8 NO-V2-EQUIVALENT (volumes, snapshot activate) |
-| pi-extension | READY-WITH-CHANGES (Node >=22.4.0; DAYTONA_API_URL dropped) | `feat/pi-extension-sdk2@9c2a066` | BLOCKED-BY-V2-GAP | persistence; list/search decoder; home dir; sandbox-wide public |
-| opencode-plugin | READY-WITH-CHANGES (Node >=22.4.0) | `feat/opencode-plugin-sdk2@2fff766` | BLOCKED-BY-V2-GAP | SSH access; persistence; sessions (background bash) |
-| dify-plugin | READY-WITH-CHANGES (api_url credential removed) | `feat/dify-plugin-sdk2@3e449f7` | BLOCKED-BY-V2-GAP | persistence (manage_sandbox); sessions; list decoder; default image |
-| inngest-agentkit-coding-agent | READY-WITH-CHANGES (Node >=22.4.0; deep import replaced) | `feat/inngest-agentkit-coding-agent-sdk2@42eeb60` | BLOCKED-BY-V2-GAP | sessions (422); interpreter argv |
-| opencode-workspaces-plugin | READY-WITH-CHANGES (Node >=22.4.0; 14 test FIXMEs fixed) | `feat/opencode-workspaces-plugin-sdk2@f9dc243` | BLOCKED-BY-V2-GAP | never-delete lifecycle; stop/start persistence; preview token |
-| stripe-coding-agent-template | READY-WITH-CHANGES (apiUrl dropped; Node >=22.4.0) | `feat/stripe-coding-agent-template-sdk2@53b2350` | BLOCKED-BY-V2-GAP | sessions (422) |
+| pi-extension | READY-WITH-CHANGES (Node >=22.15.0; DAYTONA_API_URL dropped) | `feat/pi-extension-sdk2@eff304b` | BLOCKED-BY-V2-GAP | persistence; list/search decoder; home dir; sandbox-wide public |
+| opencode-plugin | READY-WITH-CHANGES (Node >=22.15.0) | `feat/opencode-plugin-sdk2@426bc81` | BLOCKED-BY-V2-GAP | SSH access; persistence; sessions (background bash) |
+| dify-plugin | READY-WITH-CHANGES (api_url credential removed) | `feat/dify-plugin-sdk2@3c0b5e0` | BLOCKED-BY-V2-GAP | persistence (manage_sandbox); sessions; list decoder; default image |
+| inngest-agentkit-coding-agent | READY-WITH-CHANGES (Node >=22.15.0; deep import replaced) | `feat/inngest-agentkit-coding-agent-sdk2@ad534c4` | BLOCKED-BY-V2-GAP | sessions (422); interpreter argv |
+| opencode-workspaces-plugin | READY-WITH-CHANGES (Node >=22.15.0; 14 test FIXMEs fixed) | `feat/opencode-workspaces-plugin-sdk2@2a48b4d` | BLOCKED-BY-V2-GAP | never-delete lifecycle; stop/start persistence; preview token |
+| stripe-coding-agent-template | READY-WITH-CHANGES (apiUrl dropped; Node >=22.15.0) | `feat/stripe-coding-agent-template-sdk2@a1eed09` | BLOCKED-BY-V2-GAP | sessions (422) |
 
-The four PoC branches stacked on Step A are `feat/daytona-adk-sdk2-v2@76813ba`, `feat/langchain-daytona-data-analysis-sdk2-v2@095a066`, `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` and `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` (§5). No pull request exists for any branch.
+The four PoC branches stacked on Step A are `feat/daytona-adk-sdk2-v2@76813ba`, `feat/langchain-daytona-data-analysis-sdk2-v2@095a066`, `feat/inngest-agentkit-coding-agent-sdk2-v2@ae51d35` and `feat/stripe-coding-agent-template-sdk2-v2@c42ef43` (§5). They stay pinned to alpha.5 and stacked on the pre-re-pin Step A heads; they were not re-pinned to alpha.12. No pull request exists for any branch.
 
 ## 3. Step A details per integration
 
@@ -52,8 +63,8 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### daytona-adk
 
-- Verdict: READY. Branch https://github.com/daytona/integrations/tree/feat/daytona-adk-sdk2 (`4f928ea`, 2 commits since base).
-- Forced breaks: none beyond the SDK major. Pin `daytona[v0-sdk]==2.0.0a5` at `packages/adk-plugin/pyproject.toml:28` (was `>=0.194.0,<0.195.0`).
+- Verdict: READY. Branch https://github.com/daytona/integrations/tree/feat/daytona-adk-sdk2 (`daaa58d`, 3 commits since base).
+- Forced breaks: none beyond the SDK major. Pin `daytona[v0-sdk]==2.0.0a12` at `packages/adk-plugin/pyproject.toml:28` (was `>=0.194.0,<0.195.0`).
 - Codemod: dry exit 0, dry `--json` exit 0, apply `--yes --json` exit 0; changed `plugin.py`, `tools.py`, `pyproject.toml`; applied diff equals dry diff; `--suggest-v2 --json` exit 0 and wrote nothing.
 - FIXMEs: 0 inserted; 1 informational `types-unresolved` item ledgered.
 - CI parity: ruff exit 0 before and after; pytest 22 collected / 22 skipped before and after (the suite is live-gated, so it proves imports only).
@@ -61,8 +72,8 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### langchain-daytona-data-analysis
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/langchain-daytona-data-analysis-sdk2 (`b3dfaa6`, 3 commits). Evidence: `packages/langchain-data-analysis/pyproject.toml:22` (`python = ">=3.10,<4.0"`) and `:24` (`daytona = {version = "2.0.0a5", extras = ["v0-sdk"]}`); the root client has no resource methods, so `create`/`get`/`delete` moved to `.v0` (ref: sdk-py:daytona/_client.py:353).
-- Forced breaks: Python floor raised from `>=3.9` to `>=3.10` in its own `feat!` commit, because SDK 2 supports Python 3.10+ and Poetry couldn't resolve it under the old floor; exact pre-release pin (Poetry accepts the exact `2.0.0a5` without `allow-prereleases`, but rejects it under `>=2,<3`).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/langchain-daytona-data-analysis-sdk2 (`cbd50a4`, 4 commits). Evidence: `packages/langchain-data-analysis/pyproject.toml:22` (`python = ">=3.10,<4.0"`) and `:24` (`daytona = {version = "2.0.0a12", extras = ["v0-sdk"]}`); the root client has no resource methods, so `create`/`get`/`delete` moved to `.v0` (ref: sdk-py:daytona/_client.py:353).
+- Forced breaks: Python floor raised from `>=3.9` to `>=3.10` in its own `feat!` commit, because SDK 2 supports Python 3.10+ and Poetry couldn't resolve it under the old floor; exact pre-release pin (Poetry accepts the exact `2.0.0a12` without `allow-prereleases`, but rejects it under `>=2,<3`).
 - Codemod: dry/apply exit 0; 3 FIXMEs inserted (`close()`, `get_sandbox()`) and resolved by moving the calls to `.v0`; 2 `mock-target` items resolved by moving the unit-test `Daytona` mocks under `.v0`; notebook diff applied by the tool.
 - FIXMEs: 3 inserted / 3 resolved / 0 ledgered.
 - CI parity: `poetry run ruff check .` clean both times; `pytest tests/unit_tests` 21 passed before and after. A mutation probe (reverting the mock to the root shape) turns 5 tests red, so the suite covers the `.v0` path. `poetry.lock` is gitignored in this package.
@@ -71,7 +82,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### pydantic-ai-daytona
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/pydantic-ai-daytona-sdk2 (`af0d42a`, 3 commits). Evidence: `packages/pydantic-ai-daytona/pyproject.toml:33` (exact pin; the "Wide on purpose" comment is kept with a note to restore `>=2,<3` at GA); the root config rejects `api_url` with a TypeError (ref: sdk-py:daytona/_client.py:202).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/pydantic-ai-daytona-sdk2 (`494a35e`, 4 commits). Evidence: `packages/pydantic-ai-daytona/pyproject.toml:33` (exact pin; the "Wide on purpose" comment is kept with a note to restore `>=2,<3` at GA); the root config rejects `api_url` with a TypeError (ref: sdk-py:daytona/_client.py:202).
 - Forced breaks: `api_url` and `target` options removed from the session, capability and toolset (`feat!`, commit #1). The session config was inlined so the codemod could verify it.
 - Codemod: dry refused twice with exit 2 (`custom-api-url`), then exit 0 after commit #1; apply exit 0, 12 files, 13 manual items, 0 FIXMEs. One codemod miss fixed by hand: integration create-recorders at `tests/integration_tests/conftest.py:108-111,120` retargeted to the v0 client class.
 - FIXMEs: 0; manual items 13 = 12 `mock-target` resolved (unit fakes gained a `FakeV0` facade) + 1 `types-unresolved` ledgered.
@@ -80,7 +91,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### agentenv-daytona
 
-- Verdict: READY-WITH-CHANGES, with the upstream blocker from §2. Branch https://github.com/daytona/integrations/tree/feat/agentenv-daytona-sdk2 (`438d154`, 3 commits). Evidence: `packages/agentenv-daytona/pyproject.toml:31` (exact pin); root config has no URL field (ref: sdk-py:daytona/_client.py:156).
+- Verdict: READY-WITH-CHANGES, with the upstream blocker from §2. Branch https://github.com/daytona/integrations/tree/feat/agentenv-daytona-sdk2 (`dac1740`, 4 commits). Evidence: `packages/agentenv-daytona/pyproject.toml:31` (exact pin); root config has no URL field (ref: sdk-py:daytona/_client.py:156).
 - Forced breaks: `api_url` / `target` config keys removed (`feat!`, commit #1). `CONFIG_KEYS` is now `api_key, snapshot, base_image, egress_hosts`; `DEFAULT_API_URL` survives only for the non-SDK preview-domain fetch.
 - Codemod: dry/apply exit 0; 0 FIXMEs. The codemod missed 4 resource calls because the receivers are typed `Any`; they were hand-migrated to `.v0` in commit #2. Unit fakes gained a `FakeV0` facade.
 - FIXMEs: 0 inserted; 1 `types-unresolved` ledgered; 21 `--suggest-v2` items fed into §6.
@@ -89,7 +100,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### daytona-claude-toolsets
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/daytona-claude-toolsets-sdk2 (`22de00f`, 2 commits). Evidence: `packages/claude-toolsets/python/pyproject.toml:41` (exact pin, was `>=0.223.0,<0.224.0`); v0 keeps `mouse.down/up` while v2 lacks them (ref: sdk-py:daytona/v2/computer_use_services.py:136).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/daytona-claude-toolsets-sdk2 (`4b1abe1`, 3 commits). Evidence: `packages/claude-toolsets/python/pyproject.toml:41` (exact pin, was `>=0.223.0,<0.224.0`); v0 keeps `mouse.down/up` while v2 lacks them (ref: sdk-py:daytona/v2/computer_use_services.py:136).
 - Forced breaks: none beyond the SDK major (`requires-python >=3.10` already matched).
 - Codemod: dry, dry `--json`, apply exit 0 (11 files), post-apply dry idempotent; `--suggest-v2` 67 items (6 "No v2 equivalent" for mouse/key down/up).
 - FIXMEs: 0 inserted. The codemod didn't route the bare `MagicMock` test doubles in `tests/unit_tests/{test_computer,test_browser,test_examples}.py`; 3 files fixed by hand (6 failures before the fix).
@@ -98,8 +109,8 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### claude-toolsets
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/claude-toolsets-sdk2 (`2169287`, 2 commits). Evidence: `packages/claude-toolsets/typescript/package.json:43` (`"node": ">=22.4.0"`) and `:57` (exact pin, was `^0.223.0`); the alpha's engine floor (ref: sdk-ts:package.json:167).
-- Forced breaks: Node floor `>=22.4.0`; a test fixture's `apiUrl` removed because the root constructor throws on it (ref: sdk-ts:Daytona.js:173).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/claude-toolsets-sdk2 (`6d510ee`, 3 commits). Evidence: `packages/claude-toolsets/typescript/package.json:43` (`"node": ">=22.15.0"`) and `:57` (exact pin, was `^0.223.0`); the alpha's engine floor (ref: sdk-ts:package.json:167; `>=22.4.0` in alpha.5, raised to `>=22.15.0` in alpha.12).
+- Forced breaks: Node floor `>=22.15.0`; a test fixture's `apiUrl` removed because the root constructor throws on it (ref: sdk-ts:Daytona.js:173).
 - Codemod: **tool defect**: `@daytona/upgrade@0.1.0` hangs on a whole-package scan (exit 124 at the 900 s cap, three times; a minimal repro throws `RangeError: Invalid array length` while analysing `vi.fn().mockResolvedValue`). It was applied per folder (`src/`, `examples/`). `tests/` was migrated by hand (the codemod refused on the fixture `apiUrl` literal) and confirmed by a zero-change dry run afterwards.
 - FIXMEs: 1 inserted / 1 resolved / 0 remaining.
 - CI parity: 15 files / 344 tests pass before and after; typecheck and build exit 0; V0_ESM_OK.
@@ -108,7 +119,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### pi-extension
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/pi-extension-sdk2 (`9c2a066`, 2 commits). Evidence: `packages/pi-extension/package.json:43` (exact pin, was `^0.184.0`) and `:46` (`"node": ">=22.4.0"`); the root `.v0` client ignores `DAYTONA_API_URL` (ref: sdk-ts:Daytona.js:275).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/pi-extension-sdk2 (`eff304b`, 3 commits). Evidence: `packages/pi-extension/package.json:43` (exact pin, was `^0.184.0`) and `:46` (`"node": ">=22.15.0"`); the root `.v0` client ignores `DAYTONA_API_URL` (ref: sdk-ts:Daytona.js:275).
 - Forced breaks: Node floor; `DAYTONA_API_URL` README row removed (the `DAYTONA_TARGET` row stays, see §4).
 - Codemod: dry, dry `--json`, apply, `--suggest-v2`, post-apply dry all exit 0. Output depends on `npm ci` having run first (§8c).
 - FIXMEs: 1 inserted (a false-positive `mock-target` at `index.ts:432`) / 1 removed; 4 manual items = 2 code changes (`scripts/recovery.mjs` now imports `DaytonaNotFoundError` from `@daytona/sdk/v0`) + 2 reviewed with no change.
@@ -117,7 +128,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### opencode-plugin
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/opencode-plugin-sdk2 (`2fff766`, 2 commits). Evidence: `packages/opencode-plugin/package.json:32` (exact pin, was `^0.204.1`) and `:42` (Node floor) (ref: sdk-ts:package.json:167).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/opencode-plugin-sdk2 (`426bc81`, 3 commits). Evidence: `packages/opencode-plugin/package.json:32` (exact pin, was `^0.204.1`) and `:42` (Node floor) (ref: sdk-ts:package.json:167).
 - Forced breaks: Node floor only.
 - Codemod: rewrote the 7 dot-directory sources under `.opencode/plugin/daytona/**` itself; no manual v0 rewrite needed. The codemod emitted one cosmetic split import.
 - FIXMEs: 0 / 0 / 0.
@@ -126,7 +137,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### dify-plugin
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/dify-plugin-sdk2 (`3e449f7`, 3 commits). Evidence: `apps/dify-plugin/pyproject.toml:15` and `apps/dify-plugin/requirements.txt:2` (exact pin, was `>=0.193.0,<1.0.0`); custom URL text "SDK 2.x targets Daytona Cloud" (ref: sdk-py:daytona/_client.py:73).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/dify-plugin-sdk2 (`3c0b5e0`, 4 commits). Evidence: `apps/dify-plugin/pyproject.toml:15` and `apps/dify-plugin/requirements.txt:2` (exact pin, was `>=0.193.0,<1.0.0`); custom URL text "SDK 2.x targets Daytona Cloud" (ref: sdk-py:daytona/_client.py:73).
 - Forced breaks: the user-facing `api_url` credential removed from `_client.py` and `provider/daytona.yaml` (`feat!`, commit #1); `PRIVACY.md` self-hosted sentence adjusted.
 - Codemod: dry exit 2 (`custom-api-url`) before commit #1, exit 0 after; apply exit 0, 10 files; per-file mode not needed.
 - FIXMEs: 0; 2 manual items (`private-import`, `types-unresolved`) ledgered as non-actionable.
@@ -135,8 +146,8 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### inngest-agentkit-coding-agent
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/inngest-agentkit-coding-agent-sdk2 (`42eeb60`, 3 commits). Evidence: `apps/inngest-agentkit-coding-agent/package.json:9` (Node floor) and `:21` (`@daytona/sdk` exact pin, was `@daytonaio/sdk ^0.117.0`); v0 exports `FileUpload` (ref: sdk-ts:v0/index.d.ts:4) and the package only exports `.`, `./v0`, `./v2` (ref: sdk-ts:package.json:29).
-- Forced breaks: package rename to `@daytona/sdk`; Node `>=22.4.0`; Dockerfile `node:22-alpine`; the private deep import `@daytonaio/sdk/src/FileSystem.js` replaced by `@daytona/sdk/v0`.
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/inngest-agentkit-coding-agent-sdk2 (`ad534c4`, 4 commits). Evidence: `apps/inngest-agentkit-coding-agent/package.json:9` (Node floor) and `:21` (`@daytona/sdk` exact pin, was `@daytonaio/sdk ^0.117.0`); v0 exports `FileUpload` (ref: sdk-ts:v0/index.d.ts:4) and the package only exports `.`, `./v0`, `./v2` (ref: sdk-ts:package.json:29).
+- Forced breaks: package rename to `@daytona/sdk`; Node `>=22.15.0`; Dockerfile `node:22-alpine`; the private deep import `@daytonaio/sdk/src/FileSystem.js` replaced by `@daytona/sdk/v0`.
 - Codemod: dry, dry `--json`, apply, `--suggest-v2` (16 suggestions) exit 0; post-apply dry 0 files.
 - FIXMEs: 0; 3 manual items (deep import fixed in code; `env-api-url` needs no change because `.env.example` has no `DAYTONA_API_URL`; exact pin intentional).
 - CI parity (not in `ci.yml`): `npm ci` / `npm run build` 0/0 before and after; `docker build` exit 0. Restoring the deep import fails with TS2307, so the build gate is real.
@@ -145,7 +156,7 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### opencode-workspaces-plugin
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/opencode-workspaces-plugin-sdk2 (`f9dc243`, 3 commits). Evidence: `apps/opencode-workspaces-plugin/package.json:29` (exact pin, was `^0.163.0`) and `:39` (Node floor); v0 `list()` returns an async iterator (ref: sdk-ts:v0/Daytona.d.ts:368).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/opencode-workspaces-plugin-sdk2 (`2a48b4d`, 4 commits). Evidence: `apps/opencode-workspaces-plugin/package.json:29` (exact pin, was `^0.163.0`) and `:39` (Node floor); v0 `list()` returns an async iterator (ref: sdk-ts:v0/Daytona.d.ts:368).
 - Forced breaks: Node floor; README floor, install and self-hosted lines.
 - Codemod: walked the dot-directory `.opencode/plugin/daytona/index.ts` itself; 5 root-client calls moved to `.v0`. It did **not** rewrite the test files: it inserted 14 FIXMEs in `test/*.test.ts` instead. An independent review found those calls broken under the pin (several in `afterAll` cleanups, one inside a silent `try/catch` that would leak sandboxes), so they were fixed in commit `6d5b9fa` (including `for await` over `v0.list()`).
 - FIXMEs: 14 inserted / 14 resolved / 0 ledgered; 2 idempotence notices ledgered.
@@ -154,16 +165,16 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### stripe-coding-agent-template
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/stripe-coding-agent-template-sdk2 (`53b2350`, 4 commits). Evidence: `apps/stripe-coding-agent-template/package.json:7` (Node floor) and `:35` (exact pin, was `0.184.0`); the root rejects `apiUrl` (ref: sdk-ts:Daytona.js:173).
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/stripe-coding-agent-template-sdk2 (`a1eed09`, 5 commits). Evidence: `apps/stripe-coding-agent-template/package.json:7` (Node floor) and `:35` (exact pin, was `0.184.0`); the root rejects `apiUrl` (ref: sdk-ts:Daytona.js:173).
 - Forced breaks: `apiUrl` / `DAYTONA_SANDBOX_API_URL` dropped from `app/api/copilotkit/route.ts` (`feat!`, commit #1); `organizationId` stays (it's a valid root field). Node floor. Residual "stay on 0.x" wording in README, `.env.example`, `.env.local.example`, `AGENTS.md` and a route comment was aligned afterwards.
 - Codemod: exit 2 (`custom-api-url`) before commit #1, exit 0 after (no `--drop-api-url`, no `--force`); apply exit 0; 0 FIXMEs; 2 `env-api-url` items reviewed.
 - CI parity (not in `ci.yml`): `npm ci`, `npx tsc --noEmit`, `next build` exit 0. The baseline build needed a placeholder key; the branch builds without one. The CJS-only `./v0` entry is in the Next server output via the nft trace. Next prints a non-fatal "Critical dependency" warning from the SDK's v2 events module (the baseline had the same warning class). npm prints the same `@opentelemetry/api` ERESOLVE peer warnings as inngest (not added).
 - Live v0 smoke: passed. Sandboxes 1 / 1.
-- Note: `engines.node: ">=22.4.0"` is open-ended, so Vercel may pick Node 22 or 24; both satisfy the SDK.
+- Note: `engines.node: ">=22.15.0"` is open-ended, so Vercel may pick Node 22 or 24; both satisfy the SDK.
 
 ## 4. Who is excluded by SDK 2
 
-**Every self-hosted or custom-endpoint user is excluded.** SDK 2.x targets Daytona Cloud only: the TS root constructor throws a TypeError on `apiUrl` (ref: sdk-ts:Daytona.js:173), the Python root config raises a TypeError on `api_url` (ref: sdk-py:daytona/_client.py:202), and both SDKs carry the message "SDK 2.x targets Daytona Cloud. For a custom API URL, stay on SDK 0.x." (ref: sdk-ts:Daytona.js:71) (ref: MIGRATION:32). Both codemods refuse a project with a custom URL (exit 2) and say the same.
+**Every self-hosted or custom-endpoint user is excluded.** SDK 2.x targets Daytona Cloud only: the TS root constructor rejects `apiUrl` (a TypeError in alpha.5 (ref: sdk-ts:Daytona.js:173), a `BadRequestError` in alpha.12), the Python root config raises a TypeError on `api_url` (ref: sdk-py:daytona/_client.py:202), and both SDKs carry the message "SDK 2.x targets Daytona Cloud. For a custom API URL, stay on SDK 0.x." (ref: sdk-ts:Daytona.js:71) (ref: MIGRATION:32). Both codemods refuse a project with a custom URL (exit 2) and say the same.
 
 Four packages had to remove an option to migrate:
 
@@ -188,7 +199,7 @@ Every Step A branch README now says the last self-hosted-capable release is the 
 
 Four integrations got a real `daytona.v2` port on a branch stacked on their Step A branch, run live against microVMs. These branches aren't meant to merge.
 
-| integration | `-v2` branch@sha | Step A parent | step_b verdict | live-proven sha -> final sha |
+| integration | `-v2` branch@sha | Step A parent (pre-re-pin, alpha.5) | step_b verdict | live-proven sha -> final sha |
 |---|---|---|---|---|
 | daytona-adk | `feat/daytona-adk-sdk2-v2@76813ba` | `4f928ea` | BLOCKED-BY-V2-GAP(sessions:create_session) | `d671fb5` -> `76813ba` |
 | langchain-daytona-data-analysis | `feat/langchain-daytona-data-analysis-sdk2-v2@095a066` | `b3dfaa6` | READY-WITH-CHANGES (breaking) | `f1281a1` -> `095a066` |
@@ -370,25 +381,25 @@ Verdict BLOCKED-BY-REWRITE. Evidence: every call goes through `httpRequestWithAu
 
 | branch | manifest file(s) | current pin -> GA pin | lockfile command | CI-parity commands |
 |---|---|---|---|---|
-| `feat/daytona-adk-sdk2` | `packages/adk-plugin/pyproject.toml` | `daytona[v0-sdk]==2.0.0a5` -> `daytona[v0-sdk]>=2,<3` (or `>=2.0,<2.1`) | none (no lock) | `python -m pip install -e ".[dev]" && ruff check .` |
-| `feat/langchain-daytona-data-analysis-sdk2` | `packages/langchain-data-analysis/pyproject.toml` | `daytona = {version = "2.0.0a5", extras = ["v0-sdk"]}` -> `daytona = {version = ">=2,<3", extras = ["v0-sdk"]}` | none (`poetry.lock` is gitignored) | `poetry install --with test,lint && poetry run ruff check . && poetry run pytest tests/unit_tests` |
-| `feat/pydantic-ai-daytona-sdk2` | `packages/pydantic-ai-daytona/pyproject.toml` | `daytona[v0-sdk]==2.0.0a5` -> `daytona[v0-sdk]>=2,<3` | none | `python -m pip install -e ".[dev]" && ruff check . && pytest` |
-| `feat/agentenv-daytona-sdk2` | `packages/agentenv-daytona/pyproject.toml` | `daytona[v0-sdk]==2.0.0a5` -> `daytona[v0-sdk]>=2,<3` (or `>=2.0,<2.1`) | none | `python -m pip install -e ".[dev]" && ruff check . && black --check . && mypy agentenv_daytona && pytest` |
-| `feat/daytona-claude-toolsets-sdk2` | `packages/claude-toolsets/python/pyproject.toml` | `daytona[v0-sdk]==2.0.0a5` -> `daytona[v0-sdk]>=2,<3` (or `>=2.0,<2.1`) | none | `python -m pip install -e ".[dev]" && ruff check . && mypy daytona_claude_toolsets && pytest` |
-| `feat/claude-toolsets-sdk2` | `packages/claude-toolsets/typescript/package.json` | `"@daytona/sdk": "2.0.0-alpha.5"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck && npm run build && npm test` |
-| `feat/pi-extension-sdk2` | `packages/pi-extension/package.json` | `"@daytona/sdk": "2.0.0-alpha.5"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck --if-present && npm run build --if-present` |
-| `feat/opencode-plugin-sdk2` | `packages/opencode-plugin/package.json` | `"@daytona/sdk": "2.0.0-alpha.5"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck --if-present && npm run build --if-present` |
-| `feat/dify-plugin-sdk2` | `apps/dify-plugin/pyproject.toml`, `apps/dify-plugin/requirements.txt` | `daytona[v0-sdk]==2.0.0a5` -> `daytona[v0-sdk]>=2,<3` (both files) | `uv lock` | `uv lock --check && uv sync --frozen && uv run python -c 'import _client, provider.daytona'` |
-| `feat/inngest-agentkit-coding-agent-sdk2` | `apps/inngest-agentkit-coding-agent/package.json` | `"@daytona/sdk": "2.0.0-alpha.5"` -> `"^2.0.0"` | `npm install` | `npm ci && npm run build && docker build .` |
-| `feat/opencode-workspaces-plugin-sdk2` | `apps/opencode-workspaces-plugin/package.json` | `"@daytona/sdk": "2.0.0-alpha.5"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck && npm run build` |
-| `feat/stripe-coding-agent-template-sdk2` | `apps/stripe-coding-agent-template/package.json` | `"@daytona/sdk": "2.0.0-alpha.5"` -> `"^2.0.0"` | `npm install` | `npm ci && npx tsc --noEmit && npm run build` |
+| `feat/daytona-adk-sdk2` | `packages/adk-plugin/pyproject.toml` | `daytona[v0-sdk]==2.0.0a12` -> `daytona[v0-sdk]>=2,<3` (or `>=2.0,<2.1`) | none (no lock) | `python -m pip install -e ".[dev]" && ruff check .` |
+| `feat/langchain-daytona-data-analysis-sdk2` | `packages/langchain-data-analysis/pyproject.toml` | `daytona = {version = "2.0.0a12", extras = ["v0-sdk"]}` -> `daytona = {version = ">=2,<3", extras = ["v0-sdk"]}` | none (`poetry.lock` is gitignored) | `poetry install --with test,lint && poetry run ruff check . && poetry run pytest tests/unit_tests` |
+| `feat/pydantic-ai-daytona-sdk2` | `packages/pydantic-ai-daytona/pyproject.toml` | `daytona[v0-sdk]==2.0.0a12` -> `daytona[v0-sdk]>=2,<3` | none | `python -m pip install -e ".[dev]" && ruff check . && pytest` |
+| `feat/agentenv-daytona-sdk2` | `packages/agentenv-daytona/pyproject.toml` | `daytona[v0-sdk]==2.0.0a12` -> `daytona[v0-sdk]>=2,<3` (or `>=2.0,<2.1`) | none | `python -m pip install -e ".[dev]" && ruff check . && black --check . && mypy agentenv_daytona && pytest` |
+| `feat/daytona-claude-toolsets-sdk2` | `packages/claude-toolsets/python/pyproject.toml` | `daytona[v0-sdk]==2.0.0a12` -> `daytona[v0-sdk]>=2,<3` (or `>=2.0,<2.1`) | none | `python -m pip install -e ".[dev]" && ruff check . && mypy daytona_claude_toolsets && pytest` |
+| `feat/claude-toolsets-sdk2` | `packages/claude-toolsets/typescript/package.json` | `"@daytona/sdk": "2.0.0-alpha.12"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck && npm run build && npm test` |
+| `feat/pi-extension-sdk2` | `packages/pi-extension/package.json` | `"@daytona/sdk": "2.0.0-alpha.12"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck --if-present && npm run build --if-present` |
+| `feat/opencode-plugin-sdk2` | `packages/opencode-plugin/package.json` | `"@daytona/sdk": "2.0.0-alpha.12"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck --if-present && npm run build --if-present` |
+| `feat/dify-plugin-sdk2` | `apps/dify-plugin/pyproject.toml`, `apps/dify-plugin/requirements.txt` | `daytona[v0-sdk]==2.0.0a12` -> `daytona[v0-sdk]>=2,<3` (both files) | `uv lock` | `uv lock --check && uv sync --frozen && uv run python -c 'import _client, provider.daytona'` |
+| `feat/inngest-agentkit-coding-agent-sdk2` | `apps/inngest-agentkit-coding-agent/package.json` | `"@daytona/sdk": "2.0.0-alpha.12"` -> `"^2.0.0"` | `npm install` | `npm ci && npm run build && docker build .` |
+| `feat/opencode-workspaces-plugin-sdk2` | `apps/opencode-workspaces-plugin/package.json` | `"@daytona/sdk": "2.0.0-alpha.12"` -> `"^2.0.0"` | `npm install` | `npm ci --ignore-scripts && npm run typecheck && npm run build` |
+| `feat/stripe-coding-agent-template-sdk2` | `apps/stripe-coding-agent-template/package.json` | `"@daytona/sdk": "2.0.0-alpha.12"` -> `"^2.0.0"` | `npm install` | `npm ci && npx tsc --noEmit && npm run build` |
 
 Range notes:
 
 - `>=2,<3` is wide on purpose for pydantic-ai-daytona and langchain-daytona-data-analysis: the maintainers' comment on #102 says a one-minor pin can't share an environment with other Daytona SDK users.
 - daytona-adk (`>=0.194.0,<0.195.0`), agentenv-daytona (`>=0.224.0,<0.225.0`) and daytona-claude-toolsets (`>=0.223.0,<0.224.0`) used one-minor windows on main and may prefer `>=2.0,<2.1`.
 - In Poetry syntax the wide range is `daytona = {version = ">=2,<3", extras = ["v0-sdk"]}`.
-- Keep the `>=22.4.0` Node engines and the langchain `>=3.10` floor unless 2.0.0 changes them.
+- Keep the `>=22.15.0` Node engines and the langchain `>=3.10` floor unless 2.0.0 changes them.
 
 ### 8b. GA order of operations
 
@@ -422,13 +433,13 @@ test -z "$(git -C $W status --porcelain)"
 # 3 apply (exit 0; 4 manual items: index.ts:430 mock-target, 3x dynamic-import)
 npx -y @daytona/upgrade@0.1.0 . --yes --json
 # 4 pin exact alpha + engines BEFORE any install
-sed -i 's|"@daytona/sdk": "\^2.0.0"|"@daytona/sdk": "2.0.0-alpha.5"|' package.json
-sed -i '/^  "peerDependencies": {/i\  "engines": {\n    "node": ">=22.4.0"\n  },' package.json
-jq -e '.dependencies["@daytona/sdk"]=="2.0.0-alpha.5" and .engines.node==">=22.4.0"' package.json
+sed -i 's|"@daytona/sdk": "\^2.0.0"|"@daytona/sdk": "2.0.0-alpha.12"|' package.json
+sed -i '/^  "peerDependencies": {/i\  "engines": {\n    "node": ">=22.15.0"\n  },' package.json
+jq -e '.dependencies["@daytona/sdk"]=="2.0.0-alpha.12" and .engines.node==">=22.15.0"' package.json
 # 5 install + CI parity
 npm install
 rm -rf node_modules && npm ci --ignore-scripts
-jq -r '.packages["node_modules/@daytona/sdk"].version' package-lock.json   # 2.0.0-alpha.5
+jq -r '.packages["node_modules/@daytona/sdk"].version' package-lock.json   # 2.0.0-alpha.12
 # 6 manual fixes (false-positive FIXME; v0 error import in recovery.mjs)
 perl -0pi -e 's/      if \(daytona\)\n      \/\/ FIXME\(daytona-upgrade\): [^\n]*\n      await reapOrphans\(daytona\)\n/      if (daytona) await reapOrphans(daytona)\n/' index.ts
 perl -pi -e 's/^const \{ Daytona, DaytonaNotFoundError \} = await import\(\x27\@daytona\/sdk\x27\)$/const { Daytona } = await import(\x27\@daytona\/sdk\x27)\nconst { DaytonaNotFoundError } = await import(\x27\@daytona\/sdk\/v0\x27)/' scripts/recovery.mjs
@@ -510,8 +521,9 @@ Every live sandbox was labelled `sdk2-readiness=<component>`, journaled on creat
 
 ## 10. Risks and unverified items
 
-- **Alpha drift.** Everything here is pinned to alpha.5, and the SDK may change between alphas. Re-run the codemod dry passes and the CI-parity commands on each new alpha and at 2.0.0.
-- **PyPI ordering.** `daytona` `2.0.0rc1` (published 2026-09-09) outranks `2.0.0a5` (2026-11-02) under PEP 440, so `pip install --pre daytona` or `uv --prerelease=allow` resolves rc1. Pins must stay exact until 2.0.0.
+- **Alpha drift.** The measurements here are from alpha.5, and the SDK may change between alphas. Re-run the codemod dry passes and the CI-parity commands on each new alpha and at 2.0.0.
+- **Alphas keep changing.** alpha.5 -> alpha.12 raised the Node floor and changed root exports; re-run the checks at the next pre-release or RC.
+- **PyPI ordering.** `daytona` `2.0.0rc1` (published 2026-09-09) outranks `2.0.0a5` (2026-11-02) and `2.0.0a12` under PEP 440, so `pip install --pre daytona` or `uv --prerelease=allow` resolves rc1. Pins must stay exact until 2.0.0.
 - **No published GA date** for SDK 2.0.0.
 - **Session rejection may be a deployment state.** The 422 comes from the deployed daemon, while the SDK documents sessions. A daemon update could clear the dominant Step B blocker without any SDK change. Re-test before acting on the session verdicts.
 - **Offline-only fix rounds.** The final revision of each `-v2` branch wasn't re-run live (§5).
