@@ -137,8 +137,8 @@ On the React side, `app/page.tsx` registers one `useRenderTool` per tool; each r
 
 ## Prerequisites
 
-- **Node.js 22.4+** (`engines.node` is `>=22.4.0`, which Vercel reads to pick a Node 22+ runtime)
-- Installs Daytona SDK 2.x (`@daytona/sdk` pinned to the pre-release `2.0.0-alpha.5` until 2.0.0 is stable), used through its `daytona.v0` namespace
+- **Node.js 22.15+** (`engines.node` is `>=22.15.0`, which Vercel reads to pick a Node 22+ runtime)
+- Installs Daytona SDK 2.x (`@daytona/sdk` pinned to the pre-release `2.0.0-alpha.12` until 2.0.0 is stable), used through its `daytona.v0` namespace
 - Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 - A **Daytona** key (or `daytona/sandbox` via Stripe Projects) — note a Daytona plan must be active before a sandbox can be provisioned
 - An **OpenRouter** key (or `openrouter/api` via Stripe Projects). The default model needs the `pay_as_you_go` plan; on the `free` plan, set `OPENROUTER_MODEL` to a free model
