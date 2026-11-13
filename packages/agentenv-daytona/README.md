@@ -19,7 +19,7 @@ pip install agentenv-daytona      # or: uv add agentenv-daytona
 It installs `agentenv-framework` and the Daytona Python SDK. `agent-env plugin list` then shows
 `sandbox provider daytona`.
 
-Requires the Daytona SDK 2.x `v0` namespace, pinned to the pre-release `daytona[v0-sdk]==2.0.0a5` until 2.0.0 is
+Requires the Daytona SDK 2.x `v0` namespace, pinned to the pre-release `daytona[v0-sdk]==2.0.0a12` until 2.0.0 is
 stable.
 
 Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
