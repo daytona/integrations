@@ -1,0 +1,26 @@
+SDK2-MIGRATION.md
+  s_f625f8623f808c::t_6190bbd7a35b8a 529
+  s_f625f8623f808c::t_f5eabcb72751c2 519
+  s_f625f8623f808c::t_d4b8c42e6e88ce 232,243
+  s_f625f8623f808c::t_cfa0daf5ee3bae 19
+  s_f625f8623f808c::t_df22ca47d9ca1d 58
+  s_f625f8623f808c::t_ede71a42eddba6 200,202-207
+  s_f625f8623f808c::t_09e2ccbaab7fcd 209
+  s_f625f8623f808c::t_253d1fd0177476 411
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6d0740f4a62eb7a7f40fdfc52e21c75ff7afc547",
+  "prompts": {},
+  "sessions": {
+    "s_f625f8623f808c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e2a4a49c5ffetmKGv2kdxIMO71",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
