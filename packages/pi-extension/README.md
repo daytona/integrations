@@ -31,7 +31,7 @@ pi install npm:@daytona/pi
 > [!NOTE]
 > To update the extension later, run `pi update` — `pi install` won't refresh an existing install.
 
-Requires Node.js 22.4 or newer. The extension uses the Daytona SDK 2.x `v0` namespace and is pinned to the pre-release `@daytona/sdk@2.0.0-alpha.5` until 2.0.0 is stable.
+Requires Node.js 22.15 or newer. The extension uses the Daytona SDK 2.x `v0` namespace and is pinned to the pre-release `@daytona/sdk@2.0.0-alpha.12` until 2.0.0 is stable.
 
 ### Environment Configuration
 
