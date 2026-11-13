@@ -28,7 +28,7 @@ dependencies = [
     # loading the plugin and skips it when the installed agent-env is outside it.
     "agentenv-framework>=0.9.1322,<0.10",
     # Exact pre-release pin until 2.0.0 is stable; restore >=2,<3 at GA.
-    "daytona[v0-sdk]==2.0.0a5",
+    "daytona[v0-sdk]==2.0.0a12",
 ]
 
 [project.optional-dependencies]
