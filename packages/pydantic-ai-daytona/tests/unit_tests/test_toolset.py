@@ -80,6 +80,7 @@ def make_toolset(session: FakeSession, **overrides: Any) -> DaytonaSandboxToolse
         "auto_stop_interval": None,
         "auto_delete_interval": None,
         "api_key": None,
+        "target": None,
         "default_command_timeout": 60.0,
         "max_command_timeout": 300,
         "max_output_bytes": 50 * 1024,

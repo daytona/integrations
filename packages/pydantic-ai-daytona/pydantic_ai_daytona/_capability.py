@@ -137,6 +137,9 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
     api_key: str | None = None
     """Daytona API key (falls back to the `DAYTONA_API_KEY` environment variable)."""
 
+    target: str | None = None
+    """Daytona target region (falls back to `DAYTONA_TARGET`, then the Daytona default)."""
+
     default_command_timeout: float = 60.0
     """Default timeout in seconds for one `run_command`, used when the model omits one."""
 
@@ -265,6 +268,7 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
             ("sandbox_id", self.sandbox_id),
             ("workdir", self.workdir),
             ("api_key", self.api_key),
+            ("target", self.target),
         ):
             if value is not None:
                 conflicts.append(name)
@@ -303,6 +307,7 @@ class DaytonaSandbox(AbstractCapability[AgentDepsT]):
             auto_stop_interval=self.auto_stop_interval,
             auto_delete_interval=self.auto_delete_interval,
             api_key=self.api_key,
+            target=self.target,
             default_command_timeout=self.default_command_timeout,
             max_command_timeout=self.max_command_timeout,
             max_output_bytes=self.max_output_bytes,

@@ -59,6 +59,7 @@ class DaytonaSandboxSession:
         auto_stop_interval: int | None = None,
         auto_delete_interval: int | None = None,
         api_key: str | None = None,
+        target: str | None = None,
         create_timeout: float = DEFAULT_SANDBOX_CREATE_TIMEOUT,
     ) -> None:
         if snapshot is not None and image is not None:
@@ -77,6 +78,7 @@ class DaytonaSandboxSession:
         self._auto_stop_interval = auto_stop_interval
         self._auto_delete_interval = auto_delete_interval
         self._api_key = api_key
+        self._target = target
         self._create_timeout = create_timeout
         self._daytona: AsyncDaytona | None = None
         self._sandbox: AsyncSandbox | None = None
@@ -190,6 +192,7 @@ class DaytonaSandboxSession:
                 domain_allow_list=self._domain_allow_list,
                 auto_stop_interval=self._auto_stop_interval,
                 auto_delete_interval=self._auto_delete_interval,
+                target=self._target,
             )
         return CreateSandboxFromSnapshotParams(
             snapshot=self._snapshot,
@@ -202,6 +205,7 @@ class DaytonaSandboxSession:
             domain_allow_list=self._domain_allow_list,
             auto_stop_interval=self._auto_stop_interval,
             auto_delete_interval=self._auto_delete_interval,
+            target=self._target,
         )
 
     def _require_sandbox(self) -> AsyncSandbox:
