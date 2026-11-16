@@ -35,7 +35,25 @@ concurrency:
 
 jobs:
   cla-assistant:
-    name: CLA signed
+    # Only a run that actually executes the CLA action below may report the
+    # required "CLA signed" check. Runs that skip it -- the `pull_request` path
+    # on every PR except release-please's, and a PR closed without merging --
+    # still post a check on the PR head, and a job whose step was skipped
+    # succeeds, so under the required name they would pass the CLA gate without
+    # checking anything. Keep this condition identical to the step's `if`.
+    name: >-
+      ${{ ((github.event_name == 'issue_comment' &&
+            github.event.issue.pull_request != null &&
+            (github.event.comment.body == 'recheck' ||
+             github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')) ||
+           (github.event_name == 'pull_request_target' &&
+            (github.event.action != 'closed' ||
+             (github.event.pull_request.merged == true &&
+              github.event.pull_request.user.login != 'github-actions[bot]'))) ||
+           (github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.user.login == 'github-actions[bot]'))
+          && 'CLA signed' || 'CLA (no-op)' }}
     runs-on: ubuntu-latest
     steps:
       - name: CLA Assistant
