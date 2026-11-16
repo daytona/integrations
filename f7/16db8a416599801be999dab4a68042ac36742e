@@ -1,0 +1,25 @@
+packages/agentenv-daytona/agentenv_daytona/config.py
+  s_8f4f2313f85c17::t_d5fcdce5620fe1 19,45,69-72,83,141
+packages/agentenv-daytona/README.md
+  s_8f4f2313f85c17::t_d5fcdce5620fe1 50,86
+packages/agentenv-daytona/tests/unit_tests/test_provider_config.py
+  s_8f4f2313f85c17::t_d5fcdce5620fe1 25,33,39-40,54
+packages/agentenv-daytona/tests/unit_tests/test_provider_create.py
+  s_8f4f2313f85c17::t_d5fcdce5620fe1 113-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f716db8a416599801be999dab4a68042ac36742e",
+  "prompts": {},
+  "sessions": {
+    "s_8f4f2313f85c17": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e1ad4f9a6ffef1BMgUaXTJViJc",
+        "model": "gpt-6-luna-fast"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}

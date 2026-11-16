@@ -1,0 +1,21 @@
+packages/agentenv-daytona/README.md
+  s_781b665d6a5e33::t_7612ef785617f2 22
+packages/agentenv-daytona/pyproject.toml
+  s_781b665d6a5e33::t_fb9065520a192d 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1ae43af6adc38206c516e58537fd3c7699ce378d",
+  "prompts": {},
+  "sessions": {
+    "s_781b665d6a5e33": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e2a92e68affe9P1QtD8JaR6slz",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
