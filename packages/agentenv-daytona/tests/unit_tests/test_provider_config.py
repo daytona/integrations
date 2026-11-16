@@ -22,6 +22,7 @@ def test_only_an_api_key_is_required() -> None:
     settings = parse_settings({"api_key": "k"})
 
     assert (settings.snapshot, settings.base_image) == (None, DEFAULT_BASE_IMAGE)
+    assert settings.target is None
     assert settings.egress_hosts == ()
 
 
@@ -29,12 +30,14 @@ def test_every_key_is_read() -> None:
     settings = parse_settings(
         {
             "api_key": "k",
+            "target": "eu",
             "snapshot": "my-dind",
             "egress_hosts": ["*.internal.example"],
         }
     )
 
-    assert (settings.snapshot, settings.egress_hosts) == (
+    assert (settings.target, settings.snapshot, settings.egress_hosts) == (
+        "eu",
         "my-dind",
         ("*.internal.example",),
     )
@@ -48,7 +51,7 @@ def test_every_key_is_read() -> None:
         ({"api_key": "k", "foo": 1}, "unknown key(s): ['foo']"),
         ({"api_key": "k", "snapshot": 3}, "'snapshot' must be a non-empty string"),
         ({"api_key": "k", "api_url": "https://d.example/api"}, "unknown key(s): ['api_url']"),
-        ({"api_key": "k", "target": "eu"}, "unknown key(s): ['target']"),
+        ({"api_key": "k", "target": 3}, "'target' must be a non-empty string"),
         (
             {"api_key": "k", "snapshot": "s", "base_image": "ubuntu:24.04"},
             "either 'snapshot' or 'base_image'",
