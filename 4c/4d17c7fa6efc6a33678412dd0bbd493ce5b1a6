@@ -1,0 +1,19 @@
+packages/langchain-data-analysis/langchain_daytona_data_analysis/tools.py
+  s_46280527a8a9e4::t_947851ea2625a1 54,75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4c4d17c7fa6efc6a33678412dd0bbd493ce5b1a6",
+  "prompts": {},
+  "sessions": {
+    "s_46280527a8a9e4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e1b11f438ffelBPgQZgrM44lzv",
+        "model": "gpt-6-luna-fast"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
