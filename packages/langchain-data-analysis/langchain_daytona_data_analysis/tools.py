@@ -51,7 +51,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
 
 
      Setup:
-          Install ``daytona`` and set credentials for Daytona:
+          Install ``langchain-daytona-data-analysis`` and set credentials for Daytona:
 
 
           1. Set the environment variable:
@@ -72,7 +72,7 @@ class DaytonaDataAnalysisTool(BaseTool):  # type: ignore[override]
           Then install the package:
               .. code-block:: bash
 
-                  pip install -U daytona
+                  pip install -U langchain-daytona-data-analysis
 
 
     Key init args:
