@@ -1,0 +1,31 @@
+packages/pydantic-ai-daytona/tests/unit_tests/test_session_lifecycle.py
+  s_9dc3adfd5d1287::t_68b4f8f62c1f77 8-13,128-144
+packages/pydantic-ai-daytona/tests/integration_tests/test_live_sandbox.py
+  s_9dc3adfd5d1287::t_68b4f8f62c1f77 174
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_toolset.py
+  s_9dc3adfd5d1287::t_68b4f8f62c1f77 54,78,112,148
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_session.py
+  s_9dc3adfd5d1287::t_68b4f8f62c1f77 62,81,195,208
+packages/pydantic-ai-daytona/tests/unit_tests/test_toolset.py
+  s_9dc3adfd5d1287::t_68b4f8f62c1f77 83
+packages/pydantic-ai-daytona/pydantic_ai_daytona/_capability.py
+  s_9dc3adfd5d1287::t_68b4f8f62c1f77 140-142,271,310
+packages/pydantic-ai-daytona/README.md
+  s_9dc3adfd5d1287::t_68b4f8f62c1f77 23,124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "21065602c84488fdc0c9c3726e7c20482e7dcf4a",
+  "prompts": {},
+  "sessions": {
+    "s_9dc3adfd5d1287": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e1ad54cdaffe25Xem3G126ZTrD",
+        "model": "gpt-6-luna-fast"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
