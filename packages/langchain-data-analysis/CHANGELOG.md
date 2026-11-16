@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/daytona/integrations/compare/langchain-daytona-data-analysis-v0.2.2...langchain-daytona-data-analysis-v0.2.3) (2026-11-16)
+
+
+### Bug Fixes
+
+* **langchain-data-analysis:** tell users to install the package, not the bare daytona SDK ([#120](https://github.com/daytona/integrations/issues/120)) ([7ca6396](https://github.com/daytona/integrations/commit/7ca63963b09e723e165da46768dd872bd2ddf8a9))
+
 ## [0.2.2](https://github.com/daytona/integrations/compare/langchain-daytona-data-analysis-v0.2.1...langchain-daytona-data-analysis-v0.2.2) (2026-11-11)
 
 
