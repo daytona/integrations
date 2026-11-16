@@ -1,0 +1,19 @@
+packages/claude-toolsets/typescript/README.md
+  s_031c85eb9f1820::t_d564114df87de4 91-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "929262368a69e361682551035b3ffc50c1a41c8b",
+  "prompts": {},
+  "sessions": {
+    "s_031c85eb9f1820": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e1ac0af9cffesZaJLmR5qRI64u",
+        "model": "gpt-6-luna-fast"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}

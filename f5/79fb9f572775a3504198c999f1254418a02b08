@@ -1,0 +1,19 @@
+packages/claude-toolsets/typescript/README.md
+  s_e1fa693b7cdd84::t_f9bad1a9a3f387 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f579fb9f572775a3504198c999f1254418a02b08",
+  "prompts": {},
+  "sessions": {
+    "s_e1fa693b7cdd84": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e618159d0ffe9tCs9ZVwsDJErj",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
