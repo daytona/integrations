@@ -1,0 +1,14 @@
+packages/pydantic-ai-daytona/README.md
+  h_634fa4b3782b12 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a990d004ab2c5d9715f1168496b93f0d7a905ce6",
+  "prompts": {},
+  "humans": {
+    "h_634fa4b3782b12": {
+      "author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
