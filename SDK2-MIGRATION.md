@@ -26,7 +26,7 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 **Step A (SDK 2.x on the `.v0` namespace): yes for all 12 SDK consumers, with the changes listed in §3.** Each has a pushed `feat/<component>-sdk2` branch with the official codemod applied, the exact alpha pinned, CI-parity commands matching their baseline (the one new failure is the agentenv upstream conflict below), and a live v0 smoke that created and deleted a real sandbox. One package is READY as-is (daytona-adk); eleven are READY-WITH-CHANGES. Four things keep the GA flip from being clean:
 
 1. **agentenv-daytona has an upstream blocker.** agentenv-framework (>=0.9.1417, allowed by the package's `>=0.9.1322,<0.10`) ships a built-in `daytona` provider that shadows this plugin, imports SDK 0.x root names (`CreateSandboxFromImageParams`, `CreateSandboxFromSnapshotParams`, `Resources`) and pins `daytona~=0.224.0` in its `daytona` extra. Under SDK 2.x those imports raise ImportError, so `build_sandbox_provider('daytona')` fails for every user and `agentenv-framework[daytona]` can't be installed next to this package. The fix has to ship in agentenv-framework (drop or defer the built-in, or migrate it to `daytona.v0` and widen its extra).
-2. **Self-hosted users are excluded.** SDK 2.x is Daytona-Cloud-only. Four packages lose their custom URL/target option (stripe, agentenv, dify, pydantic-ai) and every self-hosted user must stay on the 0.x releases (§4).
+2. **Self-hosted users are excluded.** SDK 2.x is Daytona-Cloud-only. Four packages lose their custom URL option (stripe, agentenv, dify, pydantic-ai) and every self-hosted user must stay on the 0.x releases (§4).
 3. **Breaking floors.** Node `>=22.15.0` for the six TypeScript consumers (claude-toolsets, pi-extension, opencode-plugin, opencode-workspaces-plugin, inngest, stripe) and Python `>=3.10` for langchain-daytona-data-analysis. These are `feat!` commits and drive the version bumps in §8d.
 4. **Rebase at GA.** langchain must absorb #100 and #104; the other branches have no drift today (§8b).
 
@@ -42,8 +42,8 @@ Every fact below is pinned to these alpha versions. The SDK says it may change b
 |---|---|---|---|---|
 | daytona-adk | READY | `feat/daytona-adk-sdk2@daaa58d` | BLOCKED-BY-V2-GAP | sessions (create_session 422) |
 | langchain-daytona-data-analysis | READY-WITH-CHANGES (Python >=3.10, exact pin) | `feat/langchain-daytona-data-analysis-sdk2@cbd50a4` | READY-WITH-CHANGES (breaking) | `on_result` becomes `InterpreterResult`; registered image id required |
-| pydantic-ai-daytona | READY-WITH-CHANGES (api_url/target removed) | `feat/pydantic-ai-daytona-sdk2@494a35e` | BLOCKED-BY-V2-GAP | persistence (attach/start); sessions; Python `user=`; default image |
-| agentenv-daytona | READY-WITH-CHANGES (api_url/target removed; upstream framework conflict) | `feat/agentenv-daytona-sdk2@dac1740` | BLOCKED-BY-V2-GAP | image build decoder; DinD unverified; sessions; upstream provider |
+| pydantic-ai-daytona | READY-WITH-CHANGES (api_url removed) | `feat/pydantic-ai-daytona-sdk2@2106560` | BLOCKED-BY-V2-GAP | persistence (attach/start); sessions; Python `user=`; default image |
+| agentenv-daytona | READY-WITH-CHANGES (api_url removed; upstream framework conflict) | `feat/agentenv-daytona-sdk2@49a10d6` | BLOCKED-BY-V2-GAP | image build decoder; DinD unverified; sessions; upstream provider |
 | daytona-claude-toolsets | READY-WITH-CHANGES (test doubles routed to `.v0`) | `feat/daytona-claude-toolsets-sdk2@4b1abe1` | BLOCKED-BY-V2-GAP | computer-use parity; desktop image; sessions (Chromium) |
 | claude-toolsets | READY-WITH-CHANGES (Node >=22.15.0; per-folder codemod) | `feat/claude-toolsets-sdk2@6d510ee` | BLOCKED-BY-V2-GAP | computer-use parity; signed preview; sessions; desktop image |
 | convex | N/A (no SDK) | — (REST-only, no branch) | BLOCKED-BY-REWRITE | 23 CHANGED + 1 NO-V2-EQUIVALENT (volumes) |
@@ -82,20 +82,20 @@ Common to all twelve: the codemod rewrote root-client calls to `client.v0.*` and
 
 ### pydantic-ai-daytona
 
-- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/pydantic-ai-daytona-sdk2 (`494a35e`, 4 commits). Evidence: `packages/pydantic-ai-daytona/pyproject.toml:33` (exact pin; the "Wide on purpose" comment is kept with a note to restore `>=2,<3` at GA); the root config rejects `api_url` with a TypeError (ref: sdk-py:daytona/_client.py:202).
-- Forced breaks: `api_url` and `target` options removed from the session, capability and toolset (`feat!`, commit #1). The session config was inlined so the codemod could verify it.
+- Verdict: READY-WITH-CHANGES. Branch https://github.com/daytona/integrations/tree/feat/pydantic-ai-daytona-sdk2 (`2106560`, 5 commits). Evidence: `packages/pydantic-ai-daytona/pyproject.toml:33` (exact pin; the "Wide on purpose" comment is kept with a note to restore `>=2,<3` at GA); the root config rejects `api_url` with a TypeError (ref: sdk-py:daytona/_client.py:202).
+- Forced breaks: the `api_url` option removed from the session, capability and toolset (`feat!`, commit #1). The session config was inlined so the codemod could verify it. `target` (region) was restored on 2026-11-16: SDK 2.x still supports it for `.v0`, and it's now passed on each sandbox create.
 - Codemod: dry refused twice with exit 2 (`custom-api-url`), then exit 0 after commit #1; apply exit 0, 12 files, 13 manual items, 0 FIXMEs. One codemod miss fixed by hand: integration create-recorders at `tests/integration_tests/conftest.py:108-111,120` retargeted to the v0 client class.
 - FIXMEs: 0; manual items 13 = 12 `mock-target` resolved (unit fakes gained a `FakeV0` facade) + 1 `types-unresolved` ledgered.
-- CI parity: ruff 0; pytest 165 passed (baseline 165); mypy 0. `black --check` exits 1 before and after, but the failing file count went from 3 to 4 because the codemod wrote a 104-character import in `tests/unit_tests/conftest.py`; CI runs only ruff and pytest for this package, so it isn't a blocker. Reformat before GA.
+- CI parity: ruff 0; pytest 165 passed (baseline 165); mypy 0. `black --check` exits 1 before and after, but the failing file count went from 3 to 4 because the codemod wrote a 104-character import in `tests/unit_tests/conftest.py`; CI runs only ruff and pytest for this package, so it isn't a blocker. Reformat before GA. After the 2026-11-16 `target` fix: ruff 0, pytest 167 passed.
 - Live v0 smoke: SMOKE_OK, NOTFOUND_OK, DELETE_CONFIRMED. Sandboxes 1 / 1.
 
 ### agentenv-daytona
 
-- Verdict: READY-WITH-CHANGES, with the upstream blocker from §2. Branch https://github.com/daytona/integrations/tree/feat/agentenv-daytona-sdk2 (`dac1740`, 4 commits). Evidence: `packages/agentenv-daytona/pyproject.toml:31` (exact pin); root config has no URL field (ref: sdk-py:daytona/_client.py:156).
-- Forced breaks: `api_url` / `target` config keys removed (`feat!`, commit #1). `CONFIG_KEYS` is now `api_key, snapshot, base_image, egress_hosts`; `DEFAULT_API_URL` survives only for the non-SDK preview-domain fetch.
+- Verdict: READY-WITH-CHANGES, with the upstream blocker from §2. Branch https://github.com/daytona/integrations/tree/feat/agentenv-daytona-sdk2 (`49a10d6`, 5 commits). Evidence: `packages/agentenv-daytona/pyproject.toml:31` (exact pin); root config has no URL field (ref: sdk-py:daytona/_client.py:156).
+- Forced breaks: the `api_url` config key removed (`feat!`, commit #1). `target` (region) was restored on 2026-11-16 and is passed on each sandbox create, so `CONFIG_KEYS` is now `api_key, target, snapshot, base_image, egress_hosts`; `DEFAULT_API_URL` survives only for the non-SDK preview-domain fetch.
 - Codemod: dry/apply exit 0; 0 FIXMEs. The codemod missed 4 resource calls because the receivers are typed `Any`; they were hand-migrated to `.v0` in commit #2. Unit fakes gained a `FakeV0` facade.
 - FIXMEs: 0 inserted; 1 `types-unresolved` ledgered; 21 `--suggest-v2` items fed into §6.
-- CI parity: ruff 0 -> 0, black 0 -> 0, mypy 0 -> 0. pytest exit 1 -> 1, but 3 failed / 125 passed -> 4 failed / 126 passed. All four failures are in `test_registration.py`. Three pre-exist (the framework's built-in `daytona` provider already shadowed the plugin on 0.x); the fourth, `test_an_unknown_config_key_fails_the_build`, newly fails with an ImportError from the built-in provider under SDK 2. With the built-in removed from the registry, 130 tests pass. This is the upstream blocker, not a package defect.
+- CI parity: ruff 0 -> 0, black 0 -> 0, mypy 0 -> 0. pytest exit 1 -> 1, but 3 failed / 125 passed -> 4 failed / 126 passed. All four failures are in `test_registration.py`. Three pre-exist (the framework's built-in `daytona` provider already shadowed the plugin on 0.x); the fourth, `test_an_unknown_config_key_fails_the_build`, newly fails with an ImportError from the built-in provider under SDK 2. With the built-in removed from the registry, 130 tests pass. This is the upstream blocker, not a package defect. After the 2026-11-16 `target` fix: pytest 127 passed / 4 failed (the same four).
 - Live v0 smoke (direct `DaytonaSandboxProvider.from_config`): DOCKER_OK, TUNNEL_OK, NOTFOUND_OK, TERMINATED. Sandboxes 1 / 1. The cold host-image build path wasn't exercised (image was cached).
 
 ### daytona-claude-toolsets
@@ -181,9 +181,9 @@ Four packages had to remove an option to migrate:
 | integration | removed option | repo evidence (origin/main) |
 |---|---|---|
 | stripe-coding-agent-template | `apiUrl` from `DAYTONA_API_URL` / `DAYTONA_SANDBOX_API_URL` with a Cloud fallback | `apps/stripe-coding-agent-template/app/api/copilotkit/route.ts:22-30` |
-| agentenv-daytona | `api_url` / `target` config keys | `packages/agentenv-daytona/agentenv_daytona/provider.py:61-63` |
+| agentenv-daytona | `api_url` config key | `packages/agentenv-daytona/agentenv_daytona/provider.py:61-63` |
 | dify-plugin | `api_url` credential field | `apps/dify-plugin/provider/daytona.yaml:35-50` |
-| pydantic-ai-daytona | `api_url` / `target` constructor options | `packages/pydantic-ai-daytona/pydantic_ai_daytona/_session.py:103-105` |
+| pydantic-ai-daytona | `api_url` constructor option | `packages/pydantic-ai-daytona/pydantic_ai_daytona/_session.py:103-105` |
 
 **Correction to the plan's assumption.** The plan expected `.v0` to keep honouring `DAYTONA_API_URL`. It doesn't:
 
