@@ -1,0 +1,19 @@
+packages/langchain-data-analysis/pyproject.toml
+  s_b2d66e361241fa::t_08617c120baa9e 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "89ba2125490109dc3538ff5c1bb2f28d7f0be8a9",
+  "prompts": {},
+  "sessions": {
+    "s_b2d66e361241fa": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e62166cb2ffeRZrj3ZwyQzVSYA",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
