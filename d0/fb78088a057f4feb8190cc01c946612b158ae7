@@ -1,0 +1,21 @@
+.github/workflows/ci.yml
+  s_4ff37026ccad30::t_a395affb5f37d1 379-384
+.github/workflows/integration.yml
+  s_4ff37026ccad30::t_4dd3af5f65b711 389,392-395
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d0fb78088a057f4feb8190cc01c946612b158ae7",
+  "prompts": {},
+  "sessions": {
+    "s_4ff37026ccad30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e168d17f7ffe7gBTQh7MjJptjC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
