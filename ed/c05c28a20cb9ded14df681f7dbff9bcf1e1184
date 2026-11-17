@@ -1,0 +1,36 @@
+.release-please-manifest.json
+  s_4ff37026ccad30::t_2e542bb2cf2f93 11-12
+README.md
+  s_4ff37026ccad30::t_c97b63c2e89b8d 19
+.github/workflows/integration.yml
+  s_4ff37026ccad30::t_d0461a50bbe6d9 381-409
+  s_4ff37026ccad30::t_74385bef58b934 419
+  s_4ff37026ccad30::t_1cb5087758cc97 98-99
+  s_4ff37026ccad30::t_7f65ce822faaa6 114
+  s_4ff37026ccad30::t_8894deaef6e832 76
+  s_4ff37026ccad30::t_cee6b47c16691a 41
+  s_4ff37026ccad30::t_0de12692b3c040 144
+release-please-config.json
+  s_4ff37026ccad30::t_3ad31dee196a76 55-59
+.github/workflows/ci.yml
+  s_4ff37026ccad30::t_1416a6f2bfc385 65-66
+  s_4ff37026ccad30::t_38bb8bfaa17fd3 420
+  s_4ff37026ccad30::t_bf222780cd2dd1 374-412
+  s_4ff37026ccad30::t_65125745ad4f93 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "edc05c28a20cb9ded14df681f7dbff9bcf1e1184",
+  "prompts": {},
+  "sessions": {
+    "s_4ff37026ccad30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e168d17f7ffe7gBTQh7MjJptjC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
