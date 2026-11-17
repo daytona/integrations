@@ -1,0 +1,19 @@
+.github/workflows/integration.yml
+  s_4ff37026ccad30::t_65727bdce925be 167-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0f5779fec1807a991f450f8cc51e9a22599596c6",
+  "prompts": {},
+  "sessions": {
+    "s_4ff37026ccad30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e168d17f7ffe7gBTQh7MjJptjC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
