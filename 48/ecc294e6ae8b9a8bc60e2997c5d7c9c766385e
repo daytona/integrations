@@ -1,0 +1,23 @@
+packages/agentenv-daytona/pyproject.toml
+  s_4ff37026ccad30::t_8822744ea882e8 27-31
+packages/agentenv-daytona/agentenv_daytona/provider.py
+  s_4ff37026ccad30::t_ed661cce99823a 150,153,155-156
+packages/agentenv-daytona/tests/unit_tests/test_provider_create.py
+  s_4ff37026ccad30::t_ff9106fc46cf8c 133-138,142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "48ecc294e6ae8b9a8bc60e2997c5d7c9c766385e",
+  "prompts": {},
+  "sessions": {
+    "s_4ff37026ccad30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e168d17f7ffe7gBTQh7MjJptjC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
