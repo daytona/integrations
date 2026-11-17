@@ -1,0 +1,35 @@
+.github/workflows/pr-title-lint.yml
+  s_4ff37026ccad30::t_e75876ccd93957 24
+.github/workflows/integration.yml
+  s_4ff37026ccad30::t_07b067ad45f7e1 76,152,185,217,253,292,325,358
+  s_4ff37026ccad30::t_4de891eca96188 191,266,305
+  s_4ff37026ccad30::t_bb126ae2c43002 165,230,338,363
+  s_4ff37026ccad30::t_40243d102735aa 77
+.github/workflows/ci.yml
+  s_4ff37026ccad30::t_f83f23c73ffa84 125,151,177,271,343
+  s_4ff37026ccad30::t_8a1341a8d51613 35,70,95,124,150,176,202,232,270,300,338
+  s_4ff37026ccad30::t_007d9eddacd718 71,96,203,237,305
+  s_4ff37026ccad30::t_f0f17217a7de41 36
+.github/workflows/release.yml
+  s_4ff37026ccad30::t_d945f48d6b5a56 85,110,134,158,183,212,248,276,304,331
+  s_4ff37026ccad30::t_c456639bfc571e 86,111,135,159,184
+  s_4ff37026ccad30::t_aa69c6fe410cbc 95,120,144,168,196
+  s_4ff37026ccad30::t_8b40b2ec046e57 213,249,277,305,332
+  s_4ff37026ccad30::t_972ce739b24373 65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a392852446234e5fb01fa7c2cd4027fb36fce3c4",
+  "prompts": {},
+  "sessions": {
+    "s_4ff37026ccad30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e168d17f7ffe7gBTQh7MjJptjC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
