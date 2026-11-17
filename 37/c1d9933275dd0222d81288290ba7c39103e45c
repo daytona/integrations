@@ -1,0 +1,19 @@
+packages/agentenv-daytona/pyproject.toml
+  s_5ca4dfee717534::t_fb87702265b891 27-29,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "37c1d9933275dd0222d81288290ba7c39103e45c",
+  "prompts": {},
+  "sessions": {
+    "s_5ca4dfee717534": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e1ab9782fffeXVJTlgkVqr6Rir",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
