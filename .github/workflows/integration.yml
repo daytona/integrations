@@ -38,6 +38,7 @@ on:
           - pi
           - pydantic-ai
           - agentenv-daytona
+          - smolagents
 
 permissions:
   contents: read
@@ -72,6 +73,7 @@ jobs:
       pi: ${{ steps.decide.outputs.pi }}
       pydantic_ai: ${{ steps.decide.outputs.pydantic_ai }}
       agentenv_daytona: ${{ steps.decide.outputs.agentenv_daytona }}
+      smolagents: ${{ steps.decide.outputs.smolagents }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
@@ -93,6 +95,8 @@ jobs:
               - 'packages/pydantic-ai-daytona/**'
             agentenv_daytona:
               - 'packages/agentenv-daytona/**'
+            smolagents:
+              - 'packages/smolagents-daytona/**'
       - name: Decide which packages run
         id: decide
         env:
@@ -107,6 +111,7 @@ jobs:
           CH_PI: ${{ steps.filter.outputs.pi }}
           CH_PYDANTIC_AI: ${{ steps.filter.outputs.pydantic_ai }}
           CH_AGENTENV_DAYTONA: ${{ steps.filter.outputs.agentenv_daytona }}
+          CH_SMOLAGENTS: ${{ steps.filter.outputs.smolagents }}
         run: |
           set -euo pipefail
           # Two lanes, one lane per PR type: same-repo PRs run on `pull_request`,
@@ -136,6 +141,7 @@ jobs:
             echo "pi=$(decide pi "${CH_PI:-false}")"
             echo "pydantic_ai=$(decide pydantic-ai "${CH_PYDANTIC_AI:-false}")"
             echo "agentenv_daytona=$(decide agentenv-daytona "${CH_AGENTENV_DAYTONA:-false}")"
+            echo "smolagents=$(decide smolagents "${CH_SMOLAGENTS:-false}")"
           } >> "$GITHUB_OUTPUT"
 
   adk:
@@ -372,6 +378,38 @@ jobs:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: pytest tests/integration_tests -v
 
+  smolagents:
+    needs: changes
+    if: needs.changes.outputs.smolagents == 'true'
+    runs-on: ubuntu-latest
+    environment: integration-tests
+    timeout-minutes: 30
+    steps:
+      # Fork lane checks out the PR head (see the adk job note).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Fork-lane opt-in + credential hygiene — see the adk job for rationale.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
+          python-version: "3.12"
+      - name: Install
+        working-directory: packages/smolagents-daytona
+        # TEMPORARY (until smolagents>=1.27.0 is on PyPI): see the ci.yml
+        # smolagents job for details; collapse to `pip install -e ".[dev]"` then.
+        run: |
+          python -m pip install "smolagents @ git+https://github.com/huggingface/smolagents.git@5d49484a8c0959fd511c8904f632b60e3dc36b32"
+          python -m pip install "daytona>=0.211.0,<0.212.0" "pytest>=7.0.0"
+          python -m pip install --no-deps -e .
+      - name: Integration tests (live Daytona)
+        working-directory: packages/smolagents-daytona
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: pytest tests/integration_tests
+
   # Single, stable status check to require in branch protection -- the
   # integration counterpart of ci.yml's ci-success. Suites skipped because a PR
   # does not touch their package pass through; a failed, cancelled, or
@@ -381,7 +419,7 @@ jobs:
   # required checks treat as satisfied, so the owning lane's verdict governs.
   integration-success:
     name: integration-success
-    needs: [changes, adk, convex, langchain, n8n, pi, pydantic-ai, agentenv-daytona]
+    needs: [changes, adk, convex, langchain, n8n, pi, pydantic-ai, agentenv-daytona, smolagents]
     if: >-
       always() && (
         github.event_name == 'workflow_dispatch' ||
