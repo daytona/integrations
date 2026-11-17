@@ -1,0 +1,21 @@
+.github/workflows/ci.yml
+  s_4ff37026ccad30::t_13b4090afef50f 83-86,112-115,235-238
+  s_4ff37026ccad30::t_dfef0c798e9137 39-40,44,47,50,53,56,59,62,65,68,72,75
+  s_4ff37026ccad30::t_53020427037308 145-148,175-178,205-208,307-310
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ab95e9637651b547901aa98e76d2db3ade8e5034",
+  "prompts": {},
+  "sessions": {
+    "s_4ff37026ccad30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e168d17f7ffe7gBTQh7MjJptjC",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
