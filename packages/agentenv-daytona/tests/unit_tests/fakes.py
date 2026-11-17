@@ -12,7 +12,7 @@ import shlex
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from daytona import DaytonaNotFoundError
+from daytona.v0 import DaytonaNotFoundError
 
 # (exit_code, stdout, stderr), or an exception to raise, for one session command.
 Outcome = tuple[int | None, str, str] | BaseException
@@ -138,7 +138,8 @@ class _Preview:
 
 @dataclass
 class FakeDaytona:
-    """An ``AsyncDaytona``. ``create_hook`` may raise, sleep or mutate before a create returns."""
+    """A root ``AsyncDaytona``: resource calls go through ``.v0`` (SDK 2.x), ``close`` stays on the
+    root. ``create_hook`` may raise, sleep or mutate before a create returns."""
 
     sandboxes: dict[str, FakeRaw] = field(default_factory=dict)
     created_params: list[Any] = field(default_factory=list)
@@ -147,31 +148,44 @@ class FakeDaytona:
     closed: bool = False
     lookups: list[str] = field(default_factory=list)
     make_raw: Callable[[], FakeRaw] = FakeRaw
+    v0: FakeV0 = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.v0 = FakeV0(self)
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+@dataclass
+class FakeV0:
+    """The ``.v0`` namespace client of a ``FakeDaytona``; records into its root."""
+
+    root: FakeDaytona
 
     async def create(
         self, params: Any = None, *, timeout: float = 60, on_snapshot_create_logs: Any = None
     ) -> FakeRaw:
-        self.created_params.append(params)
-        self.create_timeouts.append(timeout)
-        raw = self.make_raw()
+        root = self.root
+        root.created_params.append(params)
+        root.create_timeouts.append(timeout)
+        raw = root.make_raw()
         raw.name = params.name or ""
         raw.labels = dict(params.labels or {})
         raw.domain_allow_list = params.domain_allow_list
         raw.network_allow_list = params.network_allow_list
         raw.network_block_all = bool(params.network_block_all)
-        if self.create_hook is not None:
-            result = self.create_hook(params, raw)
+        if root.create_hook is not None:
+            result = root.create_hook(params, raw)
             if asyncio.iscoroutine(result):
                 await result
-        self.sandboxes[raw.id] = raw
+        root.sandboxes[raw.id] = raw
         return raw
 
     async def get(self, sandbox_id_or_name: str, request_timeout: float | None = None) -> FakeRaw:
-        self.lookups.append(sandbox_id_or_name)
-        for raw in self.sandboxes.values():
+        root = self.root
+        root.lookups.append(sandbox_id_or_name)
+        for raw in root.sandboxes.values():
             if sandbox_id_or_name in (raw.id, raw.name) and raw.state != "destroyed":
                 return raw
         raise DaytonaNotFoundError(f"Sandbox with ID or name {sandbox_id_or_name} not found")
-
-    async def close(self) -> None:
-        self.closed = True

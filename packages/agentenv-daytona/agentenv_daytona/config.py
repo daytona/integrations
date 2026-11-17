@@ -10,13 +10,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agent_env.config.errors import ConfigError
-from daytona import CreateSandboxFromImageParams, CreateSandboxFromSnapshotParams, Resources
+from daytona.v0 import CreateSandboxFromImageParams, CreateSandboxFromSnapshotParams, Resources
 
 from agentenv_daytona.image import DEFAULT_BASE_IMAGE, HOST_IMAGE_VERSION, host_image
 
 SECTION = "[sandbox.providers.daytona.config]"
 DEFAULT_API_URL = "https://app.daytona.io/api"
-CONFIG_KEYS = ("api_key", "api_url", "target", "snapshot", "base_image", "egress_hosts")
+CONFIG_KEYS = ("api_key", "target", "snapshot", "base_image", "egress_hosts")
 
 # Docker-in-Docker needs at least 2 vCPU and 4 GiB (Daytona's guidance); 10 GiB holds images.
 MIN_CPU = 2
@@ -42,7 +42,6 @@ class Settings:
     """``[sandbox.providers.daytona.config]``, parsed. The key never appears in ``repr``."""
 
     api_key: str = field(repr=False)
-    api_url: str = DEFAULT_API_URL
     target: str | None = None
     snapshot: str | None = None
     base_image: str = DEFAULT_BASE_IMAGE
@@ -67,8 +66,10 @@ def parse_settings(config: Mapping[str, Any]) -> Settings:
         raise ConfigError(
             f"{SECTION} requires a non-empty 'api_key' (e.g. \"env:DAYTONA_API_KEY\")"
         )
-    snapshot, base_image = _optional_string(config, "snapshot"), _optional_string(
-        config, "base_image"
+    target, snapshot, base_image = (
+        _optional_string(config, "target"),
+        _optional_string(config, "snapshot"),
+        _optional_string(config, "base_image"),
     )
     if snapshot and base_image:
         raise ConfigError(f"{SECTION} takes either 'snapshot' or 'base_image', not both")
@@ -79,8 +80,7 @@ def parse_settings(config: Mapping[str, Any]) -> Settings:
         raise ConfigError(f"{SECTION} 'egress_hosts' must be a list of hostnames (no bare '*')")
     return Settings(
         api_key=api_key.strip(),
-        api_url=_optional_string(config, "api_url") or DEFAULT_API_URL,
-        target=_optional_string(config, "target"),
+        target=target,
         snapshot=snapshot,
         base_image=base_image or DEFAULT_BASE_IMAGE,
         egress_hosts=tuple(h.strip() for h in hosts),
@@ -138,6 +138,7 @@ def create_params(
 ) -> tuple[CreateParams, int]:
     """Params booting the configured snapshot, or the host image at ``resources``; and how long a
     create may take."""
+    common = {"target": settings.target, **common}
     if settings.snapshot:
         params: CreateParams = CreateSandboxFromSnapshotParams(snapshot=settings.snapshot, **common)
         return params, SNAPSHOT_CREATE_TIMEOUT

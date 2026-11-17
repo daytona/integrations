@@ -11,7 +11,7 @@ from agent_env.providers.sandbox_providers.sandbox import (
     NetworkPolicy,
     NetworkPolicyUnsupportedError,
 )
-from daytona import (
+from daytona.v0 import (
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
     DaytonaAuthenticationError,
@@ -110,6 +110,17 @@ async def test_a_configured_snapshot_is_used_instead_of_the_image() -> None:
     assert params.labels is not None and "agentenv.host-image" not in params.labels
 
 
+async def test_target_is_sent_for_image_and_snapshot_creates() -> None:
+    image_provider, image_fake = make(target="eu")
+    snapshot_provider, snapshot_fake = make(target="eu", snapshot="my-dind")
+
+    await image_provider.create_vm(setup_for_gateway=False)
+    await snapshot_provider.create_vm(setup_for_gateway=False)
+
+    assert image_fake.created_params[0].target == "eu"
+    assert snapshot_fake.created_params[0].target == "eu"
+
+
 async def test_create_sandbox_is_a_bare_vm_exposing_the_port() -> None:
     provider, fake = make()
 
@@ -130,11 +141,16 @@ async def test_setup_for_gateway_runs_after_create() -> None:
     assert ["sudo", "docker", "compose", "version"] in commands
 
 
-async def test_an_image_override_is_refused() -> None:
+@pytest.mark.parametrize(
+    ("image", "env"), [("ubuntu:24.04", None), (None, {"SEED": "1"})], ids=["image", "env-seed"]
+)
+async def test_an_image_override_or_its_env_seed_is_refused(
+    image: str | None, env: dict[str, str] | None
+) -> None:
     provider, fake = make()
 
     with pytest.raises(ValueError, match="image overrides"):
-        await provider.create_vm(image="ubuntu:24.04")
+        await provider.create_vm(image=image, env=env)
 
     assert fake.created_params == []
 
@@ -364,7 +380,7 @@ async def test_a_create_the_api_rejected_outright_looks_nothing_up() -> None:
 
 
 async def test_a_failed_setup_retries_a_delete_that_fails_once() -> None:
-    from daytona import DaytonaError
+    from daytona.v0 import DaytonaError
 
     provider, fake = make()
     fake.make_raw = lambda: FakeRaw(
@@ -379,7 +395,7 @@ async def test_a_failed_setup_retries_a_delete_that_fails_once() -> None:
 
 
 async def test_a_cancelled_create_retries_a_delete_that_fails_once() -> None:
-    from daytona import DaytonaError
+    from daytona.v0 import DaytonaError
 
     started, release = asyncio.Event(), asyncio.Event()
 
