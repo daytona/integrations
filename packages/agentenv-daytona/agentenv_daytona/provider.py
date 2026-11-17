@@ -147,11 +147,13 @@ class DaytonaSandboxProvider(SandboxProvider):
         setup_for_gateway: bool = True,
         attribution: Attribution | None = None,
         network_policy: NetworkPolicy | None = None,
+        env: dict[str, str] | None = None,
     ) -> DaytonaSandbox:
         """Create a sandbox; ``timeout`` is its hard lifetime."""
-        if image is not None:
+        if image is not None or env:
             raise ValueError(
-                "the Daytona provider boots its host image or snapshot; image overrides are unsupported"
+                "the Daytona provider boots its host image or snapshot; image overrides and their"
+                " env seed are unsupported"
             )
         if boot_mode is not None:
             logger.warning("Ignoring boot_mode=%s: Daytona sandboxes have no boot modes", boot_mode)

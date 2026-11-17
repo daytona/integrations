@@ -141,11 +141,16 @@ async def test_setup_for_gateway_runs_after_create() -> None:
     assert ["sudo", "docker", "compose", "version"] in commands
 
 
-async def test_an_image_override_is_refused() -> None:
+@pytest.mark.parametrize(
+    ("image", "env"), [("ubuntu:24.04", None), (None, {"SEED": "1"})], ids=["image", "env-seed"]
+)
+async def test_an_image_override_or_its_env_seed_is_refused(
+    image: str | None, env: dict[str, str] | None
+) -> None:
     provider, fake = make()
 
     with pytest.raises(ValueError, match="image overrides"):
-        await provider.create_vm(image="ubuntu:24.04")
+        await provider.create_vm(image=image, env=env)
 
     assert fake.created_params == []
 
