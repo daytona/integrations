@@ -73,8 +73,8 @@ jobs:
       pydantic_ai: ${{ steps.decide.outputs.pydantic_ai }}
       agentenv_daytona: ${{ steps.decide.outputs.agentenv_daytona }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         id: filter
         if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
         with:
@@ -149,7 +149,7 @@ jobs:
       # BASE branch; test the fork's actual code by pinning its head SHA as of
       # the triggering event (later pushes produce a new run needing a fresh
       # environment approval). Same-repo lanes keep the default (merge ref).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           # Deliberate opt-in to fork-code checkout in the pull_request_target
@@ -162,7 +162,7 @@ jobs:
           # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
           # code could read it — the suites never push/pull after checkout.
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.x"
       - name: Install
@@ -182,13 +182,13 @@ jobs:
     timeout-minutes: 30
     steps:
       # Fork lane checks out the PR head (see the adk job note).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           # Fork-lane opt-in + credential hygiene — see the adk job for rationale.
           allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Install
@@ -214,7 +214,7 @@ jobs:
     timeout-minutes: 30
     steps:
       # Fork lane checks out the PR head (see the adk job note).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           # Deliberate opt-in to fork-code checkout in the pull_request_target
@@ -227,7 +227,7 @@ jobs:
           # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
           # code could read it — the suites never push/pull after checkout.
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
           python-version: "3.12"
@@ -250,7 +250,7 @@ jobs:
     timeout-minutes: 30
     steps:
       # Fork lane checks out the PR head (see the adk job note).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           # Deliberate opt-in to fork-code checkout in the pull_request_target
@@ -263,7 +263,7 @@ jobs:
           # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
           # code could read it — the suites never push/pull after checkout.
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Install
@@ -289,7 +289,7 @@ jobs:
     timeout-minutes: 30
     steps:
       # Fork lane checks out the PR head (see the adk job note).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           # Deliberate opt-in to fork-code checkout in the pull_request_target
@@ -302,7 +302,7 @@ jobs:
           # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
           # code could read it — the suites never push/pull after checkout.
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Install
@@ -322,7 +322,7 @@ jobs:
     timeout-minutes: 30
     steps:
       # Fork lane checks out the PR head (see the adk job note).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           # Deliberate opt-in to fork-code checkout in the pull_request_target
@@ -335,7 +335,7 @@ jobs:
           # Don't leave GITHUB_TOKEN in .git/config where the (approved) fork
           # code could read it — the suites never push/pull after checkout.
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           # Pinned to 3.12 for the same reason as ci.yml (obstore wheels).
           python-version: "3.12"
@@ -355,12 +355,12 @@ jobs:
     environment: integration-tests
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Install
