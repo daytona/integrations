@@ -51,6 +51,29 @@ The first time you open a PR, our CLA assistant will also comment with a link to
 [Contributor License Agreement](./CLA.md) and a one-line instruction to sign it (see
 [Licensing](#licensing)).
 
+If your PR changes a package with live integration tests (the packages in
+[`integration.yml`](.github/workflows/integration.yml)), those tests run against real Daytona
+sandboxes with a Daytona API key, which PRs from forks never receive. A maintainer runs them for
+you after review; until then the PR's `integration-success` check stays pending ("Expected").
+
+### Running live tests for a fork PR (maintainers)
+
+Review the PR first, then run its live tests on exactly the commit you reviewed, from a branch in
+this repository:
+
+```bash
+git fetch origin pull/<N>/head:fork-pr-<N>   # confirm this is the commit you reviewed
+git diff --name-only origin/main...fork-pr-<N> -- .github   # must print nothing
+git push origin fork-pr-<N>
+gh workflow run integration.yml --ref fork-pr-<N> -f package=<package>   # e.g. package=pi
+```
+
+Approve the `integration-tests` deployment. Once that run passes, the fork PR's
+`integration-success` check passes too, since checks belong to the commit. Merge the PR, then
+delete the branch with `git push origin --delete fork-pr-<N>`. Repeat for each new commit the
+contributor pushes. Never push a fork PR that touches `.github/`: on a branch in this repository,
+its workflow files would run with this repository's token, without any approval.
+
 ## Licensing
 
 This repository is made available under [Apache-2.0](./LICENSE), unless a package declares
