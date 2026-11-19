@@ -55,7 +55,9 @@ If your PR changes a package with live integration tests (the packages in
 [`integration.yml`](.github/workflows/integration.yml)), those tests run against real Daytona
 sandboxes with a Daytona API key, which PRs from forks never receive. After review, a maintainer
 opens a copy of your PR from a branch in this repository, runs the live tests there and merges the
-copy; your PR's `integration-success` check stays pending ("Expected").
+copy. Your PR's `integration-success` check stays pending ("Expected") and your PR is closed with a
+link to the merged copy, but your contribution still counts: the merged commit credits you as
+co-author.
 
 ## Licensing
 
