@@ -57,26 +57,6 @@ sandboxes with a Daytona API key, which PRs from forks never receive. After revi
 opens a copy of your PR from a branch in this repository, runs the live tests there and merges the
 copy; your PR's `integration-success` check stays pending ("Expected").
 
-### Running live tests for a fork PR (maintainers)
-
-Live tests never run on fork PRs. Review the PR first, then open a copy of exactly the commit you
-reviewed from a branch in this repository, where they run as usual:
-
-```bash
-git fetch origin pull/<N>/head:fork-pr-<N>   # confirm this is the commit you reviewed
-git diff --name-only origin/main...fork-pr-<N> -- .github   # must print nothing
-git push origin fork-pr-<N>
-gh pr create --head fork-pr-<N> --title "<the fork PR's title>" --body "Copy of #<N> for the live tests."
-```
-
-Approve the `integration-tests` deployment on the copy. Once it's green, squash-merge the copy
-(make sure the commit credits the contributor), close the fork PR with a link to it, and delete
-the branch. The fork PR itself can't pass `integration-success`: checks from runs on other branches
-don't count for it, even on the same commit. If the contributor pushes again, review the new
-commits and push them to the same branch. Never push a fork PR that touches `.github/`: on a branch
-in this repository, its workflow files would run with this repository's token, without any
-approval.
-
 ## Licensing
 
 This repository is made available under [Apache-2.0](./LICENSE), unless a package declares
