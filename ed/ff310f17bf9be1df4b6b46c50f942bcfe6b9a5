@@ -1,0 +1,19 @@
+CONTRIBUTING.md
+  s_5ca4dfee717534::t_6ab272261372d8 58-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "edff310f17bf9be1df4b6b46c50f942bcfe6b9a5",
+  "prompts": {},
+  "sessions": {
+    "s_5ca4dfee717534": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_e1ab9782fffeXVJTlgkVqr6Rir",
+        "model": "unknown"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
