@@ -51,6 +51,14 @@ The first time you open a PR, our CLA assistant will also comment with a link to
 [Contributor License Agreement](./CLA.md) and a one-line instruction to sign it (see
 [Licensing](#licensing)).
 
+If your PR comes from a fork and changes a package with live integration tests (the packages in
+[`integration.yml`](.github/workflows/integration.yml)), those tests can't run on your PR: they run
+against real Daytona sandboxes with a Daytona API key, which PRs from forks never receive. After
+review, a maintainer opens a copy of your PR from a branch in this repository, runs the live tests
+there and merges the copy. Your PR's `integration-success` check stays pending ("Expected") and
+your PR is closed with a link to the merged copy, but your contribution still counts: the merged
+commit credits you as co-author.
+
 ## Licensing
 
 This repository is made available under [Apache-2.0](./LICENSE), unless a package declares
