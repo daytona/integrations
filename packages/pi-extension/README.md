@@ -31,6 +31,8 @@ pi install npm:@daytona/pi
 > [!NOTE]
 > To update the extension later, run `pi update` — `pi install` won't refresh an existing install.
 
+Requires Node.js 22.15 or newer. The extension uses the Daytona SDK 2.x `v0` namespace and is pinned to the pre-release `@daytona/sdk@2.0.0-alpha.12` until 2.0.0 is stable.
+
 ### Environment Configuration
 
 This extension requires a [Daytona account](https://www.daytona.io/) and [Daytona API key](https://app.daytona.io/dashboard/keys) to create sandboxes.
@@ -41,10 +43,11 @@ Set your Daytona API key as an environment variable (e.g. in your shell profile)
 export DAYTONA_API_KEY="your-api-key"
 ```
 
-The extension also reads these optional variables:
+The extension also reads this optional variable:
 
-- `DAYTONA_API_URL` — defaults to `https://app.daytona.io/api`.
 - `DAYTONA_TARGET` — e.g. `us`.
+
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 If no key is set and a UI is available, Pi prompts you for one once per session.
 

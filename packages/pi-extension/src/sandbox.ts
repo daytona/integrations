@@ -18,7 +18,7 @@
  * fails loudly — it never silently falls back to the host.
  */
 
-import { DaytonaNotFoundError, type Sandbox } from '@daytona/sdk'
+import { DaytonaNotFoundError, type Sandbox } from '@daytona/sdk/v0'
 
 export class SandboxUnavailableError extends Error {
   constructor(public readonly sandboxId: string) {
