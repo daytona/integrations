@@ -222,8 +222,8 @@ describe.skipIf(!HAS_DAYTONA_KEY)('integration', () => {
     for (const idOrName of doomed) {
       console.log(`Deleting sandbox ${idOrName}...`)
       try {
-        const sandbox = await daytona.get(idOrName)
-        await daytona.delete(sandbox)
+        const sandbox = await daytona.v0.get(idOrName)
+        await daytona.v0.delete(sandbox)
       } catch {
         // Already gone, or never created — either way nothing to clean up.
       }
@@ -269,7 +269,7 @@ describe.skipIf(!HAS_DAYTONA_KEY)('integration', () => {
     const sandboxName = `opencode-${workspace.name}`
     await sleep(5000)
 
-    const sandbox = await daytona.get(sandboxName)
+    const sandbox = await daytona.v0.get(sandboxName)
     createdSandboxId = sandbox.id
 
     const files = await sandbox.process.executeCommand('ls -la /home/daytona/workspace/repo')
