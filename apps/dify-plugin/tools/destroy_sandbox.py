@@ -15,7 +15,7 @@ class DestroySandboxTool(Tool):
 
         daytona = build_client(self.runtime.credentials)
         sandbox = get_sandbox(daytona, sandbox_id)
-        daytona.delete(sandbox, timeout=180)
+        daytona.v0.delete(sandbox, timeout=180)
 
         yield self.create_json_message({
             "success": True,

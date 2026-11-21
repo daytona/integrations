@@ -29,7 +29,7 @@ class RunCommandTool(Tool):
         if sandbox_id:
             sandbox = get_sandbox(daytona, sandbox_id)
         else:
-            sandbox = daytona.create()
+            sandbox = daytona.v0.create()
 
         try:
             response = sandbox.process.exec(command, cwd=cwd, env=env_vars, timeout=timeout)
