@@ -13,7 +13,8 @@ from google.adk.plugins import BasePlugin
 from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
 
-from daytona import Daytona, DaytonaConfig, CreateSandboxBaseParams  # type: ignore
+from daytona import Daytona, DaytonaConfig  # type: ignore
+from daytona.v0 import CreateSandboxBaseParams  # type: ignore
 
 from daytona_adk.tools import (
     ExecuteCodeTool,
@@ -69,7 +70,7 @@ class DaytonaPlugin(BasePlugin):
             auto_stop_interval=auto_stop_interval,
             auto_delete_interval=auto_delete_interval,
         )
-        self._sandbox = self._daytona.create(params)
+        self._sandbox = self._daytona.v0.create(params)
         logger.debug(f"Daytona sandbox created: {self._sandbox.id}")
 
     def get_tools(self) -> list[BaseTool]:
@@ -142,7 +143,7 @@ class DaytonaPlugin(BasePlugin):
         if self._sandbox:
             try:
                 logger.info("Deleting Daytona sandbox...")
-                self._daytona.delete(self._sandbox)
+                self._daytona.v0.delete(self._sandbox)
                 self._sandbox = None
                 logger.info("Daytona sandbox deleted.")
             except Exception as e:
