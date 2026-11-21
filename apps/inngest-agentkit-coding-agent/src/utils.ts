@@ -1,4 +1,5 @@
-import { Daytona, Sandbox } from "@daytonaio/sdk";
+import { Daytona } from "@daytona/sdk";
+import { Sandbox } from "@daytona/sdk/v0";
 import { AgentResult, NetworkRun } from "@inngest/agent-kit";
 import type { TextMessage } from "@inngest/agent-kit";
 
@@ -20,7 +21,7 @@ export async function createSandbox(network?: NetworkRun<Record<string, any>>) {
   const daytona = new Daytona();
   let sandbox: Sandbox;
   try {
-    sandbox = await daytona.create();
+    sandbox = await daytona.v0.create();
   } catch (error) {
     throw new Error(`Failed to create Daytona sandbox: ${error}`, {
       cause: error,
