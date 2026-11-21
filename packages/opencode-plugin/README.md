@@ -26,6 +26,12 @@ Now that the Daytona plugin is in the plugins list, it will automatically be dow
 
 To install the plugin globally, edit `~/.config/opencode/opencode.json`.
 
+#### Requirements
+
+- Node.js 22.15 or newer.
+- The plugin uses the Daytona SDK 2.x `v0` namespace (`@daytona/sdk/v0`) and is pinned to the pre-release `@daytona/sdk@2.0.0-alpha.12` until 2.0.0 is stable.
+- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+
 ### Environment Configuration
 
 This plugin requires a [Daytona account](https://www.daytona.io/) and [Daytona API key](https://app.daytona.io/dashboard/keys) to create sandboxes.
