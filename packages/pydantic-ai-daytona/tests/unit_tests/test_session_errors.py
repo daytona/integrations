@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Literal
 
 import pytest
-from daytona import (
+from daytona.v0 import (
     DaytonaAuthenticationError,
     DaytonaError,
     DaytonaFileNotFoundError,

@@ -5,7 +5,12 @@ import logging
 from typing import TYPE_CHECKING
 
 import pytest
-from daytona import DaytonaError, SandboxState
+from daytona.v0 import (
+    CreateSandboxFromImageParams,
+    CreateSandboxFromSnapshotParams,
+    DaytonaError,
+    SandboxState,
+)
 
 from pydantic_ai_daytona import (
     DaytonaSandboxError,
@@ -120,3 +125,20 @@ async def test_owned_deletion_completes_when_teardown_is_cancelled(sdk: FakeDayt
         await exiting
     assert sdk.sandbox.deleted
     assert sdk.closed
+
+
+@pytest.mark.parametrize("image", [None, "python:3.12-slim"])
+def test_create_params_include_target_for_snapshot_and_image(image: str | None) -> None:
+    session = DaytonaSandboxSession(
+        snapshot="my-snapshot" if image is None else None,
+        image=image,
+        target="eu",
+    )
+
+    params = session._create_params()
+
+    if image is None:
+        assert isinstance(params, CreateSandboxFromSnapshotParams)
+    else:
+        assert isinstance(params, CreateSandboxFromImageParams)
+    assert params.target == "eu"

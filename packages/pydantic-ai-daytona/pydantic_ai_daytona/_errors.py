@@ -1,6 +1,6 @@
 """Daytona failure translation and control-plane probing."""
 
-from daytona import (
+from daytona.v0 import (
     AsyncSandbox,
     DaytonaAuthenticationError,
     DaytonaError,
