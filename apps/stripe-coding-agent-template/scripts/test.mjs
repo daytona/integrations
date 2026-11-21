@@ -53,10 +53,6 @@ const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-sonnet-4.5'
 // ── Daytona wiring (mirrors route.ts) ───────────────────────────────────────
 const daytona = new Daytona({
   apiKey: process.env.DAYTONA_API_KEY || process.env.DAYTONA_SANDBOX_API_KEY,
-  apiUrl:
-    process.env.DAYTONA_API_URL ||
-    process.env.DAYTONA_SANDBOX_API_URL ||
-    'https://app.daytona.io/api',
   organizationId:
     process.env.DAYTONA_ORGANIZATION_ID || process.env.DAYTONA_SANDBOX_ORGANIZATION_ID,
 })
@@ -121,7 +117,7 @@ try {
 console.log(`\n[3/3] Daytona sandbox lifecycle`)
 let sandbox
 try {
-  sandbox = await daytona.create({ public: true, ephemeral: true })
+  sandbox = await daytona.v0.create({ public: true, ephemeral: true })
   ok(`createSandbox → ${sandbox.id}`)
 
   const r = await sandbox.process.executeCommand('echo hello-from-daytona')
