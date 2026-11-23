@@ -40,7 +40,7 @@
     "test:live": "npm run test:bash-bg && npm run test:recovery && npm run test:cwd"
   },
   "dependencies": {
-    "@daytona/sdk": "2.0.0-alpha.12"
+    "@daytona/sdk": "^2.0.0"
   },
   "engines": {
     "node": ">=22.15.0"
