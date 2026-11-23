@@ -32,45 +32,63 @@ jobs:
       toolsets: ${{ steps.filter.outputs.toolsets }}
       claude_toolsets: ${{ steps.filter.outputs.claude_toolsets }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         id: filter
         with:
+          # Each filter also matches this workflow file, so a CI change runs
+          # every job it touches on its own PR.
           filters: |
             adk:
               - 'packages/adk-plugin/**'
+              - '.github/workflows/ci.yml'
             langchain:
               - 'packages/langchain-data-analysis/**'
+              - '.github/workflows/ci.yml'
             n8n:
               - 'packages/n8n-nodes-daytona/**'
+              - '.github/workflows/ci.yml'
             pi:
               - 'packages/pi-extension/**'
+              - '.github/workflows/ci.yml'
             opencode:
               - 'packages/opencode-plugin/**'
+              - '.github/workflows/ci.yml'
             pydantic_ai:
               - 'packages/pydantic-ai-daytona/**'
+              - '.github/workflows/ci.yml'
             agentenv_daytona:
               - 'packages/agentenv-daytona/**'
+              - '.github/workflows/ci.yml'
             convex:
               - 'packages/convex/**'
+              - '.github/workflows/ci.yml'
             toolsets:
               - 'packages/claude-toolsets/python/**'
+              - '.github/workflows/ci.yml'
             # npm (TypeScript) package — distinct from the `toolsets` filter above,
             # which routes the PyPI/Python packages/claude-toolsets/python. The two
             # live side by side under packages/claude-toolsets/, so both filters are
-            # scoped to their own language subfolder and never overlap.
+            # scoped to their own language subfolder and never overlap on package files.
             claude_toolsets:
               - 'packages/claude-toolsets/typescript/**'
+              - '.github/workflows/ci.yml'
 
   adk:
     needs: changes
     if: needs.changes.outputs.adk == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          python-version: "3.x"
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          # Pinned: obstore (pulled via the daytona SDK) ships no wheels for the
+          # newest Python; 3.12 has wheels so `pip install` succeeds.
+          python-version: "3.12"
       - name: Detect package
         id: guard
         run: |
@@ -92,8 +110,12 @@ jobs:
     if: needs.changes.outputs.langchain == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           # Pinned: obstore (pulled via daytona ^0.113.2) ships no wheels for the
           # newest Python; 3.12 has wheels so `poetry install` succeeds.
@@ -121,8 +143,12 @@ jobs:
     if: needs.changes.outputs.n8n == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Detect package
@@ -147,8 +173,12 @@ jobs:
     if: needs.changes.outputs.pi == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Detect package
@@ -173,8 +203,12 @@ jobs:
     if: needs.changes.outputs.opencode == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Detect package
@@ -199,8 +233,12 @@ jobs:
     if: needs.changes.outputs.pydantic_ai == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           # Pinned: obstore (pulled via the daytona SDK) ships no wheels for the
           # newest Python; 3.12 has wheels so `pip install` succeeds.
@@ -229,12 +267,12 @@ jobs:
     if: needs.changes.outputs.agentenv_daytona == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # This job runs PR code and makes no authenticated Git calls, so it has no use for a
           # token left behind in .git/config.
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Detect package
@@ -267,8 +305,12 @@ jobs:
     if: needs.changes.outputs.convex == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job runs PR code and makes no authenticated Git calls, so it has no use for a
+          # token left behind in .git/config.
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Detect package
@@ -297,12 +339,12 @@ jobs:
     if: needs.changes.outputs.toolsets == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # This job runs PR code and makes no authenticated Git calls, so it has no use for a
           # token left behind in .git/config.
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           # Pinned to 3.12 for the same reason as pydantic-ai (obstore wheels via the daytona SDK).
           python-version: "3.12"
@@ -335,12 +377,12 @@ jobs:
     if: needs.changes.outputs.claude_toolsets == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # This job runs PR code and makes no authenticated Git calls, so it has no use for a
           # token left behind in .git/config.
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "lts/*"
       - name: Detect package
