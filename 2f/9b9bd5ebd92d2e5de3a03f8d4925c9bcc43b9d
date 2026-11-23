@@ -1,0 +1,21 @@
+packages/langchain-data-analysis/README.md
+  s_4f4cb65ce9553a::t_e0b98d7df30118 11
+packages/langchain-data-analysis/pyproject.toml
+  s_4f4cb65ce9553a::t_e95e10da518ce4 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f9b9bd5ebd92d2e5de3a03f8d4925c9bcc43b9d",
+  "prompts": {},
+  "sessions": {
+    "s_4f4cb65ce9553a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_df6cbfd37ffejxhcEsCHFh6Bn3",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
