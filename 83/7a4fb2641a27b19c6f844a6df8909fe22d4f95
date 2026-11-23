@@ -1,0 +1,21 @@
+packages/adk-plugin/README.md
+  s_e82cf66c10613f::t_8023da1f5f55c9 11
+packages/adk-plugin/pyproject.toml
+  s_e82cf66c10613f::t_db488c3112806d 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "837a4fb2641a27b19c6f844a6df8909fe22d4f95",
+  "prompts": {},
+  "sessions": {
+    "s_e82cf66c10613f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_df6ce6727ffeWXQ2pMUCujbB8P",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
