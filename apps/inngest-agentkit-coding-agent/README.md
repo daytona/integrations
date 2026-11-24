@@ -18,7 +18,7 @@ This project demonstrates a fully autonomous coding agent capable of performing 
 
 - **Node.js:** Version 22.15 or higher is required.
 - **Daytona SDK:** `@daytona/sdk` 2.x (`^2.0.0`, v0 namespace).
-- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only, so this app doesn't support a self-hosted Daytona. The last version built on Daytona SDK 0.x is the app at [`b69e306`](https://github.com/daytona/integrations/tree/b69e306b58fb2722acebd784c7c84f9ac8b7ede0/apps/inngest-agentkit-coding-agent).
 
 ## Environment Variables
 
