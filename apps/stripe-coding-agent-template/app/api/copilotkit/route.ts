@@ -19,9 +19,8 @@ import { z } from 'zod'
  * We bridge both forms here, so the template runs whether you provisioned
  * through Stripe Projects or set raw DAYTONA_* keys.
  *
- * DAYTONA_SANDBOX_API_URL is intentionally not bridged: a custom API URL is not
- * supported by SDK 2.x, which targets Daytona Cloud. Self-hosted Daytona needs a
- * release of this template built on Daytona SDK 0.x.
+ * DAYTONA_SANDBOX_API_URL is intentionally not bridged: SDK 2.x targets Daytona
+ * Cloud only, so this template doesn't support a self-hosted Daytona.
  */
 if (!process.env.DAYTONA_API_KEY && process.env.DAYTONA_SANDBOX_API_KEY) {
   process.env.DAYTONA_API_KEY = process.env.DAYTONA_SANDBOX_API_KEY
