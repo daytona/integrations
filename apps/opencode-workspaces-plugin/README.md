@@ -33,7 +33,7 @@ pwd   # note this path; it is used below
 
 `npm ci` installs the Daytona SDK 2.x (`@daytona/sdk` `^2.0.0`); sandboxes are managed through its `v0` namespace.
 
-Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only, so this plugin doesn't support a self-hosted Daytona. The last version built on Daytona SDK 0.x is the plugin at [`8b6d46e`](https://github.com/daytona/integrations/tree/8b6d46e907b22f4cd3471dfb58a81236ff8e5d3f/apps/opencode-workspaces-plugin).
 
 Add a `file://` plugin spec to your project's `.opencode/opencode.jsonc`:
 
