@@ -13,6 +13,8 @@ Every member of both toolsets is implemented, including the browser members that
 npm install @daytona/claude-toolsets @anthropic-ai/sdk
 ```
 
+This release depends on the Daytona SDK 2.x (`@daytona/sdk` `^2.0.0`) through its `v0` namespace.
+
 `@anthropic-ai/sdk` is a peer dependency — install it yourself so the toolset base classes this package extends come from the exact SDK version your application runs. Version `0.132.0` or newer is required; that is the first release exporting the toolset helpers from `@anthropic-ai/sdk/helpers/beta/toolsets`. Chromium is driven with `playwright-core`, which is a direct dependency and downloads no browser: the one that matters already lives in the sandbox.
 
 Set your keys in the environment:
@@ -74,9 +76,10 @@ With no `sandbox` option and no custom snapshot or image in `createParams`, each
 
 ## Requirements
 
-- **Node.js 20 or newer.**
+- **Node.js 22.15 or newer.**
 - **ESM only.** The package ships ES modules with no CommonJS build, so import it from a package with `"type": "module"` (or from `.mts` files, or through a bundler). `require("@daytona/claude-toolsets")` will not work; from CommonJS use dynamic `await import(...)`.
 - A **Daytona account and API key**, plus an Anthropic API key for the model loop.
+- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 ## Sandbox lifecycle
 
@@ -84,6 +87,8 @@ With no `sandbox` option and no custom snapshot or image in `createParams`, each
 |---|---|---|
 | **Owned** (default) | `DaytonaComputer.create({ createParams: { … } })`, or no options at all | deleted (`onClose: "stop"` stops it instead) |
 | **Borrowed** | `DaytonaComputer.create({ sandbox })` with a running `Sandbox` | left running; `DaytonaBrowser` stops the Chromium it started |
+
+If you pass your own `sandbox` or `daytona` client, create it with `@daytona/sdk` 2.x (`new Daytona()`, `await daytona.v0.create(...)`). Objects from Daytona SDK 0.x don't type-check, and this package doesn't recognize their errors.
 
 `close()` is idempotent and safe after a failed construction: `create()` closes the half-built driver itself before rethrowing, so a sandbox created before the failure is still removed. Sandboxes the drivers create always carry the label `created-by=daytona-claude-toolsets`, so a leftover one can be found and removed by it; `createParams.labels` adds your own labels but cannot change that one. Options the drivers don't define (`confirm`, `configs`, `urlPolicy`, `filePolicy`, `toolConfigs`) go to the SDK unchanged.
 

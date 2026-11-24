@@ -3,7 +3,7 @@ import type {
   CreateSandboxFromImageParams,
   CreateSandboxFromSnapshotParams,
   Sandbox,
-} from "@daytona/sdk";
+} from "@daytona/sdk/v0";
 
 import { errorName, warn } from "./logging.js";
 
@@ -48,15 +48,15 @@ export class SandboxLeaseConfigError extends Error {
 }
 
 /**
- * `Daytona.create` is overloaded (snapshot params and image params), and the two overloads differ
- * only in options this package never passes. Both shapes therefore take the same call, resolved in
- * one place so neither call site has to restate the union.
+ * `Daytona.v0.create` is overloaded (snapshot params and image params), and the two overloads
+ * differ only in options this package never passes. Both shapes therefore take the same call,
+ * resolved in one place so neither call site has to restate the union.
  */
 const createWithDaytona = async (
   daytona: Daytona,
   params: CreateParams,
   timeout: number,
-): Promise<Sandbox> => daytona.create(params, { timeout });
+): Promise<Sandbox> => daytona.v0.create(params, { timeout });
 
 export const withDefaults = (
   params: CreateParams | undefined,

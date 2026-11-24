@@ -1,5 +1,5 @@
 import { ToolError, URLRefusedError, type BetaFilePolicy } from "@anthropic-ai/sdk/helpers/beta/toolsets";
-import { DaytonaError } from "@daytona/sdk";
+import { DaytonaError } from "@daytona/sdk/v0";
 import type { BrowserContext, Page, Route, WebSocketRoute } from "playwright-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

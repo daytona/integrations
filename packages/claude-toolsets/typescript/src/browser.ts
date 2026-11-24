@@ -31,7 +31,8 @@ import type {
   BetaBrowserSwitchTabInput, BetaBrowserTripleClickInput, BetaBrowserTypeInput,
   BetaBrowserWaitInput, BetaBrowserZoomInput, BetaBrowserClickTarget,
 } from "@anthropic-ai/sdk/resources/beta";
-import type { Daytona, Sandbox } from "@daytona/sdk";
+import type { Daytona } from "@daytona/sdk";
+import type { Sandbox } from "@daytona/sdk/v0";
 import {
   chromium as playwrightChromium,
   errors as playwrightErrors,

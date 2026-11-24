@@ -1,5 +1,5 @@
 import type { BetaBrowserStateBlockParam, BetaToolResultBlockParam, BetaToolUseBlock } from "@anthropic-ai/sdk/resources/beta";
-import type { Sandbox } from "@daytona/sdk";
+import type { Sandbox } from "@daytona/sdk/v0";
 import { vi } from "vitest";
 
 import { encodePng } from "../src/png.js";
