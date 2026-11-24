@@ -8,6 +8,10 @@
 pip install pydantic-ai-daytona
 ```
 
+Requires the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]>=2,<3`). If your code also uses the `daytona` SDK directly, move those imports and calls to `daytona.v0` as well: one Python environment can only hold one `daytona` version.
+
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), stay on the last release built on Daytona SDK 0.x: `pip install "pydantic-ai-daytona<1"`.
+
 ## Configuration
 
 Get your API key from the [Daytona Dashboard](https://app.daytona.io/dashboard/keys) and set it in the environment (or a `.env` file):
@@ -16,7 +20,7 @@ Get your API key from the [Daytona Dashboard](https://app.daytona.io/dashboard/k
 export DAYTONA_API_KEY="your-daytona-api-key"
 ```
 
-You can also pass `api_key` (plus optional `api_url` / `target`) directly to `DaytonaSandbox`.
+You can also pass `api_key` (plus optional `target`) directly to `DaytonaSandbox`.
 
 ## Quickstart
 
@@ -117,7 +121,6 @@ async def main():
 | `auto_stop_interval` | `None` | Minutes of inactivity before Daytona stops an owned sandbox. |
 | `auto_delete_interval` | `None` | Minutes after stopping before Daytona deletes an owned sandbox (`0` = immediately, `-1` = never). |
 | `api_key` | `None` | Daytona API key (falls back to `DAYTONA_API_KEY`). |
-| `api_url` | `None` | Daytona API URL (falls back to `DAYTONA_API_URL`). |
 | `target` | `None` | Daytona target region (falls back to `DAYTONA_TARGET`). |
 | `default_command_timeout` | `60.0` | Seconds a command may run when the model omits `timeout_seconds`. |
 | `max_command_timeout` | `300` | Hard ceiling in seconds for any single command. |

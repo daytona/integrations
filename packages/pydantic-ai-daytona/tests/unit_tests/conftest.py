@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from daytona import DaytonaConnectionTimeoutError, DaytonaError, SandboxState, SessionExecuteRequest
+from daytona.v0 import DaytonaConnectionTimeoutError, DaytonaError, SandboxState, SessionExecuteRequest
 
 
 class FakeProcess:
@@ -124,6 +124,24 @@ class FakeSandbox:
         self.deleted = True
 
 
+class FakeV0:
+    """The SDK 2.x `.v0` namespace: resource calls live here, not on the root client."""
+
+    def __init__(self, root: "FakeDaytona") -> None:
+        self._root = root
+
+    async def create(self, params: object, *, timeout: float) -> FakeSandbox:
+        root = self._root
+        root.create_started.set()
+        await root.create_release.wait()
+        if root.create_error:
+            raise root.create_error
+        return root.sandbox
+
+    async def get(self, sandbox_id: str) -> FakeSandbox:
+        return self._root.sandbox
+
+
 class FakeDaytona:
     def __init__(self, sandbox: FakeSandbox) -> None:
         self.sandbox = sandbox
@@ -132,18 +150,10 @@ class FakeDaytona:
         self.create_release.set()
         self.create_error: DaytonaError | None = None
         self.closed = False
-
-    async def create(self, params: object, *, timeout: float) -> FakeSandbox:
-        self.create_started.set()
-        await self.create_release.wait()
-        if self.create_error:
-            raise self.create_error
-        return self.sandbox
-
-    async def get(self, sandbox_id: str) -> FakeSandbox:
-        return self.sandbox
+        self.v0 = FakeV0(self)
 
     async def close(self) -> None:
+        # Cleanup stays on the SDK 2.x root client.
         self.closed = True
 
 

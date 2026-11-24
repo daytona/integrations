@@ -10,10 +10,12 @@ from types import TracebackType
 
 from daytona import (
     AsyncDaytona,
+    DaytonaConfig,
+)
+from daytona.v0 import (
     AsyncSandbox,
     CreateSandboxFromImageParams,
     CreateSandboxFromSnapshotParams,
-    DaytonaConfig,
     DaytonaError,
     SandboxState,
 )
@@ -57,7 +59,6 @@ class DaytonaSandboxSession:
         auto_stop_interval: int | None = None,
         auto_delete_interval: int | None = None,
         api_key: str | None = None,
-        api_url: str | None = None,
         target: str | None = None,
         create_timeout: float = DEFAULT_SANDBOX_CREATE_TIMEOUT,
     ) -> None:
@@ -77,7 +78,6 @@ class DaytonaSandboxSession:
         self._auto_stop_interval = auto_stop_interval
         self._auto_delete_interval = auto_delete_interval
         self._api_key = api_key
-        self._api_url = api_url
         self._target = target
         self._create_timeout = create_timeout
         self._daytona: AsyncDaytona | None = None
@@ -98,16 +98,11 @@ class DaytonaSandboxSession:
     async def __aenter__(self) -> Self:
         if self._sandbox is not None:
             raise DaytonaSandboxError("The session is already open.")
-        config = None
-        if self._api_key or self._api_url or self._target:
-            config = DaytonaConfig(
-                api_key=self._api_key, api_url=self._api_url, target=self._target
-            )
-        daytona = AsyncDaytona(config)
+        daytona = AsyncDaytona(DaytonaConfig(api_key=self._api_key) if self._api_key else None)
         sandbox: AsyncSandbox | None = None
         try:
             if self._attach_id is not None:
-                sandbox = await daytona.get(self._attach_id)
+                sandbox = await daytona.v0.get(self._attach_id)
                 if sandbox.state in (SandboxState.DESTROYING, SandboxState.DESTROYED):
                     raise DaytonaSandboxTerminalError("The sandbox is gone (it was deleted).")
                 if sandbox.state in (
@@ -123,7 +118,7 @@ class DaytonaSandboxSession:
 
                 async def create() -> None:
                     nonlocal sandbox
-                    sandbox = await daytona.create(
+                    sandbox = await daytona.v0.create(
                         self._create_params(), timeout=self._create_timeout
                     )
                     self._owned = True
@@ -197,6 +192,7 @@ class DaytonaSandboxSession:
                 domain_allow_list=self._domain_allow_list,
                 auto_stop_interval=self._auto_stop_interval,
                 auto_delete_interval=self._auto_delete_interval,
+                target=self._target,
             )
         return CreateSandboxFromSnapshotParams(
             snapshot=self._snapshot,
@@ -209,6 +205,7 @@ class DaytonaSandboxSession:
             domain_allow_list=self._domain_allow_list,
             auto_stop_interval=self._auto_stop_interval,
             auto_delete_interval=self._auto_delete_interval,
+            target=self._target,
         )
 
     def _require_sandbox(self) -> AsyncSandbox:
