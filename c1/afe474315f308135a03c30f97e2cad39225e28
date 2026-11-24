@@ -1,0 +1,21 @@
+packages/adk-plugin/README.md
+  s_14897c0532d986::t_2ffc6373f8db45 11,13
+packages/adk-plugin/tests/test_plugin.py
+  s_14897c0532d986::t_f570f285ebbf20 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c1afe474315f308135a03c30f97e2cad39225e28",
+  "prompts": {},
+  "sessions": {
+    "s_14897c0532d986": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_df265b0e3ffeD2POyz3WLKHGPn",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
