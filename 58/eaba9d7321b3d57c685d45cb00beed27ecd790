@@ -1,0 +1,21 @@
+apps/dify-plugin/README.md
+  s_14897c0532d986::t_c42893fdc7956f 35
+apps/dify-plugin/_client.py
+  s_14897c0532d986::t_0ab12c390c19f1 8,31-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "58eaba9d7321b3d57c685d45cb00beed27ecd790",
+  "prompts": {},
+  "sessions": {
+    "s_14897c0532d986": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_df265b0e3ffeD2POyz3WLKHGPn",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
