@@ -13,8 +13,10 @@
  * Blueprint: examples/extensions/ssh.ts from @earendil-works/pi-coding-agent.
  */
 
-import { Daytona } from '@daytona/sdk'
-import { DaytonaNotFoundError, type Sandbox } from '@daytona/sdk/v0'
+// DaytonaNotFoundError comes from the root on purpose: it also matches errors from a
+// second loaded copy of the SDK (jiti can load one), which the `/v0` class doesn't.
+import { Daytona, DaytonaNotFoundError } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { resolveApiKey } from './src/auth.ts'
