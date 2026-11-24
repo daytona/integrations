@@ -79,7 +79,7 @@ With no `sandbox` option and no custom snapshot or image in `createParams`, each
 - **Node.js 22.15 or newer.**
 - **ESM only.** The package ships ES modules with no CommonJS build, so import it from a package with `"type": "module"` (or from `.mts` files, or through a bundler). `require("@daytona/claude-toolsets")` will not work; from CommonJS use dynamic `await import(...)`.
 - A **Daytona account and API key**, plus an Anthropic API key for the model loop.
-- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), stay on the last release built on Daytona SDK 0.x: `npm install @daytona/claude-toolsets@^1`.
 
 ## Sandbox lifecycle
 
