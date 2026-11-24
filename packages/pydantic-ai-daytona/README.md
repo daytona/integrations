@@ -8,9 +8,9 @@
 pip install pydantic-ai-daytona
 ```
 
-Requires the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]>=2,<3`).
+Requires the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]>=2,<3`). If your code also uses the `daytona` SDK directly, move those imports and calls to `daytona.v0` as well: one Python environment can only hold one `daytona` version.
 
-Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), stay on the last release built on Daytona SDK 0.x: `pip install "pydantic-ai-daytona<1"`.
 
 ## Configuration
 
