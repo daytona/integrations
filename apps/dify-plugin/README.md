@@ -32,7 +32,7 @@ Dify plugin for [Daytona](https://www.daytona.io/), secure sandbox infrastructur
 
 The plugin uses the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]>=2,<3`).
 
-Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), stay on plugin version 0.0.2, the last one built on Daytona SDK 0.x: install [`daytona-0.0.2.difypkg`](https://github.com/langgenius/dify-plugins/blob/main/daytonaio/daytona/daytona-0.0.2.difypkg) as a local package.
 
 ### Usage
 

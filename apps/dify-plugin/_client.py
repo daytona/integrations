@@ -5,6 +5,7 @@ from daytona import Daytona, DaytonaConfig
 from daytona.v0 import DaytonaError, DaytonaNotFoundError, Sandbox
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+DAYTONA_CLOUD_API_URL = "https://app.daytona.io/api"
 
 # The plugin daemon is long-lived, so cache one Daytona client per unique
 # credential set to avoid re-creating an HTTP session on every tool call.
@@ -27,6 +28,16 @@ def to_int(value: Any, name: str) -> int:
 
 
 def build_client(credentials: dict[str, Any]) -> Daytona:
+    # Credentials saved by plugin 0.0.2 or earlier can still carry a custom API URL.
+    # SDK 2.x only talks to Daytona Cloud, so refuse them rather than send a
+    # self-hosted key there.
+    api_url = str(credentials.get("api_url") or "").rstrip("/")
+    if api_url not in ("", DAYTONA_CLOUD_API_URL):
+        raise ValueError(
+            f"Custom API URL {api_url} is no longer supported: this plugin "
+            "version only targets Daytona Cloud. Re-authorize it with a Daytona "
+            "Cloud API key, or stay on plugin version 0.0.2 for a self-hosted Daytona."
+        )
     key = _cache_key(credentials)
     if key not in _client_cache:
         _client_cache[key] = Daytona(DaytonaConfig(api_key=credentials["api_key"]))
