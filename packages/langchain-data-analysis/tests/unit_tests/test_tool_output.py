@@ -2,7 +2,7 @@ from typing import Any, Iterator, List
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest  # type: ignore
-from daytona import Chart, ExecuteResponse, ExecutionArtifacts  # type: ignore
+from daytona.v0 import Chart, ExecuteResponse, ExecutionArtifacts  # type: ignore
 from langchain_core.messages import ToolMessage
 
 from langchain_daytona_data_analysis.tools import DaytonaDataAnalysisTool
@@ -13,7 +13,7 @@ PNG_BASE64 = "iVBORw0KGgo" + "A" * 2_000_000
 @pytest.fixture
 def sandbox() -> Iterator[MagicMock]:
     with patch("langchain_daytona_data_analysis.tools.Daytona") as daytona:
-        yield daytona.return_value.create.return_value
+        yield daytona.return_value.v0.create.return_value
 
 
 def _respond(
