@@ -24,8 +24,9 @@ working Daytona, OpenRouter, CopilotKit, and Vercel wiring that already exists.
   those target the OpenAI *Responses* API (`/responses`), which OpenRouter does not
   implement. `.chat()` targets `/chat/completions`, which it does.
 - **Keep the credential bridges** in `route.ts`: `DAYTONA_API_KEY ?? DAYTONA_SANDBOX_API_KEY`
-  (and `_API_URL`, `_ORGANIZATION_ID`), plus `OPENROUTER_*_API_KEY` discovery. They let
-  the app run whether env came from `stripe projects env --pull` or raw keys.
+  (and `_ORGANIZATION_ID`; the API URL bridge was removed because SDK 2.x targets Daytona
+  Cloud only), plus `OPENROUTER_*_API_KEY` discovery. They let the app run whether env came
+  from `stripe projects env --pull` or raw keys.
 - **Keep tools and their renderers in sync.** Every `defineTool` in `route.ts` has a
   matching `useRenderTool` in `app/page.tsx`. Add or remove both together.
 - **Keep the route on the Node runtime** (`export const runtime = 'nodejs'`) — the
