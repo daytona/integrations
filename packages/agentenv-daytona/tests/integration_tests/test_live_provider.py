@@ -13,7 +13,7 @@ import pytest
 import pytest_asyncio
 from agent_env.providers.sandbox_providers.sandbox import NetworkMode, NetworkPolicy
 from agent_env.providers.sandbox_providers.sandbox_provider import build_sandbox_provider
-from daytona import DaytonaNotFoundError
+from daytona.v0 import DaytonaNotFoundError
 
 from agentenv_daytona import DaytonaSandbox
 from agentenv_daytona.network import policy_from_sandbox

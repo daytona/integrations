@@ -19,6 +19,10 @@ pip install agentenv-daytona      # or: uv add agentenv-daytona
 It installs `agentenv-framework` and the Daytona Python SDK. `agent-env plugin list` then shows
 `sandbox provider daytona`.
 
+Requires the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]>=2,<3`).
+
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), stay on the last release built on Daytona SDK 0.x: `pip install "agentenv-daytona<1"`.
+
 ### 2. Get a Daytona API key
 
 Create a key in the [Daytona dashboard](https://app.daytona.io/dashboard/keys). For local work, export it:
@@ -77,7 +81,6 @@ All keys go under `[sandbox.providers.daytona.config]`. Unknown keys are refused
 | Key | Default | Meaning |
 |---|---|---|
 | `api_key` | required | The Daytona API key, as an `env:` or `secret:` reference. |
-| `api_url` | `"https://app.daytona.io/api"` | The Daytona API URL. |
 | `target` | the organization's default | The Daytona region sandboxes are created in. |
 | `snapshot` | unset | A Docker-capable snapshot in your organization to boot instead of the host image. |
 | `base_image` | `"daytonaio/sandbox:0.9.0"` | The Debian or Ubuntu image the host image is built on. Not with `snapshot`. |

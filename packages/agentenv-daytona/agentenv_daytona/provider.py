@@ -21,10 +21,12 @@ from agent_env.providers.sandbox_providers.sandbox_provider import (
     SandboxProvider,
     apply_default_attribution,
 )
-from daytona import AsyncDaytona, DaytonaBadRequestError, DaytonaConfig, DaytonaForbiddenError
+from daytona import AsyncDaytona, DaytonaConfig
+from daytona.v0 import DaytonaBadRequestError, DaytonaForbiddenError
 
 from agentenv_daytona import lifecycle, preview_domain
 from agentenv_daytona.config import (
+    DEFAULT_API_URL,
     PORTS_LABEL,
     Settings,
     create_params,
@@ -58,9 +60,7 @@ def _learn(pattern: str) -> None:
 
 
 def _client(settings: Settings) -> Any:
-    return AsyncDaytona(
-        DaytonaConfig(api_key=settings.api_key, api_url=settings.api_url, target=settings.target)
-    )
+    return AsyncDaytona(DaytonaConfig(api_key=settings.api_key))
 
 
 class DaytonaSandboxProvider(SandboxProvider):
@@ -87,7 +87,7 @@ class DaytonaSandboxProvider(SandboxProvider):
         self._fetch_template = fetch_template
 
     def __repr__(self) -> str:
-        return f"DaytonaSandboxProvider(api_url={self._settings.api_url!r}, target={self._settings.target!r})"
+        return f"DaytonaSandboxProvider(snapshot={self._settings.snapshot!r})"
 
     @classmethod
     def from_config(cls, **config: Any) -> Self:
@@ -111,12 +111,12 @@ class DaytonaSandboxProvider(SandboxProvider):
         if preview_domain.learned():
             return
         try:
-            template = await asyncio.to_thread(self._fetch_template, self._settings.api_url)
+            template = await asyncio.to_thread(self._fetch_template, DEFAULT_API_URL)
             _learn(preview_domain.pattern_from_template(template))
         except Exception as exc:  # noqa: BLE001 - each sandbox's own preview URL still teaches it
             logger.warning(
                 "Could not read Daytona's preview domain from %s/config: %s",
-                self._settings.api_url,
+                DEFAULT_API_URL,
                 exc,
             )
 
@@ -130,7 +130,7 @@ class DaytonaSandboxProvider(SandboxProvider):
         _learn(preview_domain.preview_host_pattern(sample))
 
         async def read_raw() -> Any:
-            return await client.get(raw.id)
+            return await client.v0.get(raw.id)
 
         return DaytonaSandbox(raw, tunnel_urls=urls, network_policy=policy, read_raw=read_raw)
 
@@ -263,7 +263,7 @@ class DaytonaSandboxProvider(SandboxProvider):
 
     async def get_sandbox(self, sandbox_id: str) -> DaytonaSandbox:
         """Reconnect, restoring ports, preview URLs and the applied egress policy."""
-        raw = await self._clients.current().get(sandbox_id)
+        raw = await self._clients.current().v0.get(sandbox_id)
         labels = getattr(raw, "labels", None) or {}
         ports = [
             int(port)

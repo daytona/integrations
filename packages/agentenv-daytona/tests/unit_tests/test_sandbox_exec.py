@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 from agent_env.providers.sandbox_providers.sandbox import NetworkPolicy
-from daytona import DaytonaConflictError, DaytonaConnectionError, DaytonaError, DaytonaNotFoundError
+from daytona.v0 import (
+    DaytonaConflictError,
+    DaytonaConnectionError,
+    DaytonaError,
+    DaytonaNotFoundError,
+)
 
 from agentenv_daytona.image import DOCKER_START_SCRIPT
 from agentenv_daytona.sandbox import DaytonaSandbox
