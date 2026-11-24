@@ -1,0 +1,19 @@
+apps/inngest-agentkit-coding-agent/README.md
+  s_edee95ec2c7876::t_0d433b15a1f932 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "262bf4fb049ebd7724a904d06f22caca666945ff",
+  "prompts": {},
+  "sessions": {
+    "s_edee95ec2c7876": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_df201b363ffeQ5uu3SjG0Y2PJ7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
