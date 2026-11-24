@@ -16,7 +16,7 @@ pip install 'daytona-claude-toolsets[browser]'  # + DaytonaBrowser (Playwright c
 
 This release uses the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]>=2,<3`).
 
-Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), stay on the last release built on Daytona SDK 0.x: `pip install "daytona-claude-toolsets<1"`.
 
 Set your keys in the environment:
 
