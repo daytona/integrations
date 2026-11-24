@@ -5,6 +5,9 @@
   "author": "Daytona Platforms Inc.",
   "license": "Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.15.0"
+  },
   "scripts": {
     "build": "tsc",
     "start": "npm run build && node dist/index.js"
@@ -15,7 +18,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@daytonaio/sdk": "^0.117.0",
+    "@daytona/sdk": "^2.0.0",
     "@inngest/agent-kit": "^0.13.2",
     "dotenv": "^17.2.3",
     "zod": "^4.1.13"

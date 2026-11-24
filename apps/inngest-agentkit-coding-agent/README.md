@@ -16,7 +16,9 @@ This project demonstrates a fully autonomous coding agent capable of performing 
 
 ## Requirements
 
-- **Node.js:** Version 18 or higher is required.
+- **Node.js:** Version 22.15 or higher is required.
+- **Daytona SDK:** `@daytona/sdk` 2.x (`^2.0.0`, v0 namespace).
+- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
 
 ## Environment Variables
 

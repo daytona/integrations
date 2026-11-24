@@ -7,9 +7,9 @@ import {
   createTool,
   anthropic,
 } from "@inngest/agent-kit";
-import { CodeRunParams, DaytonaError } from "@daytonaio/sdk";
+import { CodeRunParams, DaytonaError } from "@daytona/sdk/v0";
 import { getSandbox, extractTextMessageContent, logDebug } from "./utils.js";
-import type { FileUpload } from "@daytonaio/sdk/src/FileSystem.js";
+import type { FileUpload } from "@daytona/sdk/v0";
 import { Buffer } from "buffer";
 
 async function main() {
