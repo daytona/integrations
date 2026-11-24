@@ -1,0 +1,19 @@
+apps/dify-plugin/manifest.yaml
+  s_14897c0532d986::t_f20e2a972ea568 1,23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c5beb22587eebaab96dd5b35a9f41b8ed8390a70",
+  "prompts": {},
+  "sessions": {
+    "s_14897c0532d986": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_df265b0e3ffeD2POyz3WLKHGPn",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
