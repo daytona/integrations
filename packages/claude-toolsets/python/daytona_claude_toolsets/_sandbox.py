@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Literal, Optional, Union
 
-from daytona import CreateSandboxFromImageParams, CreateSandboxFromSnapshotParams, Daytona, Sandbox
+from daytona import Daytona
+from daytona.v0 import CreateSandboxFromImageParams, CreateSandboxFromSnapshotParams, Sandbox
 
 log = logging.getLogger("daytona_claude_toolsets")
 
@@ -49,7 +50,7 @@ class SandboxLease:
 
         params = with_defaults(create_params, default_env)
         client = daytona if daytona is not None else Daytona()
-        return cls(client.create(params, timeout=create_timeout), owned=True, on_close=on_close)
+        return cls(client.v0.create(params, timeout=create_timeout), owned=True, on_close=on_close)
 
     def release(self) -> None:
         """Delete or stop an owned sandbox. Safe to call more than once; a failure is logged, not

@@ -83,7 +83,8 @@ from anthropic.types.beta import (
     BetaBrowserWaitInput,
     BetaBrowserZoomInput,
 )
-from daytona import Daytona, Sandbox
+from daytona import Daytona
+from daytona.v0 import Sandbox
 from typing_extensions import override
 
 from . import _chromium, _page_js

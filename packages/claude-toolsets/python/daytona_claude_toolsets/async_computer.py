@@ -37,7 +37,7 @@ from anthropic.types.beta import (
     BetaComputerWaitInput,
     BetaComputerZoomInput,
 )
-from daytona import Sandbox
+from daytona.v0 import Sandbox
 from typing_extensions import override
 
 from .computer import DaytonaComputer
