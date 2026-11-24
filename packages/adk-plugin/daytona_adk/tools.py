@@ -8,7 +8,7 @@ import shlex
 import uuid
 from typing import Any, Dict, Optional
 
-from daytona import CodeRunParams, Sandbox, SessionExecuteRequest  # type: ignore
+from daytona.v0 import CodeRunParams, Sandbox, SessionExecuteRequest  # type: ignore
 from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
 
