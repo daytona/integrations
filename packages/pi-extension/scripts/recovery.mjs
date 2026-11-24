@@ -27,7 +27,8 @@ const jiti = createJiti(import.meta.url, {
   moduleCache: false,
   alias: { '@earendil-works/pi-coding-agent': hostEntry },
 })
-const { Daytona, DaytonaNotFoundError } = await import('@daytona/sdk')
+const { Daytona } = await import('@daytona/sdk')
+const { DaytonaNotFoundError } = await import('@daytona/sdk/v0')
 
 let pass = 0,
   fail = 0
@@ -46,7 +47,7 @@ const check = (cond, msg, detail) => {
 const { createBashOps } = await jiti.import(path.join(root, 'src/ops.ts'))
 
 const daytona = new Daytona()
-const sandbox = await daytona.create({ labels: { 'created-by': 'pi-daytona-test' }, autoDeleteInterval: 60 })
+const sandbox = await daytona.v0.create({ labels: { 'created-by': 'pi-daytona-test' }, autoDeleteInterval: 60 })
 // Resolve home from the sandbox API so the test isn't tied to a specific image/user.
 const home = (await sandbox.getUserHomeDir()) ?? '/home/daytona'
 const ops = createBashOps(sandbox)

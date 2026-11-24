@@ -18,7 +18,10 @@
  * fails loudly — it never silently falls back to the host.
  */
 
-import { DaytonaNotFoundError, type Sandbox } from '@daytona/sdk'
+// DaytonaNotFoundError comes from the root on purpose: it also matches errors from a
+// second loaded copy of the SDK (jiti can load one), which the `/v0` class doesn't.
+import { DaytonaNotFoundError } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 
 export class SandboxUnavailableError extends Error {
   constructor(public readonly sandboxId: string) {
