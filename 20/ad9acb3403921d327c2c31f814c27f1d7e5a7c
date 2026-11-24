@@ -1,0 +1,21 @@
+packages/pi-extension/index.ts
+  s_4ad9f4f92ee03e::t_a8dc50ebba62cd 16-19
+packages/pi-extension/src/sandbox.ts
+  s_4ad9f4f92ee03e::t_79e4ca9321f761 21-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "20ad9acb3403921d327c2c31f814c27f1d7e5a7c",
+  "prompts": {},
+  "sessions": {
+    "s_4ad9f4f92ee03e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_df229916fffeNdwXMr5CiiOFMK",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
