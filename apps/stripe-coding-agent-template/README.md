@@ -139,7 +139,7 @@ On the React side, `app/page.tsx` registers one `useRenderTool` per tool; each r
 
 - **Node.js 22.15+** (`engines.node` is `>=22.15.0`, which Vercel reads to pick a Node 22+ runtime)
 - Installs Daytona SDK 2.x (`@daytona/sdk` `^2.0.0`), used through its `daytona.v0` namespace
-- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), keep using a release of this package that is built on Daytona SDK 0.x.
+- Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only, so this template doesn't support a self-hosted Daytona. The last version built on Daytona SDK 0.x is the template at [`b69e306`](https://github.com/daytona/integrations/tree/b69e306b58fb2722acebd784c7c84f9ac8b7ede0/apps/stripe-coding-agent-template).
 - A **Daytona** key (or `daytona/sandbox` via Stripe Projects) — note a Daytona plan must be active before a sandbox can be provisioned
 - An **OpenRouter** key (or `openrouter/api` via Stripe Projects). The default model needs the `pay_as_you_go` plan; on the `free` plan, set `OPENROUTER_MODEL` to a free model
 
