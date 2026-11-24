@@ -30,6 +30,10 @@ Dify plugin for [Daytona](https://www.daytona.io/), secure sandbox infrastructur
 2. Generate an API key from the [Daytona Dashboard](https://app.daytona.io/dashboard/keys).
 3. Install this plugin in Dify and authorize it with your API key.
 
+The plugin uses the Daytona SDK 2.x `v0` namespace (`daytona[v0-sdk]>=2,<3`).
+
+Self-hosted / custom API URL: SDK 2.x targets Daytona Cloud only. If you need a custom API URL (self-hosted Daytona), stay on plugin version 0.0.2, the last one built on Daytona SDK 0.x: install [`daytona-0.0.2.difypkg`](https://github.com/langgenius/dify-plugins/blob/main/daytonaio/daytona/daytona-0.0.2.difypkg) as a local package.
+
 ### Usage
 
 #### Create and use a sandbox

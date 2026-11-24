@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Generator
 from typing import Any
 
-from daytona import SessionExecuteRequest
+from daytona.v0 import SessionExecuteRequest
 
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
