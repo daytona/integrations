@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Sandbox } from '@daytona/sdk'
+import type { Sandbox } from '@daytona/sdk/v0'
 import { logger } from '../core/logger'
 
 export class DaytonaSandboxGitManager {

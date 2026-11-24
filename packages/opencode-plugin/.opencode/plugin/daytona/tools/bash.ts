@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod'
-import { DaytonaNotFoundError } from '@daytona/sdk'
+import { DaytonaNotFoundError } from '@daytona/sdk/v0'
 import type { PluginInput } from '@opencode-ai/plugin'
 import type { ToolContext } from '@opencode-ai/plugin/tool'
 import type { DaytonaSessionManager } from '../core/session-manager'
