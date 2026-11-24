@@ -46,7 +46,6 @@ agent_default = "daytona"   # agents
 
 [sandbox.providers.daytona.config]
 api_key = "env:DAYTONA_API_KEY"   # or "secret:daytona_api_key"
-target  = "us"
 ```
 
 To keep the local default and use Daytona per run instead, add only the `[sandbox.providers.daytona.config]`
@@ -82,14 +81,15 @@ All keys go under `[sandbox.providers.daytona.config]`. Unknown keys are refused
 | Key | Default | Meaning |
 |---|---|---|
 | `api_key` | required | The Daytona API key, as an `env:` or `secret:` reference. |
-| target | the organization's default | The Daytona region sandboxes are created in. |
+| `target` | the organization's default | The Daytona region sandboxes are created in. |
 | `snapshot` | unset | A Docker-capable snapshot in your organization to boot instead of the host image. |
 | `base_image` | `"daytonaio/sandbox:0.9.0"` | The Debian or Ubuntu image the host image is built on. Not with `snapshot`. |
 | `egress_hosts` | `[]` | Extra hostnames every restricted sandbox may reach, e.g. `["*.internal.example"]`. |
 
 ## Examples
 
-**A shared deployment.** The key comes from the secret store, and cost is grouped by attribution:
+**A shared deployment.** The key comes from the secret store, sandboxes go to one region, and cost is grouped
+by attribution:
 
 ```toml
 [sandbox]
@@ -99,6 +99,7 @@ attribution   = { team = "env-pod", project_id = "env:PROJECT_ID?unassigned" }
 
 [sandbox.providers.daytona.config]
 api_key = "secret:daytona_api_key"
+target  = "us"
 ```
 
 **A pre-built snapshot.** Boot a Docker-capable snapshot you maintain instead of the built-in host image:
