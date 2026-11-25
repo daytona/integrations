@@ -1,0 +1,27 @@
+packages/claude-toolsets/typescript/examples/support.ts
+  s_c989287c5d5e1d::t_36037d42b108f9 13
+packages/claude-toolsets/typescript/src/computer.ts
+  s_c989287c5d5e1d::t_990c6c1e8db2b9 29-31
+packages/claude-toolsets/typescript/src/sandbox.ts
+  s_c989287c5d5e1d::t_b59612ebd6d3ac 111-112,114-117
+packages/claude-toolsets/typescript/tests/computer.test.ts
+  s_c989287c5d5e1d::t_8b2f02e6cc55a8 1-3,30-43,454-462
+packages/claude-toolsets/typescript/tests/sandbox.test.ts
+  s_c989287c5d5e1d::t_e8c3e83872755f 1-2,78,94-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "24c69c72a6d9f9941e9d16b5045b2a76a86d3b75",
+  "prompts": {},
+  "sessions": {
+    "s_c989287c5d5e1d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_debf13764ffe2WIlVu5eiayXPZ",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
