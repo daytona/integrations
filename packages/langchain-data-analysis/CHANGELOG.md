@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/daytona/integrations/compare/langchain-daytona-data-analysis-v0.2.3...langchain-daytona-data-analysis-v1.0.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **langchain-data-analysis:** requires Python >= 3.10 and the Daytona SDK 2.x v0 namespace (daytona[v0-sdk] >= 2).
+
+### Features
+
+* **langchain-data-analysis:** migrate to Daytona SDK 2.x (v0 namespace) ([#109](https://github.com/daytona/integrations/issues/109)) ([19e390e](https://github.com/daytona/integrations/commit/19e390ed9f9a1323e742f9f825cee1c039064a87))
+
 ## [0.2.3](https://github.com/daytona/integrations/compare/langchain-daytona-data-analysis-v0.2.2...langchain-daytona-data-analysis-v0.2.3) (2026-11-16)
 
 
