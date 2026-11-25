@@ -1,0 +1,19 @@
+.release-please-manifest.json
+  s_62d01af9c41e11::t_7de40a6e1da814 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7f40fabf9e3e2399f314ca9c68506b07b6bf1a00",
+  "prompts": {},
+  "sessions": {
+    "s_62d01af9c41e11": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_dec12e396ffeRHfo8v1teXiEF7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
