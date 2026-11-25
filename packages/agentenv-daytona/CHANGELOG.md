@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/daytona/integrations/compare/agentenv-daytona-v0.1.1...agentenv-daytona-v1.0.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **agentenv-daytona:** the api_url config key was removed (SDK 2.x only targets Daytona Cloud), and the package requires the Daytona SDK 2.x v0 namespace (daytona[v0-sdk] >= 2).
+
+### Features
+
+* **agentenv-daytona:** migrate to Daytona SDK 2.x (v0 namespace) ([#111](https://github.com/daytona/integrations/issues/111)) ([6ebe54e](https://github.com/daytona/integrations/commit/6ebe54e72baa65e2b595e66dae82089c9c57e694))
+
 ## [0.1.1](https://github.com/daytona/integrations/compare/agentenv-daytona-v0.1.0...agentenv-daytona-v0.1.1) (2026-11-17)
 
 
