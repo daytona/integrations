@@ -26,8 +26,9 @@ import type {
   BetaComputerWaitInput,
   BetaComputerZoomInput,
 } from "@anthropic-ai/sdk/resources/beta";
-import { DaytonaError } from "@daytona/sdk/v0";
-import type { Daytona } from "@daytona/sdk";
+// DaytonaError comes from the root on purpose: it also matches errors from a second loaded
+// copy of the SDK (such as the caller's own), which the `/v0` class doesn't.
+import { DaytonaError, type Daytona } from "@daytona/sdk";
 import type { Sandbox } from "@daytona/sdk/v0";
 
 import { XKEYSYMS, desktopKey, parseChord, splitSequence } from "./keys.js";

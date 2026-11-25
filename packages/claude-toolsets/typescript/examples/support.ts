@@ -10,8 +10,7 @@ import { strict as assert } from "node:assert";
 import { pathToFileURL } from "node:url";
 
 import type { BetaToolResultBlockParam } from "@anthropic-ai/sdk/resources/beta";
-import { Daytona } from "@daytona/sdk";
-import { DaytonaError } from "@daytona/sdk/v0";
+import { Daytona, DaytonaError } from "@daytona/sdk";
 import type { Sandbox } from "@daytona/sdk/v0";
 
 /** One block of a `tool_result`, as the model receives it. */
