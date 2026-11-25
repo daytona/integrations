@@ -5,7 +5,7 @@
   "packages/pi-extension": "1.0.0",
   "packages/opencode-plugin": "0.193.0",
   "packages/pydantic-ai-daytona": "1.0.0",
-  "packages/agentenv-daytona": "0.1.1",
+  "packages/agentenv-daytona": "1.0.0",
   "packages/convex": "2.2.0",
   "packages/claude-toolsets/typescript": "2.0.0",
   "packages/claude-toolsets/python": "0.1.1"
