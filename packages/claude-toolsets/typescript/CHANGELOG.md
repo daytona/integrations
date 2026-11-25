@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/daytona/integrations/compare/claude-toolsets-v1.0.0...claude-toolsets-v2.0.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **claude-toolsets-typescript:** requires Node.js >= 22.15.0 and the Daytona SDK 2.x v0 namespace (@daytona/sdk >= 2); a sandbox or daytona client passed in must come from @daytona/sdk 2.x.
+
+### Features
+
+* **claude-toolsets-typescript:** migrate to Daytona SDK 2.x (v0 namespace) ([#113](https://github.com/daytona/integrations/issues/113)) ([efabcf6](https://github.com/daytona/integrations/commit/efabcf6a8d09ad37b8773f23f9ce4c598f5518d0))
+
 ## 1.0.0 (2026-10-08)
 
 
