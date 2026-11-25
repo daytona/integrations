@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/daytona/integrations/compare/opencode-plugin-v0.193.0...opencode-plugin-v1.0.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **opencode-plugin:** requires Node.js >= 22.15.0 and the Daytona SDK 2.x v0 namespace (@daytona/sdk >= 2).
+
+### Features
+
+* **opencode-plugin:** migrate to Daytona SDK 2.x (v0 namespace) ([#115](https://github.com/daytona/integrations/issues/115)) ([e57cf7e](https://github.com/daytona/integrations/commit/e57cf7ec73a419410b6a9b810c07c7053ad6b56c))
+
 ## [0.193.0](https://github.com/daytona/integrations/compare/opencode-plugin-v0.192.1...opencode-plugin-v0.193.0) (2026-09-14)
 
 
