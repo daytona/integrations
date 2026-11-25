@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/daytona/integrations/compare/pydantic-ai-daytona-v0.2.1...pydantic-ai-daytona-v1.0.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **pydantic-ai-daytona:** the api_url option was removed (SDK 2.x only targets Daytona Cloud), and the package requires the Daytona SDK 2.x v0 namespace (daytona[v0-sdk] >= 2).
+
+### Features
+
+* **pydantic-ai-daytona:** migrate to Daytona SDK 2.x (v0 namespace) ([#110](https://github.com/daytona/integrations/issues/110)) ([6353a98](https://github.com/daytona/integrations/commit/6353a98186b3a969fd5d515c538175791050ca3a))
+
 ## [0.2.1](https://github.com/daytona/integrations/compare/pydantic-ai-daytona-v0.2.0...pydantic-ai-daytona-v0.2.1) (2026-10-27)
 
 
