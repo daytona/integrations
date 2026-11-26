@@ -7,6 +7,6 @@
   "packages/pydantic-ai-daytona": "1.0.0",
   "packages/agentenv-daytona": "1.0.0",
   "packages/convex": "2.2.0",
-  "packages/claude-toolsets/typescript": "2.0.0",
+  "packages/claude-toolsets/typescript": "2.0.1",
   "packages/claude-toolsets/python": "1.0.0"
 }
