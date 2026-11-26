@@ -1,0 +1,19 @@
+packages/opencode-plugin/.opencode/plugin/daytona/git/gateway-host-key.ts
+  s_1cf4350472cc66::t_168b889f63d34b 56-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "99a69870a2216bdf6cee291f489b515e460fc1db",
+  "prompts": {},
+  "sessions": {
+    "s_1cf4350472cc66": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_de7053351ffeOfrszogeD8bW2Z",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Mislav Ivanda <mislavivanda454@gmail.com>"
+    }
+  }
+}
