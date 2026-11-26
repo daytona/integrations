@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/daytona/integrations/compare/claude-toolsets-v2.0.0...claude-toolsets-v2.0.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **claude-toolsets-typescript:** match SDK errors and clients from any copy or build ([#146](https://github.com/daytona/integrations/issues/146)) ([5d78d63](https://github.com/daytona/integrations/commit/5d78d63bb3e0da30b5099d3596802b609aa8fdf8))
+
 ## [2.0.0](https://github.com/daytona/integrations/compare/claude-toolsets-v1.0.0...claude-toolsets-v2.0.0) (2026-11-25)
 
 
