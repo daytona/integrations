@@ -53,7 +53,9 @@ export class GatewayHostKeyPin {
 
   constructor(
     private readonly storageDir: string,
-    private readonly apiUrl: string = process.env.DAYTONA_API_URL?.trim() || DEFAULT_API_URL,
+    // The API the SDK creates sandboxes on: SDK 2.x ignores DAYTONA_API_URL and uses Daytona
+    // Cloud, or DAYTONA_V0_API_URL (the SDK's own dev/non-prod override) when that is set.
+    private readonly apiUrl: string = process.env.DAYTONA_V0_API_URL?.trim().replace(/\/+$/, '') || DEFAULT_API_URL,
   ) {}
 
   get pinFile(): string {
