@@ -8,15 +8,14 @@
  * Stores data per-project in ~/.local/share/opencode/storage/daytona/{projectId}.json
  */
 
+// The error classes come from the root on purpose: they also match errors from a second
+// loaded copy of the SDK, which the `/v0` classes don't.
 import {
   Daytona,
-} from '@daytona/sdk'
-import {
+  DaytonaBadRequestError,
   DaytonaNotFoundError,
-  DaytonaValidationError,
-  type CreateSandboxFromSnapshotParams,
-  type Sandbox,
-} from '@daytona/sdk/v0'
+} from '@daytona/sdk'
+import type { CreateSandboxFromSnapshotParams, Sandbox } from '@daytona/sdk/v0'
 import { logger } from './logger'
 import type { GitReturnState, GitReturnStatus, SessionSandboxMap, SandboxInfo, SessionInfo } from './types'
 import { SessionGitManager } from '../git/session-git-manager'
@@ -212,11 +211,12 @@ export class DaytonaSessionManager {
       .create(createParams)
       .catch((err: unknown) => {
         // Only blame the snapshot when the request itself was rejected. The create
-        // params contain nothing but the snapshot name, so a validation error means
+        // params contain nothing but the snapshot name, so a bad-request error means
         // Daytona refused that name (empirically: "Snapshot <name> not found" is a
-        // DaytonaValidationError). Auth, network, quota, and timeout failures are
-        // unrelated to DAYTONA_SNAPSHOT and propagate unattributed, as before.
-        if (this.snapshot && err instanceof DaytonaValidationError) {
+        // DaytonaValidationError, which v0 derives from DaytonaBadRequestError). Auth,
+        // network, quota, and timeout failures are unrelated to DAYTONA_SNAPSHOT and
+        // propagate unattributed, as before.
+        if (this.snapshot && err instanceof DaytonaBadRequestError) {
           logger.error(`Failed to create sandbox from snapshot '${this.snapshot}': ${err}`)
           toast.show({
             title: 'Sandbox error',
