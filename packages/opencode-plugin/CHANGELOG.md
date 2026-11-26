@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/daytona/integrations/compare/opencode-plugin-v1.0.1...opencode-plugin-v1.0.2) (2026-11-26)
+
+
+### Bug Fixes
+
+* **opencode-plugin:** look up the SSH gateway on the API the SDK uses ([#150](https://github.com/daytona/integrations/issues/150)) ([3bb7319](https://github.com/daytona/integrations/commit/3bb73198949b2b9dd6bcb873d34950bcd4bd217e))
+
 ## [1.0.1](https://github.com/daytona/integrations/compare/opencode-plugin-v1.0.0...opencode-plugin-v1.0.1) (2026-11-26)
 
 
