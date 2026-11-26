@@ -108,11 +108,13 @@ export class SandboxLease<TSandbox extends SandboxTarget = SandboxTarget> {
     const params = withDefaults(options.createParams, options.defaultEnv ?? DEFAULT_ENV);
     const timeout = options.createTimeout ?? 120;
     const client = options.daytona;
+    // Recognize a Daytona client by its v0 namespace, not `instanceof Daytona`: a client from the
+    // SDK's CommonJS build or from another copy of the SDK is a different class.
     const created =
-      client instanceof Daytona
-        ? await createWithDaytona(client, params, timeout)
-        : client === undefined
-          ? await createWithDaytona(new Daytona(), params, timeout)
+      client === undefined
+        ? await createWithDaytona(new Daytona(), params, timeout)
+        : "v0" in client
+          ? await createWithDaytona(client, params, timeout)
           : await client.create(params, { timeout });
     return new SandboxLease(created, true, onClose);
   }

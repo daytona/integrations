@@ -1,3 +1,6 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+
 import { ToolsetClosedError, ToolsetConfigError } from "@anthropic-ai/sdk/helpers/beta/toolsets";
 import { DaytonaError } from "@daytona/sdk/v0";
 import pngjs from "pngjs";
@@ -23,6 +26,20 @@ const pngHeader = (width: number, height: number): string => {
 };
 
 const approve = async (): Promise<boolean> => true;
+
+/** A second copy of `@daytona/sdk/v0`, as loaded by a separate install of the SDK (such as the caller's own). */
+const loadSecondSdkCopy = (): typeof import("@daytona/sdk/v0") => {
+  const require = createRequire(import.meta.url);
+  const dir = path.dirname(require.resolve("@daytona/sdk/v0")) + path.sep;
+  const loaded = Object.entries(require.cache).filter(([key]) => key.startsWith(dir));
+  for (const [key] of loaded) delete require.cache[key];
+  try {
+    return require("@daytona/sdk/v0") as typeof import("@daytona/sdk/v0");
+  } finally {
+    for (const key of Object.keys(require.cache)) if (key.startsWith(dir)) delete require.cache[key];
+    for (const [key, module] of loaded) require.cache[key] = module;
+  }
+};
 
 const computer = async (mock = mockSandbox(), options: { readonly maxScreenshotSize?: readonly [number, number]; readonly settleDelay?: number } = {}) => ({
   mock,
@@ -432,6 +449,15 @@ describe("DaytonaComputer capability probe", () => {
     await callMember(toolset, "left_click", { coordinate: [3, 4] });
     await callMember(toolset, "double_click", { coordinate: [5, 6] });
     expect(mock.raw.computerUse.mouse.click.mock.calls).toEqual([[3, 4, "left", false, 1, []], [5, 6, "left", true, 2, []]]);
+    await toolset.close();
+  });
+
+  it("treats a 404 from a second loaded copy of the SDK as unsupported", async () => {
+    const { mock, toolset } = await computer();
+    const secondCopy = loadSecondSdkCopy();
+    expect(secondCopy.DaytonaError).not.toBe(DaytonaError);
+    mock.raw.computerUse.mouse.down.mockRejectedValue(new secondCopy.DaytonaError("missing", 404));
+    expect(resultText(await callMember(toolset, "triple_click", { coordinate: [3, 4] }))).toBe(NATIVE_INPUT_FLOOR_ERROR);
     await toolset.close();
   });
 });

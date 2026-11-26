@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 import { Daytona } from "@daytona/sdk";
 import type { Sandbox } from "@daytona/sdk/v0";
 import { describe, expect, it, vi } from "vitest";
@@ -73,7 +75,7 @@ describe("sandbox lease", () => {
     ["snapshot", { snapshot: "default" }],
     ["image", { image: "debian:12.9" }],
   ])("passes %s create params and the timeout through a real Daytona client", async (_shape, createParams) => {
-    // Given: a Daytona client whose create is observed (this is the `instanceof Daytona` path).
+    // Given: a Daytona client whose create is observed.
     const sandbox = fakeSandbox();
     const daytona = new Daytona({ apiKey: "dtn_test" });
     const create = vi.fn(async () => sandbox as unknown as Sandbox);
@@ -87,6 +89,22 @@ describe("sandbox lease", () => {
       { ...createParams, envVars: DEFAULT_ENV, labels: LABELS },
       { timeout: 45 },
     );
+  });
+
+  it("creates through a Daytona client from the SDK's CommonJS build", async () => {
+    // Given: a client from `require("@daytona/sdk")`, a different class from the ESM build this package imports.
+    const { Daytona: CommonJsDaytona } = createRequire(import.meta.url)("@daytona/sdk") as typeof import("@daytona/sdk");
+    expect(CommonJsDaytona).not.toBe(Daytona);
+    const sandbox = fakeSandbox();
+    const daytona = new CommonJsDaytona({ apiKey: "dtn_test" });
+    const create = vi.fn(async () => sandbox as unknown as Sandbox);
+    daytona.v0.create = create as unknown as Daytona["v0"]["create"];
+
+    // When: an owned lease is acquired with that client.
+    await SandboxLease.acquire(undefined, { daytona, createTimeout: 45 });
+
+    // Then: the sandbox is created through its v0 namespace.
+    expect(create).toHaveBeenCalledWith({ envVars: DEFAULT_ENV, labels: LABELS }, { timeout: 45 });
   });
 
   it("stops an owned sandbox when requested", async () => {
