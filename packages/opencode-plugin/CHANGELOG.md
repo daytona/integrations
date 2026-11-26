@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/daytona/integrations/compare/opencode-plugin-v1.0.0...opencode-plugin-v1.0.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **opencode-plugin:** match errors from any loaded copy of the SDK ([#147](https://github.com/daytona/integrations/issues/147)) ([7336c4c](https://github.com/daytona/integrations/commit/7336c4c606e52542f38f96c285d102670b9b8b93))
+
 ## [1.0.0](https://github.com/daytona/integrations/compare/opencode-plugin-v0.193.0...opencode-plugin-v1.0.0) (2026-11-25)
 
 
