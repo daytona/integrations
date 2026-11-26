@@ -7,7 +7,10 @@ import {
   createTool,
   anthropic,
 } from "@inngest/agent-kit";
-import { CodeRunParams, DaytonaError } from "@daytona/sdk/v0";
+// DaytonaError comes from the root on purpose: it also matches errors from a second loaded
+// copy of the SDK, which the `/v0` class doesn't.
+import { DaytonaError } from "@daytona/sdk";
+import { CodeRunParams } from "@daytona/sdk/v0";
 import { getSandbox, extractTextMessageContent, logDebug } from "./utils.js";
 import type { FileUpload } from "@daytona/sdk/v0";
 import { Buffer } from "buffer";
